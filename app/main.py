@@ -304,6 +304,21 @@ async def list_scripts():
             "url": "https://cloud.cropin.in/services/farm/api/assets/bulk",
             "label": "Base Api Url",
             "requires_input": True
+        },
+        "Update_DOS_Variety_to_CA.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
+            "label": "Base Api Url",
+            "requires_input": True
+        },
+        "Farmer_Refresh_EditandSave.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/farmers",
+            "label": "Base Api Url",
+            "requires_input": True
+        },
+        "Asset_Refresh_EditandSave.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/assets",
+            "label": "Base Api Url",
+            "requires_input": True
         }
     }
     
