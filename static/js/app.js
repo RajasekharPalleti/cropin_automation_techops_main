@@ -211,6 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // Toggle Update DOS Config
+            const dosConfig = document.getElementById('update-dos-config');
+            if (dosConfig) {
+                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py') {
+                    dosConfig.style.display = 'block';
+                } else {
+                    dosConfig.style.display = 'none';
+                }
+            }
+
             // Logic for Attribute Count Dropdown
             const attrCountSelect = document.getElementById('attr-count-select');
             if (attrCountSelect) {
@@ -826,7 +836,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 use_farmer_id: useFarmerId,
                 attr_keys: attrKeys,
                 unit: areaUnit,
-                force_crop_audited: forceCropAuditedVal
+                force_crop_audited: forceCropAuditedVal,
+                delay_time: document.getElementById('delay-time-input') ? document.getElementById('delay-time-input').value : 1
             };
 
             const formData = new FormData();

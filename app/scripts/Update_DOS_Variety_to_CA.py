@@ -58,10 +58,17 @@ def run(input_excel, output_excel, config, log_callback=None):
         log("❌ No token provided in configuration.")
         return
 
+    args_delay = config.get("delay_time", 1) 
+    try:
+        delay_time = float(args_delay)
+    except:
+        delay_time = 1
+
     api_url = config.get("url")
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/croppable-areas" # Default
         log(f"Using default CA API URL: {api_url}")
+
     
     api_url = api_url.rstrip('/')
 
@@ -152,11 +159,12 @@ def run(input_excel, output_excel, config, log_callback=None):
             # Since I want to be safe, I will add logic to update `varietyUid` IF `variety_id` is present.
             
             CA_data["sowingDate"] = sowingDate
-            CA_data["varietyUid"] = str(variety_id) # Assigning variety ID
-            
-            # print(f"🌱 Updated sowingDate: {sowingDate}")
+            log(f"🌱 Updated sowingDate: {sowingDate}")
 
-            time.sleep(1)
+            CA_data["varietyId"] = variety_id 
+            log(f"🌱 Updated varietyId: {variety_id}")
+
+            time.sleep(delay_time)
 
             # -----------------------
             # PUT update CA
@@ -183,7 +191,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             df.at[index, "Status"] = f"Error: {str(e)}"
             log(f"❌ Error processing row {index+1}: {e}")
 
-        time.sleep(1)
+        time.sleep(delay_time)
 
     # Save output
     try:
