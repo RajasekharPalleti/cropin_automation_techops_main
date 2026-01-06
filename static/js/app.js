@@ -340,6 +340,32 @@ document.addEventListener('DOMContentLoaded', () => {
         dropdownSelected.classList.remove('active');
     }
 
+    // --- Screen Wake Lock ---
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Wake Lock active');
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock released');
+                });
+            } catch (err) {
+                console.error('Wake Lock failed:', err);
+            }
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock) {
+            wakeLock.release()
+                .then(() => {
+                    wakeLock = null;
+                });
+        }
+    }
+
     // Auto-open Config on Script Selection (Existing logic listens to scriptSelect change)
     scriptSelect.addEventListener('change', () => {
         configContent.classList.add('open');
@@ -451,6 +477,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirm("Are you sure you want to stop the running process?")) {
             stopBtn.disabled = true;
             stopBtn.textContent = 'Stopping...';
+            // Stop Wake Lock
+            releaseWakeLock();
+
             fetch('/api/stop/' + clientId, { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
@@ -488,69 +517,102 @@ document.addEventListener('DOMContentLoaded', () => {
             if (onOpen) onOpen();
         };
 
-        evtSource.onmessage = (event) => {
-            // Check for Special Events
-            if (event.data.startsWith('JOB_COMPLETED::')) {
-                const filename = event.data.split('::')[1];
+        // Buffer for batching logs
+        const logBuffer = [];
+        let isRenderPending = false;
 
-                const finishLine = document.createElement('div');
-                finishLine.className = 'console-line';
-                finishLine.style.color = '#00ff00';
-                finishLine.textContent = '> Execution Finished. Downloading ' + filename + '...';
-                consoleContent.appendChild(finishLine);
-                consoleContent.scrollTop = consoleContent.scrollHeight;
+        function flushLogs() {
+            if (logBuffer.length === 0) {
+                isRenderPending = false;
+                return;
+            }
 
-                localStorage.setItem('is_script_running', 'false');
+            const fragment = document.createDocumentFragment();
+            // Process up to 100 messages at a time to stay responsive
+            const batch = logBuffer.splice(0, 100);
 
-                // Trigger Download
-                window.location.href = '/api/download/' + filename;
+            batch.forEach(msgData => {
+                // Check for Special Events inside the batch processing
+                if (msgData.startsWith('JOB_COMPLETED::')) {
+                    const filename = msgData.split('::')[1];
+                    const finishLine = document.createElement('div');
+                    finishLine.className = 'console-line';
+                    finishLine.style.color = '#00ff00';
+                    finishLine.textContent = '> Execution Finished. Downloading ' + filename + '...';
+                    fragment.appendChild(finishLine);
 
-                statusArea.innerHTML = '<div style="color: green;">Success! Check downloads.</div>';
-                runBtn.disabled = false;
-                runBtn.innerHTML = '▶ Run Script';
-                stopBtn.style.display = 'none'; // Hide Stop
+                    localStorage.setItem('is_script_running', 'false');
 
-                // Close SSE
-                if (evtSource) {
-                    evtSource.close();
-                    evtSource = null;
+                    // Stop Wake Lock
+                    releaseWakeLock();
+
+                    // Trigger Download logic (defer to next tick to avoid blocking fragment append)
+                    setTimeout(() => {
+                        window.location.href = '/api/download/' + filename;
+                        statusArea.innerHTML = '<div style="color: green;">Success! Check downloads.</div>';
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = '▶ Run Script';
+                        stopBtn.style.display = 'none';
+                        if (evtSource) { evtSource.close(); evtSource = null; }
+
+                        const closeLine = document.createElement('div');
+                        closeLine.className = 'console-line';
+                        closeLine.style.color = 'green';
+                        closeLine.textContent = '> Connection closed. Job Done.';
+                        consoleContent.appendChild(closeLine);
+                        consoleContent.scrollTop = consoleContent.scrollHeight;
+                    }, 0);
+                    return;
                 }
-                const closeLine = document.createElement('div');
-                closeLine.className = 'console-line';
-                closeLine.style.color = 'green';
-                closeLine.textContent = '> Connection closed. Job Done.';
-                consoleContent.appendChild(closeLine);
-                return;
+
+                if (msgData.startsWith('JOB_FAILED::')) {
+                    const errorMsg = msgData.split('::')[1];
+                    const errLine = document.createElement('div');
+                    errLine.className = 'console-line';
+                    errLine.style.color = '#ff4444';
+                    errLine.textContent = '> ERROR: ' + errorMsg;
+                    fragment.appendChild(errLine);
+
+                    // Stop Wake Lock
+                    releaseWakeLock();
+
+                    setTimeout(() => {
+                        statusArea.innerHTML = '<div style="color: red;">Execution Failed</div>';
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = '▶ Run Script';
+                        stopBtn.style.display = 'none';
+                        localStorage.setItem('is_script_running', 'false');
+                    }, 0);
+                    return;
+                }
+
+                // Normal Log
+                const logLine = document.createElement('div');
+                logLine.className = 'console-line';
+                logLine.textContent = '> ' + msgData;
+                fragment.appendChild(logLine);
+            });
+
+            consoleContent.appendChild(fragment);
+            consoleContent.scrollTop = consoleContent.scrollHeight;
+
+            if (logBuffer.length > 0) {
+                requestAnimationFrame(flushLogs);
+            } else {
+                isRenderPending = false;
             }
+        }
 
-            if (event.data.startsWith('JOB_FAILED::')) {
-                const errorMsg = event.data.split('::')[1];
-                const errLine = document.createElement('div');
-                errLine.className = 'console-line';
-                errLine.style.color = '#ff4444';
-                errLine.textContent = '> ERROR: ' + errorMsg;
-                consoleContent.appendChild(errLine);
-                consoleContent.scrollTop = consoleContent.scrollHeight;
-
-                statusArea.innerHTML = '<div style="color: red;">Execution Failed</div>';
-                runBtn.disabled = false;
-                runBtn.innerHTML = '▶ Run Script';
-                stopBtn.style.display = 'none'; // Hide Stop
-                localStorage.setItem('is_script_running', 'false');
-                return;
+        evtSource.onmessage = (event) => {
+            logBuffer.push(event.data);
+            if (!isRenderPending) {
+                isRenderPending = true;
+                requestAnimationFrame(flushLogs);
             }
-
-            // Normal Log
-            const logLine = document.createElement('div');
-            logLine.className = 'console-line';
-            logLine.textContent = '> ' + event.data;
-            consoleContent.appendChild(logLine);
-            consoleContent.scrollTop = consoleContent.scrollHeight; // Auto-scroll
         };
 
         evtSource.onerror = (err) => {
             console.error("SSE Error:", err);
-            // Don't close immediately, it might reconnect.
         };
     }
 
@@ -581,6 +643,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     resumeLine.textContent = '> The session is running, please wait until finished or stop the process to proceed.';
                     consoleContent.appendChild(resumeLine);
                     connectSSE();
+
+                    // Resume Wake Lock
+                    requestWakeLock();
 
                     // Add Reset Button
                     addResetButton();
@@ -623,6 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (confirm("Are you sure you want to force reset the session? Any running task logs will be disconnected.")) {
                 localStorage.setItem('is_script_running', 'false');
                 localStorage.removeItem('running_script_name');
+                releaseWakeLock(); // Release lock on force reset
                 location.reload();
             }
         });
@@ -705,6 +771,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Persist State
         localStorage.setItem('is_script_running', 'true');
         localStorage.setItem('running_script_name', scriptSelect.value);
+
+        // Start Wake Lock
+        requestWakeLock();
 
         // HARD RESET: Close existing connection if any
         if (evtSource) {
