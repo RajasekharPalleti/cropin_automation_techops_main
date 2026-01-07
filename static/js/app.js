@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle Update DOS Config
             const dosConfig = document.getElementById('update-dos-config');
             if (dosConfig) {
-                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py') {
+                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py') {
                     dosConfig.style.display = 'block';
                 } else {
                     dosConfig.style.display = 'none';

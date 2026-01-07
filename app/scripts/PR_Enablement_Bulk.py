@@ -78,6 +78,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # BATCH PROCESSING
     # =========================
     for start in range(0, len(df), BATCH_SIZE):
+        time_delay = config.get("time_delay", 5)
         end = start + BATCH_SIZE
         batch_df = df.iloc[start:end]
 
@@ -163,7 +164,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[idx, "srPlotid"] = "N/A"
         
         # User script had specific sleep
-        time.sleep(5)  
+        time.sleep(time_delay) 
+        log(f"waiting for {time_delay} seconds") 
 
     # =========================
     # SAVE EXCEL
