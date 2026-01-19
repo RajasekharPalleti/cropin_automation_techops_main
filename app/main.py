@@ -181,6 +181,11 @@ async def list_scripts():
             "label": "Base Api Url",
             "requires_input": True
         },
+        "Update_Farmer_Number_Data.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/farmers",
+            "label": "Base Api Url",
+            "requires_input": True
+        },
         "Update_Asset_Details.py": {
             "url": "https://cloud.cropin.in/services/farm/api/assets",
             "label": "Base Api Url",

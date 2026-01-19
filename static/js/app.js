@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle Asset Attribute Config
             const attributeConfig = document.getElementById('attribute-config');
             if (attributeConfig) {
-                if (selectedScript.name === 'Update_Asset_Additional_Attribute.py' || selectedScript.name === 'Update_Farmer_Additional_Attribute.py' || selectedScript.name === 'Update_Farmer_Details.py' || selectedScript.name === 'Update_Asset_Details.py') {
+                if (selectedScript.name === 'Update_Asset_Additional_Attribute.py' || selectedScript.name === 'Update_Farmer_Additional_Attribute.py' || selectedScript.name === 'Update_Farmer_Details.py' || selectedScript.name === 'Update_Asset_Details.py' || selectedScript.name === 'Update_Farmer_Number_Data.py') {
                     attributeConfig.style.display = 'block';
                 } else {
                     attributeConfig.style.display = 'none';
@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         closeLine.style.color = 'green';
                         closeLine.textContent = '> Connection closed. Job Done.';
                         consoleContent.appendChild(closeLine);
-                        consoleContent.scrollTop = consoleContent.scrollHeight;
+                        consoleBox.scrollTop = consoleBox.scrollHeight;
                     }, 0);
                     return;
                 }
@@ -593,8 +593,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 fragment.appendChild(logLine);
             });
 
+            // Smart Auto-Scroll: Check BEFORE appending
+            const isNearBottom = consoleBox.scrollHeight - consoleBox.scrollTop - consoleBox.clientHeight < 150;
+
             consoleContent.appendChild(fragment);
-            consoleContent.scrollTop = consoleContent.scrollHeight;
+
+            if (isNearBottom) {
+                consoleBox.scrollTop = consoleBox.scrollHeight;
+            }
 
             if (logBuffer.length > 0) {
                 requestAnimationFrame(flushLogs);

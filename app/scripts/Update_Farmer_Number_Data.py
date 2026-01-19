@@ -1,5 +1,5 @@
 """
-Updates farmer details (e.g., firstName, farmerCode, email etc..) based on configured keys.
+Updates farmer details inside the 'data' object (e.g., countryIsoCode, countryCode, mobileNumber) based on configured keys.
 
 Inputs:
 Excel file with 'farmer_id'.
@@ -10,7 +10,6 @@ import pandas as pd
 import requests
 import json
 import time
-
 from concurrent.futures import ThreadPoolExecutor
 
 def run(input_excel_file, output_excel_file, config, log_callback=None):
@@ -33,7 +32,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     api_url = api_url.rstrip('/')
 
     # Attribute Keys (Dynamic)
-    # Reusing 'attr_keys' from config which is populated by the generic attribute UI
     attr_keys = config.get("attr_keys", [])
     valid_keys_map = {} # {index: key_name}
     for i, key in enumerate(attr_keys):
@@ -41,7 +39,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             valid_keys_map[i] = key.strip()
 
     if not valid_keys_map:
-        log("⚠️ No Keys configured! Please enter at least one field key (e.g., firstName) in the UI.")
+        log("⚠️ No Keys configured! Please enter at least one field key (e.g., mobileNumber) in the UI.")
 
     log(f"📘 Loading Excel file: {input_excel_file}")
     
@@ -49,22 +47,20 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         df = pd.read_excel(input_excel_file)
         # remove unnamed columns
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+        df.columns = df.columns.str.strip()
     except Exception as e:
         log(f"❌ Error reading Excel file: {e}")
         return
 
     # Check for farmer_id
     id_col = 'farmer_id'
-    if id_col not in df.columns:
-        # Try finding case-insensitive or 'farmerID'
-        possible = [c for c in df.columns if c.lower().replace('_','') in ['farmerid', 'farmer_id', 'id']]
-        if possible:
-             id_col = possible[0]
-             log(f"ℹ️ Found ID column: {id_col}")
-        else:
-             # Fallback to col 0
-             id_col = df.columns[0]
-             log(f"⚠️ 'farmer_id' column not found. Using first column: {id_col}")
+    possible_ids = [c for c in df.columns if c.lower().replace('_','') in ['farmerid', 'farmer_id', 'id', 'externalid']]
+    if possible_ids:
+        id_col = possible_ids[0]
+        log(f"ℹ️ Found ID column: {id_col}")
+    else:
+        id_col = df.columns[0]
+        log(f"⚠️ 'farmer_id' column not found. Using first column: {id_col}")
 
     # Ensure Status columns exist
     if "Status" not in df.columns:
@@ -77,7 +73,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunk1 = df.iloc[:mid_index].copy()
     chunk2 = df.iloc[mid_index:].copy()
 
-    log(f"🔄 Starting processing {len(df)} farmers with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
+    log(f"🔄 Starting processing {len(df)} farmers with 2 threads. Updating Keys in 'data': {list(valid_keys_map.values())}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
@@ -103,27 +99,30 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                 updates_made = False
 
+                # Ensure 'data' object exists
+                if 'data' not in farmer_data or farmer_data['data'] is None:
+                    farmer_data['data'] = {}
+
                 # Dynamic Update Logic
                 for key_idx, key_name in valid_keys_map.items():
-                    # Map config key index 0 -> value_1, index 1 -> value_2...
                     col_name = f"value_{key_idx + 1}"
                     
                     if col_name in df.columns:
                         new_value = row[col_name]
                         if pd.isna(new_value):
-                            new_value = "" # or None? Empty string for text fields usually safe.
-                        else:
-                            new_value = str(new_value).strip()
+                            continue # Skip if empty in excel
                         
-                        # Compare with existing
-                        current_value = farmer_data.get(key_name)
+                        new_value_str = str(new_value).strip()
+                        
+                        # Compare with existing in 'data'
+                        current_value = farmer_data['data'].get(key_name)
                         if current_value is None: current_value = ""
                         
-                        if str(current_value).strip() != new_value:
-                            farmer_data[key_name] = new_value
+                        if str(current_value).strip() != new_value_str:
+                            farmer_data['data'][key_name] = new_value_str
                             updates_made = True
                     else:
-                        # Column not found for this key
+                        # Optional: warn specific column missing?
                         pass
 
                 if not updates_made:
@@ -131,7 +130,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                      results.append((index, "Skipped: No changes", ""))
                      continue
                 
-                # PUT - Use Multipart/DTO as requested
+                # PUT
                 time.sleep(0.2)
                 
                 multipart_data = {
@@ -140,16 +139,20 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 
                 put_resp = requests.put(api_url, headers=headers, files=multipart_data)
                 
-                put_resp.raise_for_status()
-
-                status = "Success"
-                response_str = put_resp.text[:300]
-                log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
+                try:
+                    put_resp.raise_for_status()
+                    status = "Success"
+                    response_str = put_resp.text[:300]
+                    log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
+                except requests.exceptions.HTTPError as err:
+                     status = f"Failed: {put_resp.status_code}"
+                     response_str = put_resp.text
+                     log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {response_str}")
 
             except Exception as e:
                 status = f"Failed: {str(e)}"
                 response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}")
+                log(f"[Thread {thread_id}] ❌ Exception: {farmer_id} - {e}")
 
             time.sleep(0.2)
             results.append((index, status, response_str))
