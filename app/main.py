@@ -334,6 +334,20 @@ async def list_scripts():
             "url": "https://cloud.cropin.in/services/farm/api/assets",
             "label": "Base Api Url",
             "requires_input": True
+        },
+        "Delete_Farmer_Tags.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/farmers",
+            "label": "Base Api Url",
+            "url2": "https://cloud.cropin.in/services/master/api/filter?type=FARMER&size=10000",
+            "label2": "Tag Filter API Url",
+            "requires_input": True
+        },
+        "Delete_Asset_Tags.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/assets",
+            "label": "Base Api Url",
+            "url2": "https://cloud.cropin.in/services/master/api/filter?type=ASSET&size=10000",
+            "label2": "Tag Filter API Url",
+            "requires_input": True
         }
     }
     
