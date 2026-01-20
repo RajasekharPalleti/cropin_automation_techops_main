@@ -203,7 +203,7 @@ async def list_scripts():
         },
         "RefreshPlans.py": {
             "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
-            "label": "Base Api Url (Fixed in Script)",
+            "label": "Base Api Url",
             "requires_input": True
         },
         "Update_Asset_Additional_Attribute.py": {
