@@ -43,10 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
     eyeIcon.addEventListener('click', () => {
         if (passIn.type === 'password') {
             passIn.type = 'text';
-            eyeIcon.textContent = '🙈'; // Monkey covering eyes (hidden) or just a slash eye
+            eyeIcon.textContent = 'visibility'; // Material icon name
         } else {
             passIn.type = 'password';
-            eyeIcon.textContent = '👁️';
+            eyeIcon.textContent = 'visibility_off'; // Material icon name
         }
     });
 
@@ -211,25 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Toggle Update DOS Config
-            const dosConfig = document.getElementById('update-dos-config');
-            if (dosConfig) {
+            // Toggle time Config
+            const timeConfig = document.getElementById('time-delay-config');
+            if (timeConfig) {
                 if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py' || selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py') {
-                    dosConfig.style.display = 'block';
+                    timeConfig.style.display = 'block';
                 } else {
-                    dosConfig.style.display = 'none';
+                    timeConfig.style.display = 'none';
                 }
             }
 
-            // Toggle Threading Config
-            const threadingConfig = document.getElementById('threading-config');
-            if (threadingConfig) {
-                if (selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py') {
-                    threadingConfig.style.display = 'block';
-                } else {
-                    threadingConfig.style.display = 'none';
-                }
-            }
 
             // Logic for Attribute Count Dropdown
             const attrCountSelect = document.getElementById('attr-count-select');
