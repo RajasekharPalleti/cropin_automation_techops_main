@@ -214,10 +214,20 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle Update DOS Config
             const dosConfig = document.getElementById('update-dos-config');
             if (dosConfig) {
-                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py') {
+                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py' || selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py') {
                     dosConfig.style.display = 'block';
                 } else {
                     dosConfig.style.display = 'none';
+                }
+            }
+
+            // Toggle Threading Config
+            const threadingConfig = document.getElementById('threading-config');
+            if (threadingConfig) {
+                if (selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py') {
+                    threadingConfig.style.display = 'block';
+                } else {
+                    threadingConfig.style.display = 'none';
                 }
             }
 
@@ -912,7 +922,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 attr_keys: attrKeys,
                 unit: areaUnit,
                 force_crop_audited: forceCropAuditedVal,
-                delay_time: document.getElementById('delay-time-input') ? document.getElementById('delay-time-input').value : 1
+                unit: areaUnit,
+                force_crop_audited: forceCropAuditedVal,
+                delay_time: document.getElementById('delay-time-input') ? document.getElementById('delay-time-input').value : 1,
+                worker_count: document.getElementById('worker-count') ? parseInt(document.getElementById('worker-count').value) : 1
             };
 
             const formData = new FormData();

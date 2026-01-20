@@ -212,7 +212,21 @@
                         <div id="update-dos-config" style="display: none;">
                             <div class="input-group">
                                 <label for="delay-time-input">Delay Time (seconds)</label>
-                                <input type="number" id="delay-time-input" placeholder="e.g. 1" value="1" step="0.1" min="0">
+                                <input type="number" id="delay-time-input" placeholder="e.g. 1" value="1" step="0.1"
+                                    min="0">
+                            </div>
+                        </div>
+
+                        <!-- Threading Config for Geotag Script -->
+                        <div id="threading-config" style="display: none;">
+                            <div class="input-group">
+                                <label for="worker-count">Worker Count</label>
+                                <select id="worker-count">
+                                    <option value="1">1</option>
+                                    <option value="2" selected>2</option>
+                                    <option value="4">4</option>
+                                    <option value="8">8</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -318,7 +332,7 @@
 
         </div>
     </div>
-    <script src="/static/js/app.js?v=2"></script>
+    <script src="/static/js/app.js?v=5"></script>
 </body>
 
 </html>

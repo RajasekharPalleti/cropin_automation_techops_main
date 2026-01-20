@@ -348,6 +348,11 @@ async def list_scripts():
             "url2": "https://cloud.cropin.in/services/master/api/filter?type=ASSET&size=10000",
             "label2": "Tag Filter API Url",
             "requires_input": True
+        },
+        "Add_Geotag_or_Update_Lat_Long_to_CA.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
+            "label": "Base Api Url",
+            "requires_input": True
         }
     }
     
