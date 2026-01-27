@@ -353,6 +353,16 @@ async def list_scripts():
             "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
             "label": "Base Api Url",
             "requires_input": True
+        },
+        "Add_Subcompany_Permissons_To_Variety.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/varieties",
+            "label": "Variety API URL",
+            "requires_input": True
+        },
+        "Remove_Variety_Data.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/varieties",
+            "label": "Variety API URL",
+            "requires_input": True
         }
     }
     

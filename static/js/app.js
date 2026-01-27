@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle time Config
             const timeConfig = document.getElementById('time-delay-config');
             if (timeConfig) {
-                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py' || selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py') {
+                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py' || selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py' || selectedScript.name === 'Add_Subcompany_Permissons_To_Variety.py') {
                     timeConfig.style.display = 'block';
                 } else {
                     timeConfig.style.display = 'none';
@@ -231,6 +231,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('group-key-2').style.display = count >= 2 ? 'block' : 'none';
                     document.getElementById('group-key-3').style.display = count >= 3 ? 'block' : 'none';
                     document.getElementById('group-key-4').style.display = count >= 4 ? 'block' : 'none';
+                });
+            }
+
+
+            // Toggle Variety Removal Config
+            const removalConfig = document.getElementById('variety-removal-config');
+            if (removalConfig) {
+                if (selectedScript.name === 'Remove_Variety_Data.py') {
+                    removalConfig.style.display = 'block';
+                } else {
+                    removalConfig.style.display = 'none';
+                }
+            }
+
+            // Logic for Variety Removal Count Dropdown
+            const removalCountSelect = document.getElementById('removal-count-select');
+            if (removalCountSelect) {
+                removalCountSelect.addEventListener('change', function () {
+                    const count = parseInt(this.value);
+                    document.getElementById('group-remove-1').style.display = 'block';
+                    document.getElementById('group-remove-2').style.display = count >= 2 ? 'block' : 'none';
+                    document.getElementById('group-remove-3').style.display = count >= 3 ? 'block' : 'none';
+                    document.getElementById('group-remove-4').style.display = count >= 4 ? 'block' : 'none';
                 });
             }
 
@@ -916,7 +939,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 unit: areaUnit,
                 force_crop_audited: forceCropAuditedVal,
                 delay_time: document.getElementById('delay-time-input') ? document.getElementById('delay-time-input').value : 1,
-                worker_count: document.getElementById('worker-count') ? parseInt(document.getElementById('worker-count').value) : 1
+                worker_count: document.getElementById('worker-count') ? parseInt(document.getElementById('worker-count').value) : 1,
+                fields_to_remove: attrKeys // Re-using attrKeys variable which we populated above, or we could add a new key to config object
             };
 
             const formData = new FormData();

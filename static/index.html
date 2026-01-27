@@ -208,6 +208,39 @@
                             </div>
                         </div>
 
+                        <!-- Specific Config for Remove_Variety_Data -->
+                        <div id="variety-removal-config" style="display: none;">
+                            <div class="input-group">
+                                <label for="removal-count-select">Number of Fields to Remove</label>
+                                <select id="removal-count-select">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                </select>
+                            </div>
+
+                            <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Enter Variety JSON keys, refer
+                                to script details section for more info.</p>
+
+                            <div class="input-group" id="group-remove-1">
+                                <label for="remove-key-1">Variety Data Key 1</label>
+                                <input type="text" id="remove-key-1" placeholder="e.g. cropStages">
+                            </div>
+                            <div class="input-group" id="group-remove-2" style="display:none;">
+                                <label for="remove-key-2">Variety Data Key 2</label>
+                                <input type="text" id="remove-key-2" placeholder="e.g. seedGrades">
+                            </div>
+                            <div class="input-group" id="group-remove-3" style="display:none;">
+                                <label for="remove-key-3">Variety Data Key 3</label>
+                                <input type="text" id="remove-key-3" placeholder="e.g. harvestGrades">
+                            </div>
+                            <div class="input-group" id="group-remove-4" style="display:none;">
+                                <label for="remove-key-4">Variety Data Key 4</label>
+                                <input type="text" id="remove-key-4" placeholder="e.g. subCompanyIds">
+                            </div>
+                        </div>
+
                         <!-- Specific Config for Time_delay_in_API_Call -->
                         <div id="time-delay-config" style="display: none;">
                             <div class="input-group">

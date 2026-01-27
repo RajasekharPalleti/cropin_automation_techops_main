@@ -11,6 +11,7 @@ Follow these steps strictly whenever adding a new script:
     - Adapt hardcoded values to be configurable.
     - Add default URL if the url is not from configuration.
     - Add log_callback as other scripts.
+    - Add Author details as Rajasekhar Palleti
     - **Add Docstring**: Ensure the script has a structured docstring at the top of the file:
       ```python
       """
