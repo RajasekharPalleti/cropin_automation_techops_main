@@ -14,7 +14,7 @@ else
 fi
 sleep 2
 echo "Starting Server..."
-echo "Open http://127.0.0.1:4444 in your browser."
+echo "Open http://localhost:4444 or http://<your-ip>:4444 in your browser."
 python3 -m app.main
 read -p "Press any key to close..."
 exit 0
@@ -24,6 +24,6 @@ echo Restarting Cropin Automation Server...
 for /f "tokens=5" %%a in ('netstat -aon ^| find ":4444" ^| find "LISTENING"') do taskkill /f /pid %%a
 timeout /t 2 >nul
 echo Starting Server...
-echo Open http://127.0.0.1:4444 in your browser.
+echo Open http://localhost:4444 or http://<your-ip>:4444 in your browser.
 python -m app.main
 pause
