@@ -568,7 +568,8 @@ body {
 
 /* Run Controls - Flex Layout */
 .run-controls {
-    display: none; /* Toggled by JS to flex */
+    display: none;
+    /* Toggled by JS to flex */
     margin-top: 20px;
     gap: 10px;
     align-items: center;
@@ -587,6 +588,174 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive Design Media Queries */
+
+
+
+/* Mobile Devices */
+/* Mobile & Tablet Devices (Unified Drawer Layout) */
+@media (max-width: 1024px) {
+    body {
+        flex-direction: column;
+        height: auto;
+        overflow-y: auto;
+        /* Allow body scroll */
+    }
+
+    .container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    /* Sidebar becomes a drawer or stacked */
+    .sidebar {
+        position: fixed !important;
+        width: 280px;
+        height: 100vh;
+        left: 0 !important;
+        transform: translateX(-100%);
+        /* Hide off-screen */
+        top: 0;
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        overflow-y: auto;
+        /* Enable vertical scroll */
+        display: block;
+        /* Stack children vertically */
+        padding-bottom: 20px;
+        /* Ensure last item isn't cut off */
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Allow sidebar sections to grow naturally on mobile */
+    .auth-section,
+    .config-section {
+        height: auto !important;
+        max-height: none !important;
+        flex: none !important;
+        overflow: visible !important;
+    }
+
+    .config-section {
+        margin-top: 20px;
+        padding-bottom: 50px !important;
+        /* Extra padding for mobile */
+    }
+
+    /* Overlay when sidebar is open */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    #sidebar-resizer {
+        display: none;
+        /* No resizing on mobile */
+    }
+
+    .main-content {
+        padding: 15px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .header h1 {
+        font-size: 1.2rem;
+        /* Smaller title */
+        vertical-align: middle;
+    }
+
+    .header img {
+        height: 25px !important;
+        /* Smaller logo */
+    }
+
+    /* Show hamburger menu */
+    .menu-toggle-btn {
+        display: inline-block !important;
+    }
+
+    .action-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .input-group label {
+        font-size: 0.8rem;
+    }
+
+    .btn-primary {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 0;
+    }
+
+    /* Stack run controls */
+    .run-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .console-box {
+        min-height: 150px;
+        font-size: 0.85rem;
+    }
+
+    /* Make modals or popups robust */
+    .dropdown-menu {
+        position: relative;
+        width: 100%;
+        top: 0;
+    }
+}
+
+/* Header Alignment Fix */
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.menu-toggle-btn {
+    display: none;
+    /* Hide on desktop by default */
+    padding: 5px;
+    margin-right: 15px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.menu-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+/* Ensure Logo doesn't shrink */
+.header-left img {
+    flex-shrink: 0;
+}
+
+.header h1 {
+    line-height: 1.2;
 }

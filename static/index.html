@@ -5,13 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechOps Automation Console</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="icon" href="/static/images/logo.png" type="image/png">
 </head>
 
 <body>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <div class="container">
         <!-- Sidebar -->
         <div class="sidebar">
@@ -271,6 +272,10 @@
         <div class="main-content">
             <div class="header">
                 <div class="header-left">
+                    <button id="mobile-menu-toggle" class="menu-toggle-btn"
+                        style="display: none; margin-right: 10px; background: none; border: none; cursor: pointer;">
+                        <span class="material-icons" style="font-size: 28px; color: #333;">menu</span>
+                    </button>
                     <img src="/static/images/cropin_text.png" alt="Cropin"
                         style="height: 35px; vertical-align: middle; margin-right: 10px;">
                     <h1 style="display: inline; vertical-align: middle; color: #009ade;">TechOps Automation Console</h1>

@@ -7,6 +7,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusArea = document.getElementById('status-area');
     const generateTemplateBtn = document.getElementById('generate-template-btn');
 
+    // Mobile Sidebar Toggle
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mainSidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mainSidebar.classList.toggle('active');
+            if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
+        });
+    }
+
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
+            mainSidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+        });
+    }
+
     // Prevent accidental refresh
     window.addEventListener('beforeunload', (e) => {
         if (localStorage.getItem('is_script_running') === 'true') {
