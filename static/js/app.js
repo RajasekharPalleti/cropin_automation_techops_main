@@ -117,6 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function selectScript(value) {
+        // Close keyboard on mobile to prevent scroll jumps
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
+
         selectedText.textContent = value;
         scriptSelect.value = value;
 
