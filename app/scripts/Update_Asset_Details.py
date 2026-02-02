@@ -1,5 +1,5 @@
 """
-Updates asset details (e.g., name,surveyNumber,leased, etc) based on configured keys.
+Updates asset details (e.g., name, soilType, irrigationType,deleted etc) based on configured keys.
 
 Inputs:
 Excel file with 'asset_id'.
