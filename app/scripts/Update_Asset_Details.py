@@ -161,7 +161,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 put_resp.raise_for_status()
 
                 status = "Success"
-                response_str = put_resp.text[:300]
+                response_str = put_resp.text[:600]
                 log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
 
             except Exception as e:
