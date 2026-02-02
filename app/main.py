@@ -61,6 +61,10 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# Custom Exception for Job Cancellation (Inherits from BaseException to bypass Exception catches)
+class JobStoppedException(BaseException):
+    pass
+
 
 # SSE Connection Manager
 class ConnectionManager:
@@ -484,7 +488,7 @@ async def process_background_script(
             # print(f"DEBUG: Checking cancellation for {client_id}. Cancelled: {manager.is_cancelled(client_id)}. Msg: {message[:20]}") 
             if manager.is_cancelled(client_id):
                 print(f"DEBUG: Raising Stop Exception for {client_id}")
-                raise Exception("Job Stopped by User")
+                raise JobStoppedException("Job Stopped by User")
 
             try:
                asyncio.run_coroutine_threadsafe(manager.send_log(message, client_id), loop)
@@ -521,6 +525,8 @@ async def process_background_script(
         else:
             await manager.send_log("JOB_FAILED::Script does not have a 'run' function", client_id)
 
+    except JobStoppedException:
+        await manager.send_log("JOB_STOPPED::Execution stopped by user.", client_id)
     except Exception as e:
         import traceback
         traceback.print_exc()
