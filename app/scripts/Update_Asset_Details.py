@@ -107,18 +107,39 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     col_name = f"value_{key_idx + 1}"
                     
                     if col_name in df.columns:
-                        new_value = row[col_name]
-                        if pd.isna(new_value):
-                            new_value = ""
-                        else:
-                            new_value = str(new_value).strip()
-                        
+                        raw_value = row[col_name]
+                        if pd.isna(raw_value):
+                            raw_value = ""
+
+                        final_value = str(raw_value).strip()
+                        is_complex = False
+
+                        # Try parsing as JSON if string looks like object/list
+                        if isinstance(raw_value, str):
+                            s_val = raw_value.strip()
+                            if (s_val.startswith('{') and s_val.endswith('}')) or \
+                               (s_val.startswith('[') and s_val.endswith(']')):
+                                try:
+                                    parsed_json = json.loads(s_val)
+                                    final_value = parsed_json
+                                    is_complex = True
+                                except Exception:
+                                    pass
+
                         # Compare with existing
                         current_value = asset_data.get(key_name)
-                        if current_value is None: current_value = ""
                         
-                        if str(current_value).strip() != new_value:
-                            asset_data[key_name] = new_value
+                        update_needed = False
+                        if is_complex:
+                             if current_value != final_value:
+                                 update_needed = True
+                        else:
+                             curr_str = str(current_value).strip() if current_value is not None else ""
+                             if curr_str != final_value:
+                                 update_needed = True
+                        
+                        if update_needed:
+                            asset_data[key_name] = final_value
                             updates_made = True
                     else:
                         pass
