@@ -128,13 +128,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             userRoleId = get_value(row.iloc[3])
             email = get_value(row.iloc[4])
             countryCode = get_value(row.iloc[5])
-            location_name = get_value(row.iloc[6])
+            countryISOcode = get_value(row.iloc[6])
+            location_name = get_value(row.iloc[7])
             
-            timeZone = get_value(row.iloc[7])
-            language = get_value(row.iloc[8])
-            currency = get_value(row.iloc[9])
-            areaUnits = get_value(row.iloc[10])
-            locale = get_value(row.iloc[11])
+            timeZone = get_value(row.iloc[8])
+            language = get_value(row.iloc[9])
+            currency = get_value(row.iloc[10])
+            areaUnits = get_value(row.iloc[11])
+            locale = get_value(row.iloc[12])
 
             # Validation
             if not user_name:
@@ -161,12 +162,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             # Payload
             user_payload = {
                 "companyId": companyId,
-                "data": {},
+                "data": {
+                    "countryIsoCode": countryISOcode
+                    },
                 "images": {},
                 "contactNumber": contactNumber,
                 "name": user_name,
                 "userRoleId": userRoleId,
-                "countryCode": countryCode,
+                "countryCode": f"+{countryCode}", # now the value is like +91
                 "email": email,
                 "locations": location_details,
                 "managers": [managerIds[0]] if managerIds else [], # User snippet wrapped [managerIds], but managerIds is a list. Wait.
