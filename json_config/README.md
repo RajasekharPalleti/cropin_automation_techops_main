@@ -18,3 +18,10 @@ If you have cloned this repository, you must execute the setup steps to generate
     *   **How to get**: Generate a Service Account key from Google Cloud Console.
 
 > **Note**: Do not commit your personal JSON keys to version control.
+
+## 4. Configure Backup Folder ID
+After generating your credentials:
+1.  Open `app/core/backup_manager.py`.
+2.  Find the line: `BACKUP_FOLDER_ID = '...'`.
+3.  Replace the ID with the **Folder ID** of the Google Drive folder where you want to store backups.
+    *   *You get the ID from the URL of your Drive folder: `drive.google.com/drive/u/0/folders/<THIS_IS_THE_ID>`*.
