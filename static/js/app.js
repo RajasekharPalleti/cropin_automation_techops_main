@@ -1095,4 +1095,157 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // --- Backup Logic ---
+    const backupBtn = document.getElementById('backup-btn');
+    const backupModal = document.getElementById('backup-modal');
+    const closeModal = document.getElementById('close-modal');
+    const uploadedList = document.getElementById('uploaded-list');
+    const downloadedList = document.getElementById('downloaded-list');
+
+    let nextPageToken = null;
+    let isLoadingBackups = false;
+
+    // Make openTab global for onclick
+    window.openTab = function (evt, tabName) {
+        // Declare all variables
+        var i, tabcontent, tablinks;
+
+        // Get all elements with class="tab-content" and hide them
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+            tabcontent[i].classList.remove("active");
+        }
+
+        // Get all elements with class="tab-link" and remove the class "active"
+        tablinks = document.getElementsByClassName("tab-link");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        // Show the current tab, and add an "active" class to the button that opened the tab
+        document.getElementById(tabName).style.display = "block";
+        document.getElementById(tabName).classList.add("active");
+        if (evt) evt.currentTarget.className += " active";
+    }
+
+    if (backupBtn) {
+        backupBtn.addEventListener('click', () => {
+            backupModal.style.display = "block";
+            fetchBackups(true); // Initial load (reset)
+        });
+    }
+
+    if (closeModal) {
+        closeModal.addEventListener('click', () => {
+            backupModal.style.display = "none";
+        });
+    }
+
+    // Scroll listeners for infinite scroll
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(tab => {
+        tab.addEventListener('scroll', () => {
+            // Check if near bottom (within 50px)
+            if (tab.scrollTop + tab.clientHeight >= tab.scrollHeight - 50) {
+                if (nextPageToken && !isLoadingBackups) {
+                    fetchBackups(false); // Load more
+                }
+            }
+        });
+    });
+
+    // window.addEventListener('click', (event) => {
+    //     if (event.target == backupModal) {
+    //         backupModal.style.display = "none";
+    //     }
+    // });
+
+    function fetchBackups(reset = false) {
+        if (isLoadingBackups) return;
+        isLoadingBackups = true;
+
+        if (reset) {
+            nextPageToken = null;
+            uploadedList.innerHTML = '';
+            downloadedList.innerHTML = '';
+            // Don't show loading here if you want to keep existing items while loading?
+            // But for reset, we clear.
+            const loadingLi = document.createElement('li');
+            loadingLi.className = 'loading-indicator';
+            loadingLi.textContent = 'Loading...';
+            uploadedList.appendChild(loadingLi.cloneNode(true));
+            downloadedList.appendChild(loadingLi);
+        } else {
+            // Append loading indicator at bottom if not exists
+            if (!document.querySelector('.loading-indicator')) {
+                // Might need one per list
+                // Simplification: logic updates both lists, so indicators might be tricky if one list ends and other doesn't.
+                // But API returns next page for the whole drive folder.
+            }
+        }
+
+        let url = '/api/backups?page_size=100'; // Default page size
+        if (nextPageToken && !reset) {
+            url += '&page_token=' + encodeURIComponent(nextPageToken);
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                // Remove loading indicators
+                document.querySelectorAll('.loading-indicator').forEach(el => el.remove());
+
+                nextPageToken = data.nextPageToken; // Update global token
+
+                renderFileList(data.uploaded, uploadedList);
+                renderFileList(data.downloaded, downloadedList);
+            })
+            .catch(err => {
+                console.error("Failed to fetch backups:", err);
+                // Remove loading indicators
+                document.querySelectorAll('.loading-indicator').forEach(el => el.remove());
+
+                if (reset) {
+                    uploadedList.innerHTML = '<li class="empty-state">Failed to load backups. Error: ' + err.message + '</li>';
+                    downloadedList.innerHTML = '<li class="empty-state">Failed to load backups.</li>';
+                }
+            })
+            .finally(() => {
+                isLoadingBackups = false;
+            });
+    }
+
+    function renderFileList(files, listElement) {
+        if ((!files || files.length === 0) && listElement.children.length === 0) {
+            listElement.innerHTML = '<li class="empty-state">No files found.</li>';
+            return;
+        }
+
+        if (!files) return;
+
+        files.forEach(file => {
+            const li = document.createElement('li');
+            li.className = 'file-item';
+
+            // Format Date
+            const date = new Date(file.createdTime).toLocaleString();
+
+            // Build Link
+            const link = file.webContentLink || file.webViewLink || '#';
+
+            li.innerHTML = `
+                <div class="file-info">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-meta">${date} • ${(file.size / 1024).toFixed(1)} KB</span>
+                </div>
+                <a href="${link}" target="_blank" class="download-btn">
+                    <span class="material-icons" style="font-size: 16px;">download</span> Download
+                </a>
+            `;
+            listElement.appendChild(li);
+        });
+    }
+
 });

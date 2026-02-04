@@ -29,19 +29,19 @@ pip install -r requirements.txt
 ```
 
 ### 3. Run the Application
-You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux**.
+You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux** using the scripts in `batch_scripts/`.
 
 **Start Server:**
-- **Windows**: Double-click `run_server.bat`
-- **macOS/Linux**: Run `./run_server.bat` in terminal
+- **Windows**: Double-click `batch_scripts/run_server.bat`
+- **macOS/Linux**: Run `./batch_scripts/run_server.bat` in terminal
 
 **Stop Server:**
-- **Windows**: Double-click `stop_server.bat`
-- **macOS/Linux**: Run `./stop_server.bat` in terminal
+- **Windows**: Double-click `batch_scripts/stop_server.bat`
+- **macOS/Linux**: Run `./batch_scripts/stop_server.bat` in terminal
 
 **Restart Server:**
-- **Windows**: Double-click `restart_server.bat`
-- **macOS/Linux**: Run `./restart_server.bat` in terminal
+- **Windows**: Double-click `batch_scripts/restart_server.bat`
+- **macOS/Linux**: Run `./batch_scripts/restart_server.bat` in terminal
 
 The application will be accessible at: `http://127.0.0.1:4444`
 ## Usage
@@ -61,3 +61,6 @@ The application will be accessible at: `http://127.0.0.1:4444`
 -   `static/`: Frontend assets (HTML, CSS, JS).
 -   `sample_templates/`: Excel templates for users.
 -   `uploads/` & `outputs/`: Temporary directories for processing files.
+-   `batch_scripts/`: Execution scripts for running the server and ngrok.
+-   `markdown_files/`: Documentation and guides.
+-   `json_config/`: Configuration files (credentials).

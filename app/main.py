@@ -7,6 +7,7 @@ import importlib.util
 from typing import List, Dict
 import json
 from app.core.auth import get_access_token
+from app.core.backup_manager import BackupManager
 from openpyxl import load_workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 import pandas as pd
@@ -28,6 +29,18 @@ OUTPUT_DIR = "outputs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+async def periodic_cleanup_task():
+    while True:
+        try:
+            print("Executing Scheduled Backup Cleanup (Retention Policy: 3 Months)...")
+             # Run in thread because backup_manager might be blocking (API calls)
+            await asyncio.to_thread(backup_manager.cleanup_old_files, days=90)
+        except Exception as e:
+            print(f"Scheduled Cleanup Failed: {e}")
+        
+        # Wait for 24 hours (86400 seconds)
+        await asyncio.sleep(86400)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Clean up temporary directories
@@ -44,6 +57,11 @@ async def lifespan(app: FastAPI):
                         shutil.rmtree(file_path)
                 except Exception as e:
                     print(f"Failed to delete {file_path}. Reason: {e}")
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+    
+    # Start the periodic cleanup task
+    asyncio.create_task(periodic_cleanup_task())
+
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -143,6 +161,7 @@ class ConnectionManager:
             print(f"Stream cancelled for {client_id}")
 
 manager = ConnectionManager()
+backup_manager = BackupManager()
 
 @app.get("/api/logs/{client_id}")
 async def sse_endpoint(client_id: str):
@@ -442,6 +461,10 @@ async def download_result(filename: str):
         return FileResponse(file_path, filename=filename, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     raise HTTPException(status_code=404, detail="File not found")
 
+@app.get("/api/backups")
+async def get_backups(page_size: int = 100, page_token: str = None):
+    return backup_manager.list_files(page_size=page_size, page_token=page_token)
+
 async def process_background_script(
     script_path: str,
     script_name: str,
@@ -520,6 +543,17 @@ async def process_background_script(
             if os.path.exists(output_path):
                 # Signal completion with filename
                 await manager.send_log(f"JOB_COMPLETED::{output_filename}", client_id)
+                
+                # Backup Output File
+                await manager.send_log("Backing up output file to Drive...", client_id)
+                backup_manager.upload_file(output_path)
+                
+                # Backup Input File (if exists)
+                if input_path and os.path.exists(input_path):
+                     await manager.send_log("Backing up input file to Drive...", client_id)
+                     backup_manager.upload_file(input_path)
+                
+                await manager.send_log("Backup completed.", client_id)
             else:
                  await manager.send_log("JOB_FAILED::Execution finished but no output file was generated.", client_id)
         else:

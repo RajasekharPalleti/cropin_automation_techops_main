@@ -6,3 +6,7 @@ uploads/
 outputs/
 *.xlsx
 !sample_templates/*.xlsx
+
+
+# JSON Configs (Secrets)
+json_config/*.json

@@ -279,6 +279,7 @@
                     <img src="/static/images/cropin_text.png" alt="Cropin"
                         style="height: 35px; vertical-align: middle; margin-right: 10px;">
                     <h1 style="display: inline; vertical-align: middle; color: #009ade;">TechOps Automation Console</h1>
+                    <button class="backup-btn" id="backup-btn">Backup files</button>
                 </div>
             </div>
 
@@ -370,6 +371,36 @@
 
         </div>
     </div>
+
+    <!-- Backup Modal -->
+    <div id="backup-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Google Drive Backups</h2>
+                <span class="close" id="close-modal">&times;</span>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-link active" onclick="openTab(event, 'uploaded-files')">Uploaded Files</button>
+                <button class="tab-link" onclick="openTab(event, 'downloaded-files')">Downloaded Files</button>
+            </div>
+
+            <div id="uploaded-files" class="tab-content active">
+                <!-- List populated by JS -->
+                <ul class="file-list" id="uploaded-list">
+                    <li class="empty-state">Loading...</li>
+                </ul>
+            </div>
+
+            <div id="downloaded-files" class="tab-content">
+                 <!-- List populated by JS -->
+                 <ul class="file-list" id="downloaded-list">
+                    <li class="empty-state">Loading...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/app.js?v=7"></script>
 </body>
 
