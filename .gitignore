@@ -8,5 +8,3 @@ outputs/
 !sample_templates/*.xlsx
 
 
-# JSON Configs (Secrets)
-json_config/*.json
