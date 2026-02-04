@@ -35,7 +35,13 @@ _Important: Since credential files are private, they are not included in the git
 2.  Follow the guide in `markdown_files/GDrive_Setup_Instructions.md` to generate your `client_secret.json`.
 3.  Place the `client_secret.json` file inside `json_config/`.
 
-### 4. Run the Application
+### 4. Configure Backup Folder
+1.  Open `app/core/backup_manager.py`.
+2.  Find the line: `BACKUP_FOLDER_ID = '...'`.
+3.  Replace the ID with the **Folder ID** of the Google Drive folder where you want to store backups.
+    *   *You get the ID from the URL of your Drive folder: `drive.google.com/drive/u/0/folders/<THIS_IS_THE_ID>`*.
+
+### 5. Run the Application
 You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux** using the scripts in `batch_scripts/`.
 
 **Start Server:**
