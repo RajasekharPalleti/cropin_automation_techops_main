@@ -28,7 +28,14 @@ Ensure you have Python installed, then run:
 pip install -r requirements.txt
 ```
 
-### 3. Run the Application
+### 3. Setup Configuration
+_Important: Since credential files are private, they are not included in the git repository._
+
+1.  Create the `json_config/` directory if it doesn't exist.
+2.  Follow the guide in `markdown_files/GDrive_Setup_Instructions.md` to generate your `client_secret.json`.
+3.  Place the `client_secret.json` file inside `json_config/`.
+
+### 4. Run the Application
 You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux** using the scripts in `batch_scripts/`.
 
 **Start Server:**
