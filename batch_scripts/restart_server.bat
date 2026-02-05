@@ -16,6 +16,8 @@ sleep 2
 echo "Starting Server..."
 echo "Open http://localhost:4444 or http://<your-ip>:4444 in your browser."
 cd "$(dirname "$0")/.."
+echo "Installing/Updating requirements..."
+pip3 install -r requirements.txt
 python3 -m app.main
 read -p "Press any key to close..."
 exit 0
@@ -27,6 +29,8 @@ timeout /t 2 >nul
 echo Starting Server...
 echo Open http://localhost:4444 or http://<your-ip>:4444 in your browser.
 pushd %~dp0\..\
+echo Installing/Updating requirements...
+pip install -r requirements.txt
 python -m app.main
 popd
 pause

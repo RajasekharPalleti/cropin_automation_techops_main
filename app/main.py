@@ -1,3 +1,68 @@
+import sys
+import subprocess
+import importlib.util
+import os
+import re
+
+import sys
+import subprocess
+import importlib.metadata
+import os
+import re
+
+# Check for dependencies from requirements.txt
+def _ensure_dependencies():
+    requirements_path = "requirements.txt"
+    if not os.path.exists(requirements_path):
+        print("Warning: requirements.txt not found. Skipping auto-installation.")
+        return
+
+    missing = False
+    try:
+        with open(requirements_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                
+                # Parse package name (handles version specifiers like ==, >=, etc.)
+                # Split using regex to handle various separators
+                match = re.split(r'[=<>~]', line)
+                package_name = match[0].strip()
+                
+                if not package_name:
+                    continue
+                    
+                try:
+                    importlib.metadata.distribution(package_name)
+                except importlib.metadata.PackageNotFoundError:
+                    # Try replacing underscores with hyphens and vice versa as fallback check
+                    try:
+                         importlib.metadata.distribution(package_name.replace("_", "-"))
+                    except importlib.metadata.PackageNotFoundError:
+                        try:
+                            importlib.metadata.distribution(package_name.replace("-", "_"))
+                        except importlib.metadata.PackageNotFoundError:
+                            print(f"Missing dependency: {package_name}")
+                            missing = True
+                            break
+                            
+    except Exception as e:
+        print(f"Error checking dependencies: {e}")
+        # If check fails, assume we might need to install to be safe? 
+        # Or better, just proceed and let import errors happen if critical.
+        pass
+            
+    if missing:
+        print("Missing dependencies detected from requirements.txt. Installing...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
+            print("Dependencies installed successfully.")
+        except subprocess.CalledProcessError as e:
+            print(f"Error installing dependencies: {e}")
+
+_ensure_dependencies()
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
