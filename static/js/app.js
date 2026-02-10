@@ -529,17 +529,37 @@ document.addEventListener('DOMContentLoaded', () => {
             // Stop Wake Lock
             releaseWakeLock();
 
-            fetch('/api/stop/' + clientId, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    console.log(data);
-                    const stopLine = document.createElement('div');
-                    stopLine.className = 'console-line';
-                    stopLine.style.color = 'orange';
-                    stopLine.textContent = '> Stop requested. Waiting for script to terminate...';
-                    consoleContent.appendChild(stopLine);
-                })
-                .catch(err => console.error("Stop Failed:", err));
+            // Fire and forget stop request
+            fetch('/api/stop/' + clientId, { method: 'POST' }).catch(err => console.error("Stop request failed:", err));
+
+            // IMMEDIATELY Kill Connection and Stop Processing
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
+            }
+
+            // Push Stop Command to Buffer (processed AFTER pending logs)
+            logBuffer.push('STOP_UI_NOW');
+
+            // Trigger flush if not already running
+            if (!isRenderPending && window.flushLogsInstance) {
+                isRenderPending = true;
+                requestAnimationFrame(window.flushLogsInstance);
+            } else if (!window.flushLogsInstance) {
+                // Fallback if SSE never connected
+                const stopLine = document.createElement('div');
+                stopLine.className = 'console-line';
+                stopLine.style.color = 'orange';
+                stopLine.textContent = '> JOB STOPPED SUCCESSFULLY. READY FOR NEW RUN.';
+                consoleContent.appendChild(stopLine);
+                statusArea.innerHTML = '<div style="color: Orange;">Job Stopped Successfully</div>';
+                runBtn.disabled = false;
+                runBtn.innerHTML = '▶ Run Script';
+                stopBtn.style.display = 'none';
+                localStorage.setItem('is_script_running', 'false');
+                clientId = 'client_' + Math.random().toString(36).slice(2, 11);
+                localStorage.setItem('clientId', clientId);
+            }
         }
     });
 
@@ -548,12 +568,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Generate persistent client ID
     let clientId = localStorage.getItem('clientId');
     if (!clientId) {
-        clientId = 'client_' + Math.random().toString(36).substr(2, 9);
+        clientId = 'client_' + Math.random().toString(36).slice(2, 11);
         localStorage.setItem('clientId', clientId);
     }
 
     // SSE Manager
     let evtSource = null;
+    let logBuffer = [];
+    let isRenderPending = false;
 
     function connectSSE(onOpen = null) {
         if (evtSource && evtSource.readyState !== EventSource.CLOSED) return;
@@ -566,9 +588,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (onOpen) onOpen();
         };
 
-        // Buffer for batching logs
-        const logBuffer = [];
-        let isRenderPending = false;
+        // Reset buffer on new connection
+        logBuffer = [];
+        isRenderPending = false;
+
+        // Expose flushLogs to be callable from outside (for Stop button)
+        window.flushLogsInstance = flushLogs;
 
         function flushLogs() {
             if (logBuffer.length === 0) {
@@ -582,6 +607,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             batch.forEach(msgData => {
                 // Check for Special Events inside the batch processing
+
+
                 if (msgData.startsWith('JOB_COMPLETED::')) {
                     const filename = msgData.split('::')[1];
                     const finishLine = document.createElement('div');
@@ -631,6 +658,29 @@ document.addEventListener('DOMContentLoaded', () => {
                         runBtn.innerHTML = '▶ Run Script';
                         stopBtn.style.display = 'none';
                         localStorage.setItem('is_script_running', 'false');
+                    }, 0);
+                    return;
+                }
+
+                if (msgData === 'STOP_UI_NOW') {
+                    const stopLine = document.createElement('div');
+                    stopLine.className = 'console-line';
+                    stopLine.style.color = 'orange';
+                    stopLine.textContent = '> JOB STOPPED SUCCESSFULLY. READY FOR NEW RUN.';
+                    fragment.appendChild(stopLine);
+
+                    // Force UI Reset inside the loop to ensure sync with logs
+                    setTimeout(() => {
+                        statusArea.innerHTML = '<div style="color: Orange;">Job Stopped Successfully</div>';
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = '▶ Run Script';
+                        stopBtn.style.display = 'none';
+                        localStorage.setItem('is_script_running', 'false');
+
+                        // Regenerate Client ID
+                        clientId = 'client_' + Math.random().toString(36).slice(2, 11);
+                        localStorage.setItem('clientId', clientId);
+                        console.log("New Client ID generated:", clientId);
                     }, 0);
                     return;
                 }
