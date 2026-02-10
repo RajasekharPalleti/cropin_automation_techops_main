@@ -27,13 +27,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Prevent accidental refresh
+    // Prevent accidental refresh (Close/Toolbar Refresh)
     window.addEventListener('beforeunload', (e) => {
         if (localStorage.getItem('is_script_running') === 'true') {
-            const msg = "Script is running! Refreshing or Closing the browser is NOT allowed. Please wait for the process to complete.";
+            // Modern browsers ignore the custom message, but we set it for legacy support
             e.preventDefault();
-            e.returnValue = msg;
-            return msg;
+            e.returnValue = ''; // Required for Chrome/Edge to show the dialog
+        }
+    });
+
+    // Block Keyboard Refresh (F5, Ctrl+R)
+    window.addEventListener('keydown', (e) => {
+        if (localStorage.getItem('is_script_running') === 'true') {
+            if (
+                (e.key === 'F5') ||
+                (e.ctrlKey && e.key === 'r') ||
+                (e.metaKey && e.key === 'r')
+            ) {
+                e.preventDefault();
+                alert("Refresh is disabled while the script is running!");
+            }
         }
     });
 
