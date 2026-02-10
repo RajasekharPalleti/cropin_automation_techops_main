@@ -379,7 +379,7 @@
                 <h2>Google Drive Backups</h2>
                 <span class="close" id="close-modal">&times;</span>
             </div>
-            
+
             <div class="tabs">
                 <button class="tab-link active" onclick="openTab(event, 'uploaded-files')">Uploaded Files</button>
                 <button class="tab-link" onclick="openTab(event, 'downloaded-files')">Downloaded Files</button>
@@ -393,10 +393,34 @@
             </div>
 
             <div id="downloaded-files" class="tab-content">
-                 <!-- List populated by JS -->
-                 <ul class="file-list" id="downloaded-list">
+                <!-- List populated by JS -->
+                <ul class="file-list" id="downloaded-list">
                     <li class="empty-state">Loading...</li>
                 </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Confirm Action</h2>
+                <span class="close" id="close-confirm-modal">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="margin-bottom: 15px; font-size: 1.1em;">You are about to execute <strong><span
+                            id="confirm-script-name"></span></strong> with the following
+                    authentication details:</p>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <p><strong>Tenant Name:</strong> <span id="confirm-tenant"></span></p>
+                    <p><strong>Username:</strong> <span id="confirm-user"></span></p>
+                </div>
+                <p style="margin-bottom: 20px;">Do you want to proceed?</p>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="cancel-run-btn" class="btn-secondary">No, Go Back</button>
+                    <button id="confirm-run-btn" class="btn-primary">Yes, Proceed</button>
+                </div>
             </div>
         </div>
     </div>

@@ -804,6 +804,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Show Confirmation Modal Logic
+        const confirmModal = document.getElementById('confirmation-modal');
+        const confirmTenant = document.getElementById('confirm-tenant');
+        const confirmUser = document.getElementById('confirm-user');
+        const confirmScriptName = document.getElementById('confirm-script-name');
+
+        // Populate fields
+        confirmTenant.textContent = tenantIn.value || "Not Set";
+        confirmUser.textContent = userIn.value || "Not Set";
+        confirmScriptName.textContent = scriptSelect.value || "Unknown Script";
+
+        confirmModal.style.display = 'block';
+    });
+
+    // Confirmation Modal Logic
+    const confirmModal = document.getElementById('confirmation-modal');
+    const closeConfirmModal = document.getElementById('close-confirm-modal');
+    const cancelRunBtn = document.getElementById('cancel-run-btn');
+    const confirmRunBtn = document.getElementById('confirm-run-btn');
+
+    const closeConfirmation = () => {
+        confirmModal.style.display = 'none';
+    };
+
+    if (closeConfirmModal) closeConfirmModal.addEventListener('click', closeConfirmation);
+    if (cancelRunBtn) cancelRunBtn.addEventListener('click', closeConfirmation);
+
+    // Close on click outside
+    window.addEventListener('click', (event) => {
+        // Only backup modal closes on outside click (if we want to keep that behavior for backup)
+        // Or strictly prevent confirmation modal from closing
+        if (event.target == confirmModal) {
+            // Do nothing - prevent closing
+            return;
+        }
+        // Backup modal listener logic is handled elsewhere or check if backup modal needs similar treatment
+        const backupModal = document.getElementById('backup-modal');
+        if (event.target == backupModal) {
+            backupModal.style.display = "none";
+        }
+    });
+
+    if (confirmRunBtn) {
+        confirmRunBtn.addEventListener('click', () => {
+            closeConfirmation();
+            executeScriptLogic();
+        });
+    }
+
+    function executeScriptLogic() {
+
         // Show console
         consoleBox.style.display = 'block';
         setTimeout(() => {
@@ -1005,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('is_script_running', 'false');
                 });
         }
-    });
+    }
 
     // Generate Template Logic (Mock)
     generateTemplateBtn.addEventListener('click', () => {
