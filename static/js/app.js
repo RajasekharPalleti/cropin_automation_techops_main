@@ -30,9 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Prevent accidental refresh (Close/Toolbar Refresh)
     window.addEventListener('beforeunload', (e) => {
         if (localStorage.getItem('is_script_running') === 'true') {
-            // Modern browsers ignore the custom message, but we set it for legacy support
+            const msg = "Script is running! Refreshing or Closing the browser is NOT allowed. Please wait for the process to complete.";
             e.preventDefault();
-            e.returnValue = ''; // Required for Chrome/Edge to show the dialog
+            e.returnValue = msg;
+            return msg;
         }
     });
 
