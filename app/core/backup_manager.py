@@ -2,6 +2,7 @@ import os
 import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -9,9 +10,25 @@ from googleapiclient.http import MediaFileUpload
 class BackupManager:
     SCOPES = ['https://www.googleapis.com/auth/drive']
     # The folder ID provided by the user
+    SCOPES = ['https://www.googleapis.com/auth/drive']
+    # The folder ID provided by the user
     BACKUP_FOLDER_ID = '1ftnB8lX8rGHG73EdQcv1eJiJXarlJFr5'
-    CLIENT_SECRET_FILE = 'json_config/client_secret.json'
+    
+    # Embedded Client Configuration to avoid external file dependency
+    CLIENT_CONFIG = {
+        "installed": {
+            "client_id": "962570643063-mnheld5d808mr16upq187tid7dj6l9sa.apps.googleusercontent.com",
+            "project_id": "cropin-automation",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_secret": "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",
+            "redirect_uris": ["http://localhost"]
+        }
+    }
+    
     TOKEN_FILE = 'json_config/token.json'
+    SERVICE_ACCOUNT_FILE = 'json_config/service_account.json'
 
     def __init__(self):
         self.creds = None
@@ -20,29 +37,76 @@ class BackupManager:
 
     def _authenticate(self):
         try:
+            # 1. Priority: Service Account (Server/Headless)
+            if os.path.exists(self.SERVICE_ACCOUNT_FILE):
+                print(f"BackupManager: Found service account file at {self.SERVICE_ACCOUNT_FILE}. Authenticating...")
+                try:
+                    sa_creds = service_account.Credentials.from_service_account_file(
+                        self.SERVICE_ACCOUNT_FILE, scopes=self.SCOPES)
+                    sa_service = build('drive', 'v3', credentials=sa_creds)
+                    
+                    # Verify credentials with a lightweight call
+                    sa_service.files().list(pageSize=1, fields="files(id)").execute()
+                    
+                    self.creds = sa_creds
+                    self.service = sa_service
+                    print("BackupManager: Successfully authenticated with Google Drive (Service Account).")
+                    return
+                except Exception as e:
+                    print(f"BackupManager: Service Account authentication failed/invalid: {e}. Falling back to User Credentials.")
+                    # Fall through to User Credentials logic
+                    self.creds = None
+                    self.service = None
+
+            # 2. Fallback: User Credentials (Local/Interactive)
             # Load credentials from token file if it exists
             if os.path.exists(self.TOKEN_FILE):
-                self.creds = Credentials.from_authorized_user_file(self.TOKEN_FILE, self.SCOPES)
+                try:
+                    self.creds = Credentials.from_authorized_user_file(self.TOKEN_FILE, self.SCOPES)
+                except Exception as e:
+                    print(f"BackupManager: Error loading token file: {e}. Deleting invalid token file.")
+                    try:
+                        os.remove(self.TOKEN_FILE)
+                    except:
+                        pass
+                    self.creds = None
             
             # If there are no (valid) credentials available, let the user log in.
             if not self.creds or not self.creds.valid:
                 if self.creds and self.creds.expired and self.creds.refresh_token:
-                    print("BackupManager: Refreshing expired credentials...")
-                    self.creds.refresh(Request())
-                else:
-                    if os.path.exists(self.CLIENT_SECRET_FILE):
-                        print("BackupManager: Initiating new OAuth flow...")
-                        flow = InstalledAppFlow.from_client_secrets_file(
-                            self.CLIENT_SECRET_FILE, self.SCOPES)
-                        self.creds = flow.run_local_server(port=0)
-                    else:
-                        print(f"BackupManager: Client secret file not found at {self.CLIENT_SECRET_FILE}")
+                    print("BackupManager: Refreshing expired user credentials...")
+                    try:
+                        self.creds.refresh(Request())
+                    except Exception as e:
+                        print(f"BackupManager: Token refresh failed: {e}. Deleting token and re-authenticating.")
+                        if os.path.exists(self.TOKEN_FILE):
+                            try:
+                                os.remove(self.TOKEN_FILE)
+                            except:
+                                pass
+                        self.creds = None
+
+                # Check again if we have valid creds (refresh might have failed and reset creds to None)
+                if not self.creds:
+                    print("BackupManager: Initiating new OAuth flow using embedded config...")
+                    try:
+                        flow = InstalledAppFlow.from_client_config(
+                            self.CLIENT_CONFIG, self.SCOPES)
+                        # prompt='consent' ensures we get a Refresh Token every time
+                        # access_type='offline' is required for background refresh
+                        self.creds = flow.run_local_server(
+                            port=0,
+                            prompt='consent',
+                            access_type='offline'
+                        )
+                        
+                        # Save the credentials for the next run
+                        with open(self.TOKEN_FILE, 'w') as token:
+                            token.write(self.creds.to_json())
+                    except Exception as e:
+                        print(f"BackupManager: OAuth flow failed: {e}")
                         return
 
-                # Save the credentials for the next run
-                with open(self.TOKEN_FILE, 'w') as token:
-                    token.write(self.creds.to_json())
-            
             self.service = build('drive', 'v3', credentials=self.creds)
             print("BackupManager: Successfully authenticated with Google Drive (User Credentials).")
 
