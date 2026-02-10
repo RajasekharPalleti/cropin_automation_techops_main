@@ -30,8 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Prevent accidental refresh
     window.addEventListener('beforeunload', (e) => {
         if (localStorage.getItem('is_script_running') === 'true') {
-            const msg = "The session is running, please wait until finished or stop the process to proceed.";
+            const msg = "Script is running! Refreshing or Closing the browser is NOT allowed. Please wait for the process to complete.";
             e.preventDefault();
+            e.returnValue = msg;
             return msg;
         }
     });
@@ -606,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const batch = logBuffer.splice(0, 100);
 
             batch.forEach(msgData => {
-                // Check for Special Events inside the batch processing
+
 
 
                 if (msgData.startsWith('JOB_COMPLETED::')) {
@@ -738,6 +739,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (consoleBox) consoleBox.style.display = 'block';
                         if (runBtn) runBtn.disabled = true;
                     }
+
+                    // Force runContainer visible (selectScript might have hidden it)
+                    const runContainer = document.getElementById('run-container');
+                    if (runContainer) runContainer.style.display = 'flex'; // or 'block' depending on design, flex matches line 302
+
                     consoleBox.style.display = 'block';
                     runBtn.disabled = true;
                     stopBtn.style.display = 'inline-block'; // Show Stop on resume
