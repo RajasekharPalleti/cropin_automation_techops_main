@@ -98,7 +98,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                  continue
 
             try:
-                # log(f"[Thread {thread_id}] Fetching: {farmer_id}")
+                log(f"🔄 Processing row {index+1}/{len(df)}: Fetching {farmer_id}")
                 get_resp = requests.get(f"{get_url_base}/{farmer_id}", headers=headers)
                 get_resp.raise_for_status()
                 farmer_data = get_resp.json()
@@ -166,7 +166,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 put_resp.raise_for_status()
 
                 status = "Success"
-                response_str = put_resp.text[:300]
+                response_str = put_resp.text[:600]
                 log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
 
             except Exception as e:
