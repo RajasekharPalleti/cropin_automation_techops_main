@@ -1,11 +1,6 @@
 import sys
 import subprocess
 import importlib.util
-import os
-import re
-
-import sys
-import subprocess
 import importlib.metadata
 import os
 import re
@@ -63,7 +58,7 @@ def _ensure_dependencies():
 
 _ensure_dependencies()
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 import shutil
@@ -149,13 +144,13 @@ class JobStoppedException(BaseException):
     pass
 
 
-# SSE Connection Manager
-class ConnectionManager:
     def __init__(self):
         # Map client_id -> asyncio.Queue (for live streaming)
         self.active_connections: Dict[str, asyncio.Queue] = {}
-        # Map client_id -> List[str] (for history/replay)
-        self.client_logs: Dict[str, List[str]] = {}
+        # Map client_id -> List[Tuple[int, str]] (for history/replay: (id, message))
+        self.client_logs: Dict[str, List[tuple]] = {}
+        # Map client_id -> int (current sequence number)
+        self.client_counters: Dict[str, int] = {}
         
         # ACTIVE MACHINE LOCKS (One script per machine per user)
         # Key format: "{tenant}:{username}:{machine_id}"
@@ -165,14 +160,18 @@ class ConnectionManager:
         
         # Set of client_ids with active running tasks
         self.active_tasks: set = set()
+        # Map client_id -> script_name (for recovery)
+        self.client_script_map: Dict[str, str] = {}
         # Set of client_ids that requested cancellation
         self.cancellation_requests: set = set()
 
-    def mark_active(self, client_id: str, machine_key: str):
+    def mark_active(self, client_id: str, machine_key: str, script_name: str = None):
         self.active_tasks.add(client_id)
+        if script_name:
+            self.client_script_map[client_id] = script_name
         if machine_key:
-            self.active_machines.add(machine_key)
             self.client_machine_map[client_id] = machine_key
+            self.active_machines.add(machine_key)
             
         # Ensure no pending cancel request from previous run
         if client_id in self.cancellation_requests:
@@ -182,6 +181,9 @@ class ConnectionManager:
         if client_id in self.active_tasks:
             self.active_tasks.remove(client_id)
         
+        # Cleanup Script Name
+        self.client_script_map.pop(client_id, None)
+
         # Cleanup Machine Lock
         machine_key = self.client_machine_map.pop(client_id, None)
         if machine_key and machine_key in self.active_machines:
@@ -202,23 +204,36 @@ class ConnectionManager:
     def is_machine_active(self, machine_key: str) -> bool:
         return machine_key in self.active_machines
 
-    async def connect(self, client_id: str):
+    async def connect(self, client_id: str, last_event_id: str = None):
         # Force clean up old connection if exists (Duplicate Session Prevention)
         if client_id in self.active_connections:
              print(f"DEBUG: Client {client_id} reconnecting. Replacing old connection queue.")
              # We don't need to explicitly close the old queue, the old stream loop will detect it via identity check
         
         self.active_connections[client_id] = asyncio.Queue()
-        print(f"Client {client_id} connected for SSE.")
-        
-        # Replay history immediately upon connection
+        print(f"Client {client_id} connected for SSE. Last-Event-ID: {last_event_id}")
+
+        # Replay history
         if client_id in self.client_logs and self.client_logs[client_id]:
-            await self.active_connections[client_id].put("Connected to server (SSE) - Resuming session...")
-            for message in self.client_logs[client_id]:
-                await self.active_connections[client_id].put(message)
+            
+            # Send resumption message only if reconnecting
+            if last_event_id:
+                # Add a special system message to indicate resumption (not stored in history to keep IDs clean)
+                await self.active_connections[client_id].put((0, "Connected to server (SSE) - Resuming session..."))
+            else:
+                 await self.active_connections[client_id].put((0, "Connected to server (SSE)."))
+
+            logs = self.client_logs[client_id]
+            for (msg_id, message) in logs:
+                # Replay only if msg_id > last_event_id
+                if not last_event_id or (last_event_id.isdigit() and msg_id > int(last_event_id)):
+                    await self.active_connections[client_id].put((msg_id, message))
+                    
         else:
              self.client_logs[client_id] = []
-             await self.active_connections[client_id].put("Connected to server (SSE).")
+             self.client_counters[client_id] = 0
+             # Initial connection message
+             await self.active_connections[client_id].put((0, "Connected to server (SSE)."))
 
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
@@ -226,14 +241,21 @@ class ConnectionManager:
             print(f"Client {client_id} disconnected.")
 
     async def send_log(self, message: str, client_id: str):
-        # 1. Archive
+        # Initialize if needed
         if client_id not in self.client_logs:
             self.client_logs[client_id] = []
-        self.client_logs[client_id].append(message)
+            self.client_counters[client_id] = 0
+            
+        # Increment Counter
+        self.client_counters[client_id] += 1
+        msg_id = self.client_counters[client_id]
+        
+        # 1. Archive
+        self.client_logs[client_id].append((msg_id, message))
         
         # 2. Stream if active
         if client_id in self.active_connections:
-            await self.active_connections[client_id].put(message)
+            await self.active_connections[client_id].put((msg_id, message))
 
     async def stream_logs(self, client_id: str):
         try:
@@ -255,8 +277,19 @@ class ConnectionManager:
                 try:
                     # 2. Wait for message with Heartbeat Timeout (15s)
                     # This keeps the TCP connection alive even if no logs are produced
-                    message = await asyncio.wait_for(current_queue.get(), timeout=15.0)
-                    yield f"data: {message}\n\n"
+                    data = await asyncio.wait_for(current_queue.get(), timeout=15.0)
+                    
+                    if isinstance(data, tuple):
+                        msg_id, message = data
+                        if msg_id > 0:
+                            yield f"id: {msg_id}\ndata: {message}\n\n"
+                        else:
+                            # System messages with 0 ID (no replay)
+                             yield f"data: {message}\n\n"
+                    else:
+                        # Fallback for old string messages if any mixed
+                        yield f"data: {data}\n\n"
+                        
                 except asyncio.TimeoutError:
                     # Send Heartbeat comment (starts with :) so client ignores it but keeps conn alive
                     yield ": keepalive\n\n"
@@ -270,13 +303,15 @@ class ConnectionManager:
     def clear_logs(self, client_id: str):
         if client_id in self.client_logs:
             self.client_logs[client_id] = []
+            self.client_counters[client_id] = 0
 
 manager = ConnectionManager()
 backup_manager = BackupManager()
 
 @app.get("/api/logs/{client_id}")
-async def sse_endpoint(client_id: str):
-    await manager.connect(client_id)
+async def sse_endpoint(client_id: str, request: Request):
+    last_event_id = request.headers.get("Last-Event-ID")
+    await manager.connect(client_id, last_event_id)
     return StreamingResponse(manager.stream_logs(client_id), media_type="text/event-stream")
 
 @app.get("/api/status/{client_id}")
@@ -299,6 +334,27 @@ async def stop_execution(client_id: str):
 @app.get("/")
 async def read_root():
     return FileResponse("static/index.html")
+
+@app.get("/api/recover_session")
+async def recover_session(machine_id: str = None, username: str = None, tenant_code: str = None):
+    if not machine_id or not username or not tenant_code:
+        return {"found": False}
+    
+    target_key = f"{tenant_code}:{username}:{machine_id}"
+    
+    # Iterate to find if this machine key is active
+    for client_id, machine_key in manager.client_machine_map.items():
+        if machine_key == target_key:
+            # Check if still active
+            if manager.is_active(client_id):
+                script_name = manager.client_script_map.get(client_id, "Unknown Script")
+                return {
+                    "found": True, 
+                    "client_id": client_id, 
+                    "script_name": script_name
+                }
+    
+    return {"found": False}
 
 @app.get("/api/scripts")
 async def list_scripts():
@@ -714,10 +770,10 @@ async def execute_script(
                  raise HTTPException(status_code=409, detail="MACHINE LOCK: You already have a script running on this computer. Please wait for it to finish or use a different computer.")
                  
             # Lock this machine for this user
-            manager.mark_active(client_id, machine_lock_key)
+            manager.mark_active(client_id, machine_lock_key, script_name)
         else:
             # Just standard active mark without machine lock
-            manager.mark_active(client_id, None)
+            manager.mark_active(client_id, None, script_name)
 
         script_path = os.path.join(SCRIPTS_DIR, script_name)
         if not os.path.exists(script_path):

@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Prevent accidental refresh (Close/Toolbar Refresh)
     window.addEventListener('beforeunload', (e) => {
-        if (localStorage.getItem('is_script_running') === 'true') {
+        if (sessionStorage.getItem('is_script_running') === 'true') {
             const msg = "Script is running! Refreshing or Closing the browser is NOT allowed. Please wait for the process to complete.";
             e.preventDefault();
             e.returnValue = msg;
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Block Keyboard Refresh (F5, Ctrl+R)
     window.addEventListener('keydown', (e) => {
-        if (localStorage.getItem('is_script_running') === 'true') {
+        if (sessionStorage.getItem('is_script_running') === 'true') {
             if (
                 (e.key === 'F5') ||
                 (e.ctrlKey && e.key === 'r') ||
@@ -459,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', async () => {
         if (wakeLock !== null && document.visibilityState === 'visible') {
             await requestWakeLock();
-        } else if (localStorage.getItem('is_script_running') === 'true' && document.visibilityState === 'visible') {
+        } else if (sessionStorage.getItem('is_script_running') === 'true' && document.visibilityState === 'visible') {
             // Failsafe: If script is running but lock is null (maybe lost during background), try to get it back
             console.log('Visibility restored, re-acquiring Wake Lock...');
             await requestWakeLock();
@@ -607,20 +607,106 @@ document.addEventListener('DOMContentLoaded', () => {
                 runBtn.disabled = false;
                 runBtn.innerHTML = '▶ Run Script';
                 stopBtn.style.display = 'none';
-                localStorage.setItem('is_script_running', 'false');
+                sessionStorage.setItem('is_script_running', 'false');
                 clientId = 'client_' + Math.random().toString(36).slice(2, 11);
-                localStorage.setItem('clientId', clientId);
+                sessionStorage.setItem('clientId', clientId);
             }
         }
     });
 
     const consoleContent = document.getElementById('console-content');
 
-    // Generate persistent client ID
-    let clientId = localStorage.getItem('clientId');
+    // Generate persistent client ID (Session based functionality)
+    let clientId = sessionStorage.getItem('clientId');
+
+    // RECOVERY LOGIC: If no session active, check backend for orphaned session for this machine
     if (!clientId) {
+        // Attempt recovery
+        const savedTenant = localStorage.getItem('tenant_code');
+        const savedUser = localStorage.getItem('username');
+        const savedMachine = localStorage.getItem('unique_machine_id');
+
+        if (savedTenant && savedUser && savedMachine) {
+            // Synchronous-like fetch is not possible, so we use async approach.
+            // But clientId is needed immediately for some parts?
+            // Actually, we can fetch, and IF found, reload/update state. 
+            // Since this is init, we can fire the check.
+
+            fetch(`/api/recover_session?machine_id=${savedMachine}&username=${savedUser}&tenant_code=${savedTenant}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found && data.client_id) {
+                        console.log("Recovered orphaned session:", data);
+                        sessionStorage.setItem('clientId', data.client_id);
+                        sessionStorage.setItem('is_script_running', 'true');
+                        sessionStorage.setItem('running_script_name', data.script_name);
+
+                        // Reload to pick up state cleanly (simplest way to re-init everything)
+                        location.reload();
+                    } else {
+                        // No session found, proceed as new
+                        initNewSession();
+                    }
+                })
+                .catch(e => {
+                    console.error("Recovery check failed:", e);
+                    initNewSession();
+                });
+        } else {
+            initNewSession();
+        }
+    } else {
+        // Session exists, proceed
+    }
+
+    function initNewSession() {
+        if (!sessionStorage.getItem('clientId')) {
+            const newId = 'client_' + Math.random().toString(36).slice(2, 11);
+            sessionStorage.setItem('clientId', newId);
+            // Ensure global clientId var is updated if it was read before? 
+            // We need to make sure the rest of code uses the right ID. 
+            // Since clientId var is let, we can update it.
+            clientId = newId;
+        }
+    }
+
+    // NOTE: Because fetch is async, clientId might be null for a few milliseconds.
+    // However, the rest of the code (SSE connection etc) relies on `clientId`.
+    // If we are recovering, we RELOAD page, so it's fine.
+    // If we are NOT recovering (initNewSession), we set it immediately.
+    // We need to make sure initNewSession is called immediately if credentials missing.
+
+    // Refined Logic to handle async delay for variable accessibility:
+
+    if (!clientId) {
+        const savedTenant = localStorage.getItem('tenant_code');
+        const savedUser = localStorage.getItem('username');
+        const savedMachine = localStorage.getItem('unique_machine_id');
+
+        // Temporary ID to avoid crashes while checking
         clientId = 'client_' + Math.random().toString(36).slice(2, 11);
-        localStorage.setItem('clientId', clientId);
+
+        if (savedTenant && savedUser && savedMachine) {
+            fetch(`/api/recover_session?machine_id=${savedMachine}&username=${savedUser}&tenant_code=${savedTenant}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found && data.client_id) {
+                        console.log("Recovered orphaned session:", data);
+                        sessionStorage.setItem('clientId', data.client_id);
+                        sessionStorage.setItem('is_script_running', 'true');
+                        sessionStorage.setItem('running_script_name', data.script_name);
+                        location.reload();
+                    } else {
+                        // Persist the temporary ID we created
+                        sessionStorage.setItem('clientId', clientId);
+                    }
+                })
+                .catch(() => {
+                    sessionStorage.setItem('clientId', clientId);
+                });
+        } else {
+            sessionStorage.setItem('clientId', clientId);
+        }
     }
 
     // SSE Manager
@@ -671,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     finishLine.textContent = '> Execution Finished. Downloading ' + filename + '...';
                     fragment.appendChild(finishLine);
 
-                    localStorage.setItem('is_script_running', 'false');
+                    sessionStorage.setItem('is_script_running', 'false');
 
                     // Stop Wake Lock
                     releaseWakeLock();
@@ -711,7 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         runBtn.disabled = false;
                         runBtn.innerHTML = '▶ Run Script';
                         stopBtn.style.display = 'none';
-                        localStorage.setItem('is_script_running', 'false');
+                        sessionStorage.setItem('is_script_running', 'false');
                     }, 0);
                     return;
                 }
@@ -729,11 +815,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         runBtn.disabled = false;
                         runBtn.innerHTML = '▶ Run Script';
                         stopBtn.style.display = 'none';
-                        localStorage.setItem('is_script_running', 'false');
+                        sessionStorage.setItem('is_script_running', 'false');
 
                         // Regenerate Client ID
                         clientId = 'client_' + Math.random().toString(36).slice(2, 11);
-                        localStorage.setItem('clientId', clientId);
+                        sessionStorage.setItem('clientId', clientId);
                         console.log("New Client ID generated:", clientId);
                     }, 0);
                     return;
@@ -778,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // AUTO-RECONNECT LOGIC
-            if (localStorage.getItem('is_script_running') === 'true') {
+            if (sessionStorage.getItem('is_script_running') === 'true') {
                 // Only reconnect if we really think a script is running
                 const consoleContent = document.getElementById('console-content');
                 const errLine = document.createElement('div');
@@ -797,16 +883,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Check if we need to restore session
-    if (localStorage.getItem('is_script_running') === 'true') {
+    if (sessionStorage.getItem('is_script_running') === 'true') {
         const consoleBox = document.getElementById('console-box');
         const runBtn = document.getElementById('run-script-btn');
         const stopBtn = document.getElementById('stop-script-btn');
 
+
         // --- OPTIMISTIC RESTORE ---
-        // Immediately show "Running" state based on Local Storage
+        // Immediately show "Running" state based on Session Storage
         // This ensures button is visible even if network is flaky on wake
 
-        const savedScriptName = localStorage.getItem('running_script_name');
+        const savedScriptName = sessionStorage.getItem('running_script_name');
         if (savedScriptName) {
             selectScript(savedScriptName);
         }
@@ -860,8 +947,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // SERVER DENIED: Ghost Session (Server likely restarted)
                     console.warn("Server reported no active task. Clearing ghost session.");
-                    localStorage.setItem('is_script_running', 'false');
-                    localStorage.removeItem('running_script_name');
+                    sessionStorage.setItem('is_script_running', 'false');
+                    sessionStorage.removeItem('running_script_name');
                     releaseWakeLock();
 
                     // Optional: Notify user
@@ -910,8 +997,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resetBtn.addEventListener('click', () => {
             if (confirm("Are you sure you want to force reset the session? Any running task logs will be disconnected.")) {
-                localStorage.setItem('is_script_running', 'false');
-                localStorage.removeItem('running_script_name');
+                sessionStorage.setItem('is_script_running', 'false');
+                sessionStorage.removeItem('running_script_name');
                 releaseWakeLock(); // Release lock on force reset
                 location.reload();
             }
@@ -1044,8 +1131,8 @@ document.addEventListener('DOMContentLoaded', () => {
         stopBtn.textContent = 'Stop Process';
 
         // Persist State
-        localStorage.setItem('is_script_running', 'true');
-        localStorage.setItem('running_script_name', scriptSelect.value);
+        sessionStorage.setItem('is_script_running', 'true');
+        sessionStorage.setItem('running_script_name', scriptSelect.value);
 
         // Start Wake Lock
         requestWakeLock();
@@ -1230,7 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     statusArea.innerHTML = '<div style="color: red;">Request Failed</div>';
                     runBtn.disabled = false;
-                    localStorage.setItem('is_script_running', 'false');
+                    sessionStorage.setItem('is_script_running', 'false');
                 });
         }
     }
