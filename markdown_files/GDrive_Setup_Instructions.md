@@ -1,4 +1,7 @@
-# Google Drive Setup Instructions
+# Google Drive Setup Instructions (Optional)
+
+> **Note**: This setup is completely **optional**. It is only required if you want to enable automatic Google Drive backups.
+
 
 ## Method 1: OAuth 2.0 User Credentials (Recommended)
 

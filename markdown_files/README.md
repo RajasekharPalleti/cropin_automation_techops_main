@@ -10,6 +10,8 @@ This project is an automation utility designed for Cropin TechOps to streamline 
 -   **Dynamic Configuration**: Authentication and API URLs are configurable via the UI.
 -   **Searchable Dropdown**: Easily find and select automation scripts.
 -   **Template Management**: Download sample Excel templates for each script.
+-   **Backup Management**: Backup of the input and output files are stored in Google Drive.
+-   **Remote Access**: Access the app from another device (like your phone or another laptop).
 
 ## Setup & Installation
 
@@ -28,14 +30,14 @@ Ensure you have Python installed, then run:
 pip install -r requirements.txt
 ```
 
-### 3. Setup Configuration
+### 3. Setup Configuration (Optional)
 _Important: Since credential files are private, they are not included in the git repository._
 
 1.  Create the `json_config/` directory if it doesn't exist.
 2.  Follow the guide in `markdown_files/GDrive_Setup_Instructions.md` to generate your `client_secret.json`.
 3.  Place the `client_secret.json` file inside `json_config/`.
 
-### 4. Configure Backup Folder
+### 4. Configure Backup Folder (Optional)
 1.  Open `app/core/backup_manager.py`.
 2.  Find the line: `BACKUP_FOLDER_ID = '...'`.
 3.  Replace the ID with the **Folder ID** of the Google Drive folder where you want to store backups.
@@ -56,7 +58,10 @@ You can use the provided scripts to start and stop the server easily on both **W
 - **Windows**: Double-click `batch_scripts/restart_server.bat`
 - **macOS/Linux**: Run `./batch_scripts/restart_server.bat` in terminal
 
-The application will be accessible at: `http://127.0.0.1:4444`
+The application will be accessible at: `http://127.0.0.1:4444` or http:localhost:4444
+### 6. Remote Access (Optional)
+To access the app from another device (like your phone or another laptop), follow the [Remote Access Guide](markdown_files/ngrok_installation.md).
+
 ## Usage
 
 1.  **Select Script**: Choose the automation script you want to run from the dropdown.
@@ -65,6 +70,7 @@ The application will be accessible at: `http://127.0.0.1:4444`
 4.  **Upload Input**: Drag and drop your filled Excel file.
 5.  **Run**: The script will execute, showing live logs in the console.
 6.  **Download Result**: Once finished, the output file will verify automatically.
+7.  **Backup**: The input and output files will be backed up in Google Drive that you can see in backup screen by clicking the backup button.
 
 ## Project Structure
 
