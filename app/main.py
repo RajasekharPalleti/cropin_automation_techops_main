@@ -781,13 +781,19 @@ async def execute_script(
             raise HTTPException(status_code=404, detail="Script not found")
 
         input_path = None
-        output_filename = f"{script_name.replace('.py', '')}_Output.xlsx"
         
         if input_filename:
+            # Use Input Filename for Output (e.g. MyData.xlsx -> MyData_Output.xlsx)
+            base_name = os.path.splitext(input_filename)[0]
+            output_filename = f"{base_name}_Output.xlsx"
+            
             input_path = os.path.join(UPLOAD_DIR, f"input_{input_filename}")
             if not os.path.exists(input_path):
                 manager.mark_inactive(client_id)
                 raise HTTPException(status_code=404, detail="Input file not found")
+        else:
+            # Fallback to Script Name if no input
+            output_filename = f"{script_name.replace('.py', '')}_Output.xlsx"
             
         output_path = os.path.join(OUTPUT_DIR, output_filename)
 

@@ -764,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Trigger Download logic (defer to next tick to avoid blocking fragment append)
                     setTimeout(() => {
-                        window.location.href = '/api/download/' + filename;
+                        window.location.href = '/api/download/' + encodeURIComponent(filename);
                         statusArea.innerHTML = '<div style="color: green;">Success! Check downloads.</div>';
                         runBtn.disabled = false;
                         runBtn.innerHTML = '▶ Run Script';
