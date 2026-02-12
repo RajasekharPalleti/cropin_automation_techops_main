@@ -267,6 +267,10 @@ class ConnectionManager:
                 self.disconnect(client_id)
             print(f"Stream cancelled for {client_id}")
 
+    def clear_logs(self, client_id: str):
+        if client_id in self.client_logs:
+            self.client_logs[client_id] = []
+
 manager = ConnectionManager()
 backup_manager = BackupManager()
 
@@ -689,60 +693,71 @@ async def execute_script(
         raise HTTPException(status_code=409, detail="A script is already running on this tab.")
 
     try:
-        config_dict = json.loads(config)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid config JSON")
+        try:
+            config_dict = json.loads(config)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid config JSON")
 
-    # --- MACHINE-BASED LOCKING ---
-    # Enforce "One Script Per User Per Machine" policy
-    
-    tenant = config_dict.get("tenant_code", "unknown")
-    user = config_dict.get("username", "unknown")
-    
-    # Machine ID passed from frontend (localStorage)
-    # If missing (direct API call), we fall back to not locking by machine (or could use IP if available, but optional)
-    machine_lock_key = None
-    if machine_id:
-        machine_lock_key = f"{tenant}:{user}:{machine_id}"
+        # --- MACHINE-BASED LOCKING ---
+        # Enforce "One Script Per User Per Machine" policy
         
-        if manager.is_machine_active(machine_lock_key):
-             raise HTTPException(status_code=409, detail="MACHINE LOCK: You already have a script running on this computer. Please wait for it to finish or use a different computer.")
-             
-        # Lock this machine for this user
-        manager.mark_active(client_id, machine_lock_key)
-    else:
-        # Just standard active mark without machine lock
-        manager.mark_active(client_id, None)
-
-    script_path = os.path.join(SCRIPTS_DIR, script_name)
-    if not os.path.exists(script_path):
-        manager.mark_inactive(client_id, machine_lock_key) # Release lock if script not found
-        raise HTTPException(status_code=404, detail="Script not found")
-
-    input_path = None
-    output_filename = f"{script_name.replace('.py', '')}_Output.xlsx"
-    
-    if input_filename:
-        input_path = os.path.join(UPLOAD_DIR, f"input_{input_filename}")
-        if not os.path.exists(input_path):
-            manager.mark_inactive(client_id, machine_lock_key)
-            raise HTTPException(status_code=404, detail="Input file not found")
+        tenant = config_dict.get("tenant_code", "unknown")
+        user = config_dict.get("username", "unknown")
         
-    output_path = os.path.join(OUTPUT_DIR, output_filename)
+        # Machine ID passed from frontend (localStorage)
+        # If missing (direct API call), we fall back to not locking by machine (or could use IP if available, but optional)
+        machine_lock_key = None
+        if machine_id:
+            machine_lock_key = f"{tenant}:{user}:{machine_id}"
+            
+            if manager.is_machine_active(machine_lock_key):
+                 raise HTTPException(status_code=409, detail="MACHINE LOCK: You already have a script running on this computer. Please wait for it to finish or use a different computer.")
+                 
+            # Lock this machine for this user
+            manager.mark_active(client_id, machine_lock_key)
+        else:
+            # Just standard active mark without machine lock
+            manager.mark_active(client_id, None)
 
-    # Add to background tasks
-    background_tasks.add_task(
-        process_background_script,
-        script_path,
-        script_name,
-        input_path,
-        output_path,
-        output_filename,
-        config_dict,
-        client_id
-    )
-    
-    return {"status": "queued", "message": "Script execution started in background"}
+        script_path = os.path.join(SCRIPTS_DIR, script_name)
+        if not os.path.exists(script_path):
+            manager.mark_inactive(client_id) # Release lock if script not found
+            raise HTTPException(status_code=404, detail="Script not found")
+
+        input_path = None
+        output_filename = f"{script_name.replace('.py', '')}_Output.xlsx"
+        
+        if input_filename:
+            input_path = os.path.join(UPLOAD_DIR, f"input_{input_filename}")
+            if not os.path.exists(input_path):
+                manager.mark_inactive(client_id)
+                raise HTTPException(status_code=404, detail="Input file not found")
+            
+        output_path = os.path.join(OUTPUT_DIR, output_filename)
+
+        # Add to background tasks
+        background_tasks.add_task(
+            process_background_script,
+            script_path,
+            script_name,
+            input_path,
+            output_path,
+            output_filename,
+            config_dict,
+            client_id
+        )
+        
+        return {"status": "queued", "message": "Script execution started in background"}
+
+    except HTTPException as he:
+        # Re-raise HTTP exceptions so FastAPI handles them naturally
+        raise he
+    except Exception as e:
+        # Catch-all for unexpected errors (like AttributeError) to return as JSON
+        # This prevents the "Unexpected token I" error on frontend
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {str(e)}"})
 
 if __name__ == "__main__":
     import uvicorn
