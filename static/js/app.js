@@ -1606,4 +1606,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Re-acquire lock if tab becomes visible again and script is running
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible' && sessionStorage.getItem('is_script_running') === 'true') {
+            // Check if released
+            if (wakeLock.released) {
+                await requestWakeLock();
+            }
+        }
+    });
+
 });
