@@ -144,6 +144,7 @@ class JobStoppedException(BaseException):
     pass
 
 
+class ConnectionManager:
     def __init__(self):
         # Map client_id -> asyncio.Queue (for live streaming)
         self.active_connections: Dict[str, asyncio.Queue] = {}
