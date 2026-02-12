@@ -156,13 +156,24 @@ class ConnectionManager:
         self.active_connections: Dict[str, asyncio.Queue] = {}
         # Map client_id -> List[str] (for history/replay)
         self.client_logs: Dict[str, List[str]] = {}
+        
+        # ACTIVE MACHINE LOCKS (One script per machine per user)
+        # Key format: "{tenant}:{username}:{machine_id}"
+        self.active_machines: set = set()
+        # Map client_id -> machine_lock_key for cleanup
+        self.client_machine_map: Dict[str, str] = {}
+        
         # Set of client_ids with active running tasks
         self.active_tasks: set = set()
         # Set of client_ids that requested cancellation
         self.cancellation_requests: set = set()
 
-    def mark_active(self, client_id: str):
+    def mark_active(self, client_id: str, machine_key: str):
         self.active_tasks.add(client_id)
+        if machine_key:
+            self.active_machines.add(machine_key)
+            self.client_machine_map[client_id] = machine_key
+            
         # Ensure no pending cancel request from previous run
         if client_id in self.cancellation_requests:
             self.cancellation_requests.remove(client_id)
@@ -170,6 +181,12 @@ class ConnectionManager:
     def mark_inactive(self, client_id: str):
         if client_id in self.active_tasks:
             self.active_tasks.remove(client_id)
+        
+        # Cleanup Machine Lock
+        machine_key = self.client_machine_map.pop(client_id, None)
+        if machine_key and machine_key in self.active_machines:
+            self.active_machines.remove(machine_key)
+
         if client_id in self.cancellation_requests:
             self.cancellation_requests.remove(client_id)
 
@@ -182,10 +199,15 @@ class ConnectionManager:
     def is_active(self, client_id: str) -> bool:
         return client_id in self.active_tasks
 
-    def clear_logs(self, client_id: str):
-        self.client_logs[client_id] = []
+    def is_machine_active(self, machine_key: str) -> bool:
+        return machine_key in self.active_machines
 
     async def connect(self, client_id: str):
+        # Force clean up old connection if exists (Duplicate Session Prevention)
+        if client_id in self.active_connections:
+             print(f"DEBUG: Client {client_id} reconnecting. Replacing old connection queue.")
+             # We don't need to explicitly close the old queue, the old stream loop will detect it via identity check
+        
         self.active_connections[client_id] = asyncio.Queue()
         print(f"Client {client_id} connected for SSE.")
         
@@ -215,14 +237,34 @@ class ConnectionManager:
 
     async def stream_logs(self, client_id: str):
         try:
-            queue = self.active_connections[client_id]
+            if client_id not in self.active_connections:
+                return
+
+            # Capture the exact queue object for this connection attempt
+            # This allows us to detect if 'connect()' is called again and replaces it
+            current_queue = self.active_connections[client_id]
+            
             while True:
-                # Wait for message
-                message = await queue.get()
-                # Format as SSE event
-                yield f"data: {message}\n\n"
+                # 1. Connection Validity Check
+                # If active_connections[client_id] has changed (is not current_queue),
+                # it means a NEW connection has replaced us. We should exit.
+                if self.active_connections.get(client_id) is not current_queue:
+                    print(f"Closing stale connection for {client_id} (Replaced by new connection).")
+                    break
+                
+                try:
+                    # 2. Wait for message with Heartbeat Timeout (15s)
+                    # This keeps the TCP connection alive even if no logs are produced
+                    message = await asyncio.wait_for(current_queue.get(), timeout=15.0)
+                    yield f"data: {message}\n\n"
+                except asyncio.TimeoutError:
+                    # Send Heartbeat comment (starts with :) so client ignores it but keeps conn alive
+                    yield ": keepalive\n\n"
+                    
         except asyncio.CancelledError:
-            self.disconnect(client_id)
+            # Only disconnect if WE are the active connection
+            if self.active_connections.get(client_id) is current_queue:
+                self.disconnect(client_id)
             print(f"Stream cancelled for {client_id}")
 
 manager = ConnectionManager()
@@ -540,8 +582,6 @@ async def process_background_script(
     client_id: str
 ):
     try:
-        manager.mark_active(client_id)
-        
         # AUTH LOGIC
         username = config_dict.get("username")
         password = config_dict.get("password")
@@ -619,8 +659,6 @@ async def process_background_script(
                      backup_manager.upload_file(input_path)
                 
                 await manager.send_log("Backup completed.", client_id)
-            else:
-                 await manager.send_log("JOB_FAILED::Execution finished but no output file was generated.", client_id)
         else:
             await manager.send_log("JOB_FAILED::Script does not have a 'run' function", client_id)
 
@@ -640,13 +678,45 @@ async def execute_script(
     script_name: str = Form(...),
     input_filename: str = Form(None), # Optional now
     config: str = Form(...),
-    client_id: str = Form(...) # To send logs to the right client
+    client_id: str = Form(...), # To send logs to the right client
+    machine_id: str = Form(None) # Unique ID for machine lock
 ):
     # Clear previous logs for this client since it's a new run
     manager.clear_logs(client_id)
 
+    # Prevent concurrent execution (Client Lock - Single Tab safety)
+    if manager.is_active(client_id):
+        raise HTTPException(status_code=409, detail="A script is already running on this tab.")
+
+    try:
+        config_dict = json.loads(config)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid config JSON")
+
+    # --- MACHINE-BASED LOCKING ---
+    # Enforce "One Script Per User Per Machine" policy
+    
+    tenant = config_dict.get("tenant_code", "unknown")
+    user = config_dict.get("username", "unknown")
+    
+    # Machine ID passed from frontend (localStorage)
+    # If missing (direct API call), we fall back to not locking by machine (or could use IP if available, but optional)
+    machine_lock_key = None
+    if machine_id:
+        machine_lock_key = f"{tenant}:{user}:{machine_id}"
+        
+        if manager.is_machine_active(machine_lock_key):
+             raise HTTPException(status_code=409, detail="MACHINE LOCK: You already have a script running on this computer. Please wait for it to finish or use a different computer.")
+             
+        # Lock this machine for this user
+        manager.mark_active(client_id, machine_lock_key)
+    else:
+        # Just standard active mark without machine lock
+        manager.mark_active(client_id, None)
+
     script_path = os.path.join(SCRIPTS_DIR, script_name)
     if not os.path.exists(script_path):
+        manager.mark_inactive(client_id, machine_lock_key) # Release lock if script not found
         raise HTTPException(status_code=404, detail="Script not found")
 
     input_path = None
@@ -655,14 +725,10 @@ async def execute_script(
     if input_filename:
         input_path = os.path.join(UPLOAD_DIR, f"input_{input_filename}")
         if not os.path.exists(input_path):
+            manager.mark_inactive(client_id, machine_lock_key)
             raise HTTPException(status_code=404, detail="Input file not found")
         
     output_path = os.path.join(OUTPUT_DIR, output_filename)
-
-    try:
-        config_dict = json.loads(config)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid config JSON")
 
     # Add to background tasks
     background_tasks.add_task(

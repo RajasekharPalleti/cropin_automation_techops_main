@@ -410,13 +410,36 @@ document.addEventListener('DOMContentLoaded', () => {
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
             try {
+                if (wakeLock && !wakeLock.released) {
+                    console.log('Wake Lock already active');
+                    return;
+                }
                 wakeLock = await navigator.wakeLock.request('screen');
                 console.log('Wake Lock active');
+
+                if (statusArea) {
+                    // visual indicator check
+                    const lockIndicator = document.getElementById('wake-lock-indicator');
+                    if (!lockIndicator) {
+                        const newIndicator = document.createElement('div');
+                        newIndicator.id = 'wake-lock-indicator';
+                        newIndicator.style.cssText = "font-size: 0.8em; color: green; margin-top: 5px;";
+                        newIndicator.textContent = '⚡ Screen Wake Lock Active';
+                        statusArea.appendChild(newIndicator);
+                    }
+                }
+
                 wakeLock.addEventListener('release', () => {
                     console.log('Wake Lock released');
+                    const indicator = document.getElementById('wake-lock-indicator');
+                    if (indicator) indicator.remove();
                 });
+
             } catch (err) {
                 console.error('Wake Lock failed:', err);
+                if (statusArea) {
+                    statusArea.innerHTML += '<div style="color: orange; font-size: 0.8em;">⚠️ Wake Lock Failed: Screen may sleep.</div>';
+                }
             }
         }
     }
@@ -428,7 +451,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     wakeLock = null;
                 });
         }
+        const indicator = document.getElementById('wake-lock-indicator');
+        if (indicator) indicator.remove();
     }
+
+    // Re-acquire lock when page comes back to visibility
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            await requestWakeLock();
+        } else if (localStorage.getItem('is_script_running') === 'true' && document.visibilityState === 'visible') {
+            // Failsafe: If script is running but lock is null (maybe lost during background), try to get it back
+            console.log('Visibility restored, re-acquiring Wake Lock...');
+            await requestWakeLock();
+        }
+    });
 
     // Auto-open Config on Script Selection (Existing logic listens to scriptSelect change)
     scriptSelect.addEventListener('change', () => {
@@ -732,7 +768,28 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         evtSource.onerror = (err) => {
-            console.error("SSE Error:", err);
+            console.error("SSE Error (Connection Lost?):", err);
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
+            }
+
+            // AUTO-RECONNECT LOGIC
+            if (localStorage.getItem('is_script_running') === 'true') {
+                // Only reconnect if we really think a script is running
+                const consoleContent = document.getElementById('console-content');
+                const errLine = document.createElement('div');
+                errLine.className = 'console-line';
+                errLine.style.color = 'orange';
+                errLine.textContent = '> Connection lost. Attempting to reconnect in 5s...';
+                if (consoleContent) consoleContent.appendChild(errLine);
+
+                // Retry connection
+                setTimeout(() => {
+                    console.log("Attempting auto-reconnect...");
+                    connectSSE();
+                }, 5000);
+            }
         };
     }
 
@@ -740,48 +797,72 @@ document.addEventListener('DOMContentLoaded', () => {
     if (localStorage.getItem('is_script_running') === 'true') {
         const consoleBox = document.getElementById('console-box');
         const runBtn = document.getElementById('run-script-btn');
+        const stopBtn = document.getElementById('stop-script-btn');
 
-        // Verify with server if it's ACTUALLY running
+        // --- OPTIMISTIC RESTORE ---
+        // Immediately show "Running" state based on Local Storage
+        // This ensures button is visible even if network is flaky on wake
+
+        const savedScriptName = localStorage.getItem('running_script_name');
+        if (savedScriptName) {
+            selectScript(savedScriptName);
+        }
+
+        // Show Console & Disable Run
+        if (consoleBox) consoleBox.style.display = 'block';
+        if (runBtn) {
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<span class="spinner"></span> Restoring session...';
+        }
+
+        // Force runContainer visible
+        const runContainer = document.getElementById('run-container');
+        if (runContainer) runContainer.style.display = 'flex';
+
+        // SHOW STOP BUTTON
+        if (stopBtn) {
+            stopBtn.style.display = 'inline-block';
+            stopBtn.disabled = false;
+        }
+
+        const resumeLine = document.createElement('div');
+        resumeLine.className = 'console-line';
+        resumeLine.style.color = '#FFA500'; // Orange
+        resumeLine.textContent = '> Restoring session connection...';
+        consoleContent.appendChild(resumeLine);
+
+        // Resume Wake Lock
+        requestWakeLock();
+
+        // Add Reset Button
+        addResetButton();
+
+
+        // --- VERIFY WITH SERVER ---
         fetch('/api/status/' + clientId)
             .then(r => r.json())
             .then(status => {
                 if (status.is_running) {
-                    // SERVER CONFIRMED: Proceed with Restore
-                    const savedScriptName = localStorage.getItem('running_script_name');
-                    if (savedScriptName) {
-                        selectScript(savedScriptName);
-                        if (consoleBox) consoleBox.style.display = 'block';
-                        if (runBtn) runBtn.disabled = true;
-                    }
+                    // SERVER CONFIRMED
+                    if (runBtn) runBtn.innerHTML = '<span class="spinner"></span> Processing...';
 
-                    // Force runContainer visible (selectScript might have hidden it)
-                    const runContainer = document.getElementById('run-container');
-                    if (runContainer) runContainer.style.display = 'flex'; // or 'block' depending on design, flex matches line 302
+                    const confirmedLine = document.createElement('div');
+                    confirmedLine.className = 'console-line';
+                    confirmedLine.style.color = '#00AA00'; // Green
+                    confirmedLine.textContent = '> Session confirmed. Resuming logs...';
+                    consoleContent.appendChild(confirmedLine);
 
-                    consoleBox.style.display = 'block';
-                    runBtn.disabled = true;
-                    stopBtn.style.display = 'inline-block'; // Show Stop on resume
-                    consoleContent.innerHTML = '';
-                    const resumeLine = document.createElement('div');
-                    resumeLine.className = 'console-line';
-                    resumeLine.style.color = '#FFA500'; // Orange
-                    resumeLine.textContent = '> The session is running, please wait until finished or stop the process to proceed.';
-                    consoleContent.appendChild(resumeLine);
                     connectSSE();
 
-                    // Resume Wake Lock
-                    requestWakeLock();
-
-                    // Add Reset Button
-                    addResetButton();
                 } else {
                     // SERVER DENIED: Ghost Session (Server likely restarted)
                     console.warn("Server reported no active task. Clearing ghost session.");
                     localStorage.setItem('is_script_running', 'false');
                     localStorage.removeItem('running_script_name');
+                    releaseWakeLock();
 
                     // Optional: Notify user
-                    if (statusArea) statusArea.innerHTML = '<div style="color: orange;">Previous session was lost (Server restarted). Ready for new run.</div>';
+                    if (statusArea) statusArea.innerHTML = '<div style="color: orange;">Previous session was not found on server. Ready for new run.</div>';
 
                     // Reset UI
                     if (consoleBox) consoleBox.style.display = 'none';
@@ -789,10 +870,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         runBtn.disabled = false;
                         runBtn.innerHTML = '▶ Run Script';
                     }
+                    if (stopBtn) stopBtn.style.display = 'none';
+
+                    // Remove reset button?
+                    const resetBtn = document.getElementById('reset-session-btn');
+                    if (resetBtn) resetBtn.remove();
                 }
             })
             .catch(err => {
-                console.error("Status Check Failed:", err);
+                console.error("Status Check Failed (Network Error?):", err);
+                // IF NETWORK FAILS (e.g. laptop waking up), KEEP STOP BUTTON VISIBLE!
+                // Do not hide it. User can try to "Stop" which naturally handles network errors or they can use "Force Reset".
+
+                const errLine = document.createElement('div');
+                errLine.className = 'console-line';
+                errLine.style.color = 'red';
+                errLine.textContent = '> Warning: Could not reach server to verify status. Check network connection.';
+                consoleContent.appendChild(errLine);
+
+                // Allow "Force Reset" to be used
             });
     }
 
@@ -1096,6 +1192,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             formData.append('config', JSON.stringify(config));
             formData.append('client_id', clientId);
+
+            // --- MACHINE ID for Locking (One script per machine) ---
+            let machineId = localStorage.getItem('unique_machine_id');
+            if (!machineId) {
+                machineId = 'machine_' + Math.random().toString(36).slice(2, 11) + '_' + Date.now();
+                localStorage.setItem('unique_machine_id', machineId);
+            }
+            formData.append('machine_id', machineId);
 
             // Execute (Background Task)
             fetch('/api/execute', {
