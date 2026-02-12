@@ -98,7 +98,16 @@ def run(input_excel, output_excel, config, log_callback=None):
     total_rows = len(df)
     log(f"🔄 Starting processing {total_rows} rows...")
 
-    for index, row in df.iterrows():
+    import concurrent.futures
+    import threading
+
+    # Thread-safe logging
+    log_lock = threading.Lock()
+    def thread_safe_log(msg):
+        with log_lock:
+            log(msg)
+
+    def process_row(index, row):
         try:
             CA_id = row["CA_id"]
             CA_name = row["CA_name"]
@@ -106,25 +115,22 @@ def run(input_excel, output_excel, config, log_callback=None):
 
             # Validate mandatory fields
             if pd.isna(CA_id) or pd.isna(raw_sowing_date):
-                df.at[index, "Status"] = "Skipped: Missing Data"
-                continue
+                return index, "Skipped: Missing Data", "", None
 
             # Parse sowing date
             sowingDate = parse_sowing_date(raw_sowing_date)
             if not sowingDate:
-                df.at[index, "Status"] = "Skipped: Invalid Sowing Date"
-                log(f"⚠️ Row {index+1}: Invalid sowing date for CA_ID {CA_id}")
-                continue
+                thread_safe_log(f"⚠️ Row {index+1}: Invalid sowing date for CA_ID {CA_id}")
+                return index, "Skipped: Invalid Sowing Date", "", None
 
             # -----------------------
             # GET croppable area
             # -----------------------
-            log(f"⬇️ Fetching CA_ID: {CA_id}")
+            thread_safe_log(f"🔄 Processing row {index+1}/{total_rows}: Fetching CA_ID {CA_id}")
             get_response = requests.get(f"{api_url}/{CA_id}", headers=headers)
             if get_response.status_code != 200:
-                df.at[index, "Status"] = f"GET Failed: {get_response.status_code}"
-                log(f"❌ GET failed for CA_ID {CA_id}: {get_response.status_code}")
-                continue
+                thread_safe_log(f"❌ GET failed for CA_ID {CA_id}: {get_response.status_code}")
+                return index, f"GET Failed: {get_response.status_code}", "", None
 
             CA_data = get_response.json()
             
@@ -132,7 +138,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             # Update sowing date ONLY
             # -----------------------
             CA_data["sowingDate"] = sowingDate
-            log(f"🌱 Updated sowingDate: {sowingDate}")
+            # thread_safe_log(f"🌱 Updated sowingDate for {CA_id}: {sowingDate}")
 
             time.sleep(delay_time)
 
@@ -146,22 +152,30 @@ def run(input_excel, output_excel, config, log_callback=None):
             )
 
             if put_response.status_code != 200:
-                df.at[index, "Status"] = f"PUT Failed: {put_response.status_code}"
-                df.at[index, "CA_Response"] = put_response.text
-                log(f"❌ PUT failed for CA_ID {CA_id}")
+                thread_safe_log(f"❌ PUT failed for CA_ID {CA_id}")
+                return index, f"PUT Failed: {put_response.status_code}", put_response.text, None
             else:
-                df.at[index, "Status"] = "Success"
-                df.at[index, "CA_Response"] = put_response.text
-                log(f"✅ Successfully updated CA_ID: {CA_id}")
+                thread_safe_log(f"✅ Successfully updated CA_ID: {CA_id}")
+                return index, "Success", put_response.text, None
 
         except requests.exceptions.RequestException as e:
-            df.at[index, "Status"] = f"Failed: {str(e)}"
-            log(f"❌ Exception for CA_ID {CA_id}: {e}")
+            thread_safe_log(f"❌ Exception for CA_ID {CA_id}: {e}")
+            return index, f"Failed: {str(e)}", "", None
         except Exception as e:
-            df.at[index, "Status"] = f"Error: {str(e)}"
-            log(f"❌ Error processing row {index+1}: {e}")
+            thread_safe_log(f"❌ Error processing row {index+1}: {e}")
+            return index, f"Error: {str(e)}", "", None
 
-        time.sleep(delay_time)
+    # Use ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {executor.submit(process_row, index, row): index for index, row in df.iterrows()}
+        
+        for future in concurrent.futures.as_completed(futures):
+            processed_index, status, response, _ = future.result()
+            df.at[processed_index, "Status"] = status
+            df.at[processed_index, "CA_Response"] = response
+            
+
+
 
     # Save output
     try:
