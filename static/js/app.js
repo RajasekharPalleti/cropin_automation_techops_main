@@ -1082,6 +1082,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeConfirmation = () => {
         confirmModal.style.display = 'none';
+        // Re-enable run button if it was disabled during check
+        if (confirmRunBtn) {
+            confirmRunBtn.disabled = false;
+            confirmRunBtn.innerHTML = 'Yes, Run Script';
+        }
     };
 
     if (closeConfirmModal) closeConfirmModal.addEventListener('click', closeConfirmation);
@@ -1104,8 +1109,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (confirmRunBtn) {
         confirmRunBtn.addEventListener('click', () => {
-            closeConfirmation();
-            executeScriptLogic();
+            // LAST CHECK: Is this machine already running something according to server?
+            // (In case Auto-Recovery failed or User ignored it)
+            const machineId = localStorage.getItem('unique_machine_id');
+            const tenant = document.getElementById('tenant-code').value; // Use current input
+            const user = document.getElementById('username').value; // Use current input
+
+            confirmRunBtn.disabled = true;
+            confirmRunBtn.innerHTML = '<span class="spinner"></span> Checking...';
+
+            fetch(`/api/recover_session?machine_id=${machineId}&username=${user}&tenant_code=${tenant}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.found) {
+                        // IT IS RUNNING!
+                        alert("SESSION ACTIVE: A script is already running on this machine (possibly in another tab).\n\nYou cannot start a new session until the current one finishes or is Force Reset.");
+
+                        // Optional: Auto-recover?
+                        if (confirm("Do you want to join the running session?")) {
+                            sessionStorage.setItem('clientId', data.client_id);
+                            sessionStorage.setItem('is_script_running', 'true');
+                            sessionStorage.setItem('running_script_name', data.script_name);
+                            location.reload();
+                        } else {
+                            closeConfirmation();
+                        }
+                    } else {
+                        // Not running, proceed
+                        closeConfirmation();
+                        executeScriptLogic();
+                    }
+                })
+                .catch(() => {
+                    // Fallback if check fails (network error?), just try running
+                    closeConfirmation();
+                    executeScriptLogic();
+                });
         });
     }
 
@@ -1133,6 +1172,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Persist State
         sessionStorage.setItem('is_script_running', 'true');
         sessionStorage.setItem('running_script_name', scriptSelect.value);
+
+        // Persist Credentials for Auto-Recovery (Machine scope)
+        localStorage.setItem('tenant_code', document.getElementById('tenant-code').value);
+        localStorage.setItem('username', document.getElementById('username').value);
 
         // Start Wake Lock
         requestWakeLock();
