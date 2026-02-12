@@ -636,7 +636,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         evtSource.onopen = () => {
             console.log("SSE Connected");
-            if (onOpen) onOpen();
+            if (onOpen) {
+                onOpen();
+                onOpen = null; // Prevent re-execution on reconnect
+            }
         };
 
         // Reset buffer on new connection
