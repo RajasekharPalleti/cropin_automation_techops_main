@@ -150,8 +150,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 multipart_data = {
                     "dto": (None, json.dumps(asset_data), "application/json")
                 }
+                put_headers = {"Authorization": f"Bearer {token}"}
                 
-                put_resp = requests.put(put_url_final, headers=headers, files=multipart_data)
+                put_resp = requests.put(put_url_final, headers=put_headers, files=multipart_data)
                 put_resp.raise_for_status()
 
                 status = "Success"

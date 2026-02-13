@@ -4,6 +4,7 @@ Updates address details for farmers based on configured keys.
 
 Inputs:
 Excel file with 'farmer_id' and columns for address values (e.g., address_value_1).
+In UI provide keys (e.g. country, state, sublocalityLevel2, formattedAddress,postalCode,latitude,longitude, houseNo, buildingName) to update.
 """
 
 import pandas as pd
@@ -46,7 +47,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             valid_keys_map[i] = key.strip()
 
     if not valid_keys_map:
-        log("⚠️ No Address Keys configured! Please enter at least one key (e.g. sublocalityLevel2) in the UI.")
+        log("⚠️ No Address Keys configured! Please enter at least one key (e.g. country, state, sublocalityLevel2) in the UI.")
 
     log(f"📘 Loading Excel file: {input_excel_file}")
     
@@ -80,7 +81,40 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunks = [df.iloc[i:i + chunk_size].copy() for i in range(0, len(df), chunk_size)]
     if not chunks: chunks = [df]
 
-    log(f"🔄 Starting processing {len(df)} farmers. Updating Address Keys: {list(valid_keys_map.values())}")
+    # Determine column mapping
+    key_col_map = {} # {key_name: column_name_in_df}
+    
+    available_cols = list(df.columns)
+    # Remove potentially ID column from consideration regarding index if possible?
+    # Actually, simpler: Key 0 -> Index 1 (2nd col), Key 1 -> Index 2 (3rd col)
+    # Assuming Index 0 is ID.
+    
+    for key_idx, key_name in valid_keys_map.items():
+        # 1. Try explicit "address_value_X"
+        preferred_col = f"address_value_{key_idx + 1}"
+        
+        if preferred_col in available_cols:
+            key_col_map[key_name] = preferred_col
+        # 2. Try explicit key name
+        elif key_name in available_cols:
+             key_col_map[key_name] = key_name
+        # 3. Fallback: Use Column Index (Key 0 -> Col 1, Key 1 -> Col 2)
+        else:
+            target_col_idx = key_idx + 1
+            if target_col_idx < len(available_cols):
+                fallback_col = available_cols[target_col_idx]
+                key_col_map[key_name] = fallback_col
+                log(f"⚠️ Header not found for '{key_name}'. Using Column #{target_col_idx+1}: '{fallback_col}'")
+            else:
+                log(f"❌ Key '{key_name}' requires Column #{target_col_idx+1}, but file only has {len(available_cols)} columns.")
+    
+    # Validate we found columns for all keys
+    missing = [k for k in valid_keys_map.values() if k not in key_col_map]
+    if missing:
+        log(f"❌ Could not map columns for keys: {missing}")
+        return
+
+    log(f"🔄 Starting processing {len(df)} farmers. Column Mapping: {key_col_map}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
@@ -106,43 +140,20 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 updates_made = False
 
                 if "address" in farmer_data and isinstance(farmer_data["address"], dict):
-                    # Dynamic Update
-                    for key_idx, key_name in valid_keys_map.items():
-                        # We expect Excel headers to be "address_value_1", "address_value_2" or similar?
-                        # Or user said "follow existing attribute code structure".
-                        # In attribute code: "additional_attribute_{key_idx + 1}"
-                        # Let's use "address_value_{key_idx + 1}" or just rely on column order?
-                        # User example used "Village Name" in column 4.
-                        # The "Update_Farmer_Addtl_Atrribute.py" maps user inputs (Dropdown) to Excel Columns "additional_attribute_1", etc.
-                        # Let's stick to that pattern: "address_value_{i+1}"
-                        
-                        col_name = f"address_value_{key_idx + 1}"
-                        
+                    # Dynamic Update using pre-calculated map
+                    for key_name, col_name in key_col_map.items():
                         if col_name in df.columns:
                             new_value = row[col_name]
+                            # Handle NaN
                             if pd.isna(new_value):
                                 new_value = ""
                             else:
                                 new_value = str(new_value).strip()
                             
-                            # Update Address Dict
-                            # Handle nested if key has dots? (e.g. "address.pincode") - No, user said valid_keys_map are keys inside address
-                            
                             current_val = farmer_data["address"].get(key_name, "")
                             if str(current_val) != new_value:
                                 farmer_data["address"][key_name] = new_value
                                 updates_made = True
-                        else:
-                             # Try finding by key name itself if col_name standard not found?
-                             if key_name in df.columns:
-                                 new_value = row[key_name]
-                                 if pd.isna(new_value): new_value = ""
-                                 else: new_value = str(new_value).strip()
-                                 
-                                 current_val = farmer_data["address"].get(key_name, "")
-                                 if str(current_val) != new_value:
-                                     farmer_data["address"][key_name] = new_value
-                                     updates_made = True
                 else:
                     status = "Failed: No address data"
                     results.append((index, status, ""))
@@ -154,15 +165,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                      continue
                 
                 # PUT
-                time.sleep(1) # specified in user example
                 
-                # requests.put(PUT_API_URL, headers=HEADERS,  files=multipart_data)
+                # For multipart/form-data, do NOT manually set Content-Type.
+                # requests will set it with the boundary.
+                put_headers = {"Authorization": f"Bearer {token}"}
 
                 multipart_data = {
                     "dto": (None, json.dumps(farmer_data), "application/json")
                 }
                 
-                put_resp = requests.put(put_url_final, headers=headers, files=multipart_data)
+                put_resp = requests.put(put_url_final, headers=put_headers, files=multipart_data)
                 put_resp.raise_for_status()
 
                 status = "Success"
@@ -170,9 +182,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
 
             except Exception as e:
+                # Capture full response text if available for better debugging
+                error_details = ""
+                if hasattr(e, 'response') and e.response is not None:
+                     error_details = f" - Server Response: {e.response.text[:200]}"
+                
                 status = f"Failed: {str(e)}"
-                response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}")
+                response_str = str(e) + error_details
+                log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}{error_details}")
 
             time.sleep(0.5)
             results.append((index, status, response_str))
