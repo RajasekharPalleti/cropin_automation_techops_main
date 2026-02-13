@@ -76,6 +76,7 @@ import ast
 
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # ... existing imports ...
 
@@ -336,8 +337,17 @@ async def stop_execution(client_id: str):
 async def read_root():
     return FileResponse("static/index.html")
 
-@app.get("/api/recover_session")
-async def recover_session(machine_id: str = None, username: str = None, tenant_code: str = None):
+class RecoveryRequest(BaseModel):
+    machine_id: str
+    username: str
+    tenant_code: str
+
+@app.post("/api/recover_session")
+async def recover_session(request: RecoveryRequest):
+    machine_id = request.machine_id
+    username = request.username
+    tenant_code = request.tenant_code
+
     if not machine_id or not username or not tenant_code:
         return {"found": False}
     

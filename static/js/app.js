@@ -632,7 +632,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Actually, we can fetch, and IF found, reload/update state. 
             // Since this is init, we can fire the check.
 
-            fetch(`/api/recover_session?machine_id=${savedMachine}&username=${savedUser}&tenant_code=${savedTenant}`)
+            fetch('/api/recover_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    machine_id: savedMachine,
+                    username: savedUser,
+                    tenant_code: savedTenant
+                })
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.found && data.client_id) {
@@ -686,8 +694,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Temporary ID to avoid crashes while checking
         clientId = 'client_' + Math.random().toString(36).slice(2, 11);
 
+        // Check backend for orphaned session for this machine
+        // RATIONALE: This check runs on page load to see if a previous session is still active on the server.
+        // It helps purely for recovery purposes (e.g. tab closed accidentally).
         if (savedTenant && savedUser && savedMachine) {
-            fetch(`/api/recover_session?machine_id=${savedMachine}&username=${savedUser}&tenant_code=${savedTenant}`)
+            fetch('/api/recover_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    machine_id: savedMachine,
+                    username: savedUser,
+                    tenant_code: savedTenant
+                })
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.found && data.client_id) {
