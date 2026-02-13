@@ -80,7 +80,37 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunks = [df.iloc[i:i + chunk_size].copy() for i in range(0, len(df), chunk_size)]
     if not chunks: chunks = [df]
 
-    log(f"🔄 Starting processing {len(df)} assets. Updating Address Keys: {list(valid_keys_map.values())}")
+    # Determine column mapping
+    key_col_map = {} # {key_name: column_name_in_df}
+    
+    available_cols = list(df.columns)
+    
+    for key_idx, key_name in valid_keys_map.items():
+        # 1. Try explicit "address_value_X"
+        preferred_col = f"address_value_{key_idx + 1}"
+        
+        if preferred_col in available_cols:
+            key_col_map[key_name] = preferred_col
+        # 2. Try explicit key name
+        elif key_name in available_cols:
+             key_col_map[key_name] = key_name
+        # 3. Fallback: Use Column Index (Key 0 -> Col 1, Key 1 -> Col 2)
+        else:
+            target_col_idx = key_idx + 1
+            if target_col_idx < len(available_cols):
+                fallback_col = available_cols[target_col_idx]
+                key_col_map[key_name] = fallback_col
+                log(f"⚠️ Header not found for '{key_name}'. Using Column #{target_col_idx+1}: '{fallback_col}'")
+            else:
+                log(f"❌ Key '{key_name}' requires Column #{target_col_idx+1}, but file only has {len(available_cols)} columns.")
+    
+    # Validate we found columns for all keys
+    missing = [k for k in valid_keys_map.values() if k not in key_col_map]
+    if missing:
+        log(f"❌ Could not map columns for keys: {missing}")
+        return
+
+    log(f"🔄 Starting processing {len(df)} assets. Column Mapping: {key_col_map}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
@@ -106,12 +136,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 updates_made = False
 
                 if "address" in asset_data and isinstance(asset_data["address"], dict):
-                    # Dynamic Update
-                    for key_idx, key_name in valid_keys_map.items():
-                        # Pattern: "address_value_{i+1}"
-                        
-                        col_name = f"address_value_{key_idx + 1}"
-                        
+                    # Dynamic Update using pre-calculated map
+                    for key_name, col_name in key_col_map.items():
                         if col_name in df.columns:
                             new_value = row[col_name]
                             if pd.isna(new_value):
@@ -123,17 +149,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                             if str(current_val) != new_value:
                                 asset_data["address"][key_name] = new_value
                                 updates_made = True
-                        else:
-                             # Try finding by key name itself
-                             if key_name in df.columns:
-                                 new_value = row[key_name]
-                                 if pd.isna(new_value): new_value = ""
-                                 else: new_value = str(new_value).strip()
-                                 
-                                 current_val = asset_data["address"].get(key_name, "")
-                                 if str(current_val) != new_value:
-                                     asset_data["address"][key_name] = new_value
-                                     updates_made = True
                 else:
                     status = "Failed: No address data"
                     results.append((index, status, ""))
@@ -145,26 +160,32 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                      continue
                 
                 # PUT
-                time.sleep(1) 
                 
+                # For multipart/form-data, do NOT manually set Content-Type.
+                put_headers = {"Authorization": f"Bearer {token}"}
+
                 multipart_data = {
                     "dto": (None, json.dumps(asset_data), "application/json")
                 }
-                put_headers = {"Authorization": f"Bearer {token}"}
                 
                 put_resp = requests.put(put_url_final, headers=put_headers, files=multipart_data)
                 put_resp.raise_for_status()
 
                 status = "Success"
-                response_str = put_resp.text[:300]
+                response_str = put_resp.text[:600]
                 log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
 
             except Exception as e:
+                # Capture full response text if available for better debugging
+                error_details = ""
+                if hasattr(e, 'response') and e.response is not None:
+                     error_details = f" - Server Response: {e.response.text[:200]}"
+                
                 status = f"Failed: {str(e)}"
-                response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}")
+                response_str = str(e) + error_details
+                log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}{error_details}")
 
-            time.sleep(0.5)
+            time.sleep(1)
             results.append((index, status, response_str))
 
         return results
