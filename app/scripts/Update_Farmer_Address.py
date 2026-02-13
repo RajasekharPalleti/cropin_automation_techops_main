@@ -191,7 +191,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 response_str = str(e) + error_details
                 log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}{error_details}")
 
-            time.sleep(0.5)
+            time.sleep(1)
             results.append((index, status, response_str))
 
         return results
