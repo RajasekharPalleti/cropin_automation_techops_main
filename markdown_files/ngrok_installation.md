@@ -4,19 +4,33 @@ This project allows you to access the automation server from other devices (remo
 
 ## 🚀 Quick Start
 
-### 1. Start the Server
+### 1. Setup Auth Token (One Time Setup)
+Before starting, you need to authenticate your ngrok agent.
+1.  Go to your [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken).
+2.  Copy your Authtoken.
+3.  Open a terminal in this project folder.
+4.  Run the following command (replace `<YOUR_TOKEN>` with your actual token):
+    ```bash
+    ngrok config add-authtoken <YOUR_TOKEN>
+    ```
+    *Or on Windows if not in PATH:*
+    ```bash
+    .\ngrok.exe config add-authtoken <YOUR_TOKEN>
+    ```
+
+### 2. Start the Server
 First, ensure your local web server is running.
 - **Windows**: Double-click `run_server.bat`
 - **Mac/Linux**: Run `bash run_server.bat`
 
-### 2. Start the Tunnel (ngrok)
+### 3. Start the Tunnel (ngrok)
 This creates the "bridge" to the internet.
 - **Windows**: Double-click `run_ngrok.bat`
 - **Mac/Linux**: Run `bash run_ngrok.bat`
 
 > **Note**: A terminal window will open. **Keep it open!** If you close it, the remote link will stop working.
 
-### 3. Access Remotely
+### 4. Access Remotely
 Look at the ngrok window. It will show a URL line like:
 `Forwarding https://random-name.ngrok-free.app -> http://localhost:4444`
 
