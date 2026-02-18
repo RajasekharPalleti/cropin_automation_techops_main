@@ -18,10 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 MAX_RETRIES = 1  # Number of retries for GET/PUT
 TIME_OUT = 5  # seconds
 
-MAX_RETRIES = 1  # Number of retries for GET/PUT
-TIME_OUT = 5  # seconds
-
-WAIT_TIME = 1  # seconds between PUT calls
+WAIT_TIME = 2  # seconds between PUT calls
 MAX_WORKERS = 4  # number of threads
 # =================================================
 
@@ -79,7 +76,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     log(f"⚠️ Attempt {attempt} failed for URL: {url} | Status Code: {resp.status_code}")
             except Exception as e:
                 log(f"⚠️ Attempt {attempt} exception for URL: {url} | {e}")
-            time.sleep(1)  # wait 1 second before retry
+            time.sleep(WAIT_TIME)  # wait 1 second before retry
         return None
 
 
