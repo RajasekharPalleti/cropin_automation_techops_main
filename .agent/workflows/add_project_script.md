@@ -12,10 +12,11 @@ Follow these steps strictly whenever adding a new script:
     - Add default URL if the url is not from configuration.
     - Add log_callback as other scripts.
     - Add Author details as Rajasekhar Palleti
+    - Add log that shows which rows is executing
     - **Add Docstring**: Ensure the script has a structured docstring at the top of the file:
       ```python
       """
-      [Short Description]
+      [Short Description about the script to cover the what exactly script will do]
 
       Inputs:
       [Input Details]

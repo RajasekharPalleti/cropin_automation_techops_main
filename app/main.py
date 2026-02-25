@@ -564,6 +564,11 @@ async def list_scripts():
             "url": "https://cloud.cropin.in/services/farm/api/varieties",
             "label": "Variety API URL",
             "requires_input": True
+        },
+        "CA_Close_and_Delete.py": {
+            "url": "https://cloud.cropin.in/services/farm/api",
+            "label": "Base Api Url",
+            "requires_input": True
         }
     }
     

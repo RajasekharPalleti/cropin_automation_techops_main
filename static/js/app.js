@@ -262,6 +262,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
 
+            // Toggle CA Close and Delete Config
+            const caCloseDeleteConfig = document.getElementById('ca-close-delete-config');
+            if (caCloseDeleteConfig) {
+                if (selectedScript.name === 'CA_Close_and_Delete.py') {
+                    caCloseDeleteConfig.style.display = 'block';
+                } else {
+                    caCloseDeleteConfig.style.display = 'none';
+                }
+            }
+
             // Logic for Attribute Count Dropdown
             const attrCountSelect = document.getElementById('attr-count-select');
             if (attrCountSelect) {
@@ -1326,6 +1336,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 post_api_url: postApiUrl,
                 secondary_api_url: document.getElementById('secondary-api-url').value,
                 x_api_key: document.getElementById('x-api-key').value,
+                ca_action: document.getElementById('ca-action-select') ? document.getElementById('ca-action-select').value : 'none', // Added ca_action
                 use_farmer_id: useFarmerId,
                 attr_keys: attrKeys,
                 unit: areaUnit,
