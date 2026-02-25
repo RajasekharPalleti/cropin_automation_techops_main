@@ -63,10 +63,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     asset_col = lower_cols["project_asset_id"]
     ca_col = lower_cols["croppable_area_id"]
 
-    # Ensure status columns
-    for col in ["closed API status", "delete API status", "closed_api_http_status", "delete_api_http_status"]:
-        if col not in df.columns:
-            df[col] = ""
+    # Ensure only relevant status columns based on action mode
+    if "close" in ca_action:
+        for col in ["closed_api_http_status", "closed_api_status"]:
+            if col not in df.columns:
+                df[col] = ""
+    if "delete" in ca_action:
+        for col in ["delete_api_http_status", "delete_api_status"]:
+            if col not in df.columns:
+                df[col] = ""
 
     # Clean and Format Data
     df[project_col] = df[project_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)
@@ -149,7 +154,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                     closed_api_summary = id_status_list or close_json or resp_close.text
                     df.at[first_row_index, "closed_api_http_status"] = close_status_code
-                    df.at[first_row_index, "closed API status"] = json.dumps(closed_api_summary, default=str)
+                    df.at[first_row_index, "closed_api_status"] = json.dumps(closed_api_summary, default=str)
                     
                     if close_status_code == 200:
                         log(f"    ✅ Close Success (HTTP {close_status_code})")
@@ -159,7 +164,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 except Exception as e:
                     log(f"    ❌ Close Error: {str(e)}")
                     df.at[first_row_index, "closed_api_http_status"] = "Error"
-                    df.at[first_row_index, "closed API status"] = str(e)
+                    df.at[first_row_index, "closed_api_status"] = str(e)
 
                 time.sleep(delay_time)
 
@@ -197,7 +202,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     }
 
                     df.at[first_row_index, "delete_api_http_status"] = delete_status_code
-                    df.at[first_row_index, "delete API status"] = json.dumps(delete_info, default=str)
+                    df.at[first_row_index, "delete_api_status"] = json.dumps(delete_info, default=str)
 
                     if is_deleted:
                         log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
@@ -207,7 +212,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 except Exception as e:
                     log(f"    ❌ Delete Error: {str(e)}")
                     df.at[first_row_index, "delete_api_http_status"] = "Error"
-                    df.at[first_row_index, "delete API status"] = str(e)
+                    df.at[first_row_index, "delete_api_status"] = str(e)
 
                 time.sleep(delay_time)
 
