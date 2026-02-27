@@ -6,3 +6,4 @@ uploads/
 outputs/
 *.xlsx
 !sample_templates/*.xlsx
+~$*.xlsx
