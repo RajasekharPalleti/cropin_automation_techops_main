@@ -211,7 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         scripts.forEach(scriptObj => {
             const scriptName = scriptObj.name;
-            const displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
+            // Remove .py, replace underscores with spaces, and insert spaces between CamelCase words
+            let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
+            displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
 
             // Populate hidden select for compatibility
             const option = document.createElement('option');
@@ -239,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // If displayName is not passed (e.g. from local storage restore), compute it
         if (!displayName) {
             displayName = value.replace('.py', '').replace(/_/g, ' ');
+            displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
         }
         selectedText.textContent = displayName;
         scriptSelect.value = value;
