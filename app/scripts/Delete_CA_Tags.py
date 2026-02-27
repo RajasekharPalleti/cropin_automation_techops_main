@@ -2,7 +2,8 @@
 Remove CA tags from croppable areas using Excel input.
 
 Inputs:
-Excel file with 'CA ID' and 'Tags' (comma-separated IDs or Names).
+Inputs:
+Excel file with 'CA_id', 'CA_name', and 'Tags IDs' (comma-separated IDs or Names).
 """
 
 import json
@@ -127,7 +128,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     for row in range(2, max_row + 1):
         ca_id = sheet.cell(row, 1).value
-        raw_tags = sheet.cell(row, 2).value
+        # CA_name is column 2 but we don't strictly need it for the API call
+        raw_tags = sheet.cell(row, 3).value
 
         # End of data check
         if ca_id is None and raw_tags is None:
@@ -135,11 +137,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
         if not ca_id or not raw_tags:
             sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing CA ID or Tags")
+            sheet.cell(row, reason_col, "Missing CA_id or Tags IDs")
             continue
 
         ca_id = str(ca_id).strip()
-        raw_tokens = [t for t in str(raw_tags).split(",") if t.strip()]
+        cleaned_tags = re.sub(r'[\[\]\'\"]', '', str(raw_tags))
+        raw_tokens = [t.strip() for t in cleaned_tags.split(",") if t.strip()]
         tag_ids, unresolved = resolve_tag_ids(raw_tokens, tag_name_map)
 
         if unresolved:
@@ -189,13 +192,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             
             # Format as expected by Cropin CA PUT API (list of ints)
             ca_data["data"]["tags"] = list(final_tag_ids)
-
-            multipart_data = {
-                "dto": (None, json.dumps(ca_data), "application/json")
-            }
             
             # Update the CA
-            put_resp = requests.put(api_url, headers=req_headers, files=multipart_data)
+            put_resp = requests.put(api_url, headers=req_headers, json=ca_data)
             put_resp.raise_for_status()
 
             sheet.cell(row, status_col, "Success")

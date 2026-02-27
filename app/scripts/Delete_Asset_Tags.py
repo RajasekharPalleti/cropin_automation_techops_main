@@ -162,14 +162,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     for row in range(2, max_row + 1):
         asset_id = sheet.cell(row, 1).value
-        raw_tags = sheet.cell(row, 2).value
+        # Asset Name is column 2
+        raw_tags = sheet.cell(row, 3).value
 
         if not asset_id or not raw_tags:
             sheet.cell(row, status_col, "Skipped")
             sheet.cell(row, reason_col, "Missing Asset ID or Tags")
             continue
 
-        raw_tokens = [t for t in str(raw_tags).split(",") if t.strip()]
+        cleaned_tags = re.sub(r'[\[\]\'\"]', '', str(raw_tags))
+        raw_tokens = [t.strip() for t in cleaned_tags.split(",") if t.strip()]
         tag_ids, _ = resolve_tag_ids(raw_tokens, tag_name_map)
 
         if not tag_ids:
