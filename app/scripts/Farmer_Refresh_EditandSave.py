@@ -136,7 +136,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             futures.append(
                 executor.submit(process_farmer, index, row[id_col])
             )
-            time.sleep(0.1) # Small delay to prevent burst
+            time.sleep(delay_time / 5.0) # Proportional delay to prevent burst
 
         completed_count = 0
         for future in as_completed(futures):
