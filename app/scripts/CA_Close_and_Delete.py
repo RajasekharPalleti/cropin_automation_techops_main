@@ -42,7 +42,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     log(f"🚀 CA Action Mode: {ca_action}")
 
     batch_size = 100
-    delay_time = 5  # seconds
+    delay_time = float(config.get("delay_time", 5))  # seconds, configurable via UI
 
     log(f"📘 Loading Excel file: {input_excel_file}")
     try:

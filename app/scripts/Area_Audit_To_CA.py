@@ -89,6 +89,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         "channel": "mobile"
     }
 
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     log(f"📘 Loading Excel file: {input_excel_file}")
     try:
         df = pd.read_excel(input_excel_file)
@@ -229,7 +231,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Status"] = f"Error: {e}"
             log(f"❌ Error: {e}")
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     # Save output
     log(f"\n💾 Saving output to: {output_excel_file}")

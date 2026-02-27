@@ -116,6 +116,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("Error: Authorization token missing.")
         return
 
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     # 2. Setup
     log(f"Fetching Tag Map from Master API...")
     try:
@@ -204,7 +206,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 "dto": (None, json.dumps(updated_asset), "application/json")
             }
 
-            time.sleep(0.5)
+            time.sleep(delay_time)
 
             # PUT Asset update
             put_resp = requests.put(api_url, headers=req_headers, files=multipart_data)
@@ -226,7 +228,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             sheet.cell(row, reason_col, err_msg)
             log(f"Row {row}: Failed - {err_msg[:100]}")
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     # Save to OUTPUT file
     wb.save(output_excel_file)

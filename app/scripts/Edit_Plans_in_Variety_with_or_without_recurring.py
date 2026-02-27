@@ -44,6 +44,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     
     # Use configured URL or default
     api_url = config.get("post_api_url")
+    delay_time = float(config.get("delay_time", 0.3))  # seconds, configurable via UI
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/plans"
         log(f"Using default API URL: {api_url}")
@@ -199,7 +200,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 exdata.at[index, 'status'] = f"Failed PUT: {put_response.status_code}"
                 exdata.at[index, 'Response'] = f"Reason: {put_response.reason}, Message: {put_response.text}"
 
-            time.sleep(0.3)  # Throttle API calls
+            time.sleep(delay_time)  # Throttle API calls
 
         except Exception as e:
             log(f"[ROW {index + 1}] ❌ Error: {str(e)}")

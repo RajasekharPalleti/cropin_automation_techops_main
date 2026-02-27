@@ -38,11 +38,11 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
         token = config_dict.get("token")
         base_url = config_dict.get("url", "https://cloud.cropin.in/services/farm/api/varieties")
         
-        # Get delay time from config, default to 0.5 seconds if not provided or invalid
+        # Get delay time from config, default to 1 seconds if not provided or invalid
         try:
-            delay_time = float(config_dict.get("time_delay", 0.5))
+            delay_time = float(config_dict.get("delay_time", 1))
         except (ValueError, TypeError):
-            delay_time = 0.5
+            delay_time = 1
             
         log(f"Starting process with URL: {base_url} and Delay: {delay_time}s")
 

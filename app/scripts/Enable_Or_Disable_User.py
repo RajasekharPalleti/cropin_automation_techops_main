@@ -39,7 +39,7 @@ def run(input_excel_path, output_excel_path, config, log_callback=None):
     token = config.get("token")
 
     # Delay to avoid rate limiting
-    delay_time = 0.2 #To avoid rate limiting
+    delay_time = float(config.get("delay_time", 0.2))  # configurable via UI
 
     headers = {
         "Authorization": f"Bearer {token}",

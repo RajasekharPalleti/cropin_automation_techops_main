@@ -26,6 +26,8 @@ def run(input_excel, output_excel, config, log_callback=None):
     # seed_grade_url is the secondary URL
     seed_grade_url = config.get("secondary_api_url", "https://cloud.cropin.in/services/farm/api/seed-grades")
 
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     def fetch_seed_grade(token):
         url = seed_grade_url
         headers = {"Authorization": f"Bearer {token}"}
@@ -134,7 +136,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             df.at[i, 'Status'] = "Failed"
             df.at[i, 'Response'] = str(e)
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     df.to_excel(output_excel, index=False)
     log(f"\n✅ Processing complete. Output saved to {output_excel}")

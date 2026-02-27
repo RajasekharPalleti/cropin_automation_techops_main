@@ -123,6 +123,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("Error: Authorization token missing.")
         return
 
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     # 2. Setup
     log(f"Fetching Tag Map from Master API...")
     try:
@@ -231,7 +233,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log(f"Row {row}: Failed - {err_msg[:100]}")
 
         # Basic rate limiting
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     # 5. Save Output
     wb.save(output_excel_file)

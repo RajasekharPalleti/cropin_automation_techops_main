@@ -23,6 +23,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     post_api_url = config.get("post_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
 
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     # 2. Read Excel
     log(f"Loading input Excel file: {input_excel_file}")
     try:
@@ -162,7 +164,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, 'Status'] = "Error"
             df.at[index, 'Response'] = str(e)
             
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     try:
         df.to_excel(output_excel_file, index=False)

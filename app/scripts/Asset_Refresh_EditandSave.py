@@ -31,7 +31,7 @@ def run(input_excel, output_excel, config, log_callback=None):
 
     MAX_RETRIES = 2
     MAX_WORKERS = 4
-    SUBMIT_GAP_SECONDS = 1
+    delay_time = float(config.get("delay_time", 1))
     # ========================================== #
 
     headers = {
@@ -86,7 +86,7 @@ def run(input_excel, output_excel, config, log_callback=None):
 
                 if get_resp.status_code != 200:
                     last_error = f"GET Failed: {get_resp.status_code}"
-                    time.sleep(SUBMIT_GAP_SECONDS)
+                    time.sleep(delay_time)
                     continue
 
                 asset_data = get_resp.json()
@@ -112,11 +112,11 @@ def run(input_excel, output_excel, config, log_callback=None):
 
                 last_error = f"PUT Failed: {put_resp.status_code}"
                 log(f"❌ PUT Failed {asset_id}: {put_resp.status_code}")
-                time.sleep(SUBMIT_GAP_SECONDS)
+                time.sleep(delay_time)
 
             except Exception as e:
                 last_error = str(e)
-                time.sleep(SUBMIT_GAP_SECONDS)
+                time.sleep(delay_time)
 
         return index, "FAIL", last_error
 

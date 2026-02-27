@@ -24,7 +24,9 @@ def run(input_excel, output_excel, config, log_callback=None):
     # The user prompt had specific URLs.
     cropstage_url = config.get("secondary_api_url", "https://cloud.cropin.in/services/farm/api/crop-stages")
     variety_url = config.get("post_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
-    
+
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
+
     # Allow overriding via config if we want to be fancy, but user snippet was specific.
     # config['url'] from main.py usually maps to one of them.
     # Let's stick to the logic of the user script which uses these hardcoded global vars
@@ -149,7 +151,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             df.at[i, 'Status'] = "Failed"
             df.at[i, 'Response'] = str(e)
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     df.to_excel(output_excel, index=False)
     log(f"\n✅ Processing complete. Output saved to {output_excel}")

@@ -27,6 +27,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         user_api_url = "https://cloud.cropin.in/services/user/api/users/images"
         log(f"Using default User API URL: {user_api_url}")
     
+    delay_time = float(config.get("delay_time", 1.0))  # seconds, configurable via UI
+
     # We use x_api_key field for Google Maps API Key
     google_api_key = config.get("x_api_key")
     if not google_api_key:
@@ -221,7 +223,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, 'Status'] = "Error"
             df.at[index, 'Response'] = str(e)
             
-        time.sleep(1)
+        time.sleep(delay_time)
 
     try:
         df.to_excel(output_excel_file, index=False)

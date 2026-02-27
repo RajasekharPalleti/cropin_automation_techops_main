@@ -39,6 +39,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     if not base_url:
         base_url = "https://cloud.cropin.in/services/farm/api/croppable-areas"
         log(f"⚠️ No Base URL provided, defaulting to: {base_url}")
+
+    delay_time = float(config.get("delay_time", 2))  # configurable via UI
     
     # GET URL:  Base + /<id> -> https://cloud.cropin.in/services/farm/api/croppable-areas/<id>
     # Ensure base_url ends correctly for appending ID later
@@ -76,7 +78,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     log(f"⚠️ Attempt {attempt} failed for URL: {url} | Status Code: {resp.status_code}")
             except Exception as e:
                 log(f"⚠️ Attempt {attempt} exception for URL: {url} | {e}")
-            time.sleep(WAIT_TIME)  # wait 1 second before retry
+            time.sleep(delay_time)  # wait before retry
         return None
 
 
@@ -119,7 +121,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             ca_data = get_resp.json()
 
             # Step 2️⃣: Wait before PUT call
-            time.sleep(WAIT_TIME)
+            time.sleep(delay_time)
 
             log(f"🟡 Sending PUT request for CA_id: {ca_id}...")
 
@@ -128,7 +130,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             put_resp = request_with_retry("PUT", put_url, headers=headers, data=json.dumps(ca_data))
 
             end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            duration = round((time.time()-WAIT_TIME) - start_ts, 2)
+            duration = round((time.time()-delay_time) - start_ts, 2)
 
             if put_resp:
                 log(f"✅ Completed CA_id: {ca_id} | Status: Success | Duration: {duration}s")
@@ -156,7 +158,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         except Exception as e:
             traceback.print_exc()
             end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            duration = round((time.time()-WAIT_TIME) - start_ts, 2)
+            duration = round((time.time()-delay_time) - start_ts, 2)
             log(f"⚠️ Error processing CA_id: {ca_id} | Duration: {duration}s")
             return {
                 "ca_id": ca_id,

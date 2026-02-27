@@ -34,7 +34,7 @@ def parse_comma_ids(cell):
             continue
     return ids
 
-def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeout=30):
+def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeout=30, delay_time=1):
     
     def log(msg):
         if log_callback:
@@ -134,7 +134,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
                 response_str = str(e)
             log(f"[Thread {thread_id}] Request error for farmer {farmer_id}: {response_str[:100]}")
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
         results.append((index, status, response_str))
 
     return results
@@ -156,6 +156,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     if not token:
         log("Error: Authorization token missing.")
         return
+
+    delay_time = float(config.get("delay_time", 1))  # seconds, configurable via UI
 
     log(f"Reading input file: {input_excel_file}")
     try:
@@ -192,7 +194,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = []
         for i, chunk in enumerate(chunks):
-            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, log_callback))
+            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, log_callback, delay_time=delay_time))
         
         for f in futures:
             try:

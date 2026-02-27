@@ -32,6 +32,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default Asset API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
+    delay_time = float(config.get("delay_time", 0.2))  # seconds, configurable via UI
+
     # Attribute Keys (Dynamic)
     attr_keys = config.get("attr_keys", [])
     valid_keys_map = {} # {index: key_name}
@@ -150,7 +152,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                      continue
                 
                 # PUT - Use Multipart/DTO (Assuming Asset API works same as Farmer API)
-                time.sleep(0.2)
+                time.sleep(delay_time)
                 
                 multipart_data = {
                     "dto": (None, json.dumps(asset_data), "application/json")
@@ -169,7 +171,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 response_str = str(e)
                 log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}")
 
-            time.sleep(0.2)
+            time.sleep(delay_time)
             results.append((index, status, response_str))
 
         return results

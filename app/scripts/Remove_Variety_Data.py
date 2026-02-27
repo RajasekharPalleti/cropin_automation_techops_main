@@ -26,7 +26,9 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
     try:
         token = config_dict.get("token")
         base_url = config_dict.get("url", "https://cloud.cropin.in/services/farm/api/varieties")
-        
+
+        delay_time = float(config_dict.get("delay_time", 0.5))  # seconds, configurable via UI
+
         # Get list of fields to clear
         fields_to_remove = config_dict.get("fields_to_remove", [])
         
@@ -112,7 +114,7 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
                 df.at[i, 'Response'] = str(e)
                 log(f"❌ Error processing row {i+2}: {e}")
 
-            time.sleep(0.5)
+            time.sleep(delay_time)
 
         # --- Save output ---
         df.to_excel(output_excel, index=False)

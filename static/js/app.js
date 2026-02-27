@@ -352,7 +352,27 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle time Config
             const timeConfig = document.getElementById('time-delay-config');
             if (timeConfig) {
-                if (selectedScript.name === 'Update_DOS_Variety_to_CA.py' || selectedScript.name === 'Update_DOS_to_CA.py' || selectedScript.name === 'Update_Variety_to_CA.py' || selectedScript.name === 'PR_Enablement_Bulk.py' || selectedScript.name === 'Add_Geotag_or_Update_Lat_Long_to_CA.py' || selectedScript.name === 'Add_Subcompany_Permissons_To_Variety.py') {
+                const scriptsWithDelay = [
+                    'Update_DOS_Variety_to_CA.py', 'Update_DOS_to_CA.py', 'Update_Variety_to_CA.py',
+                    'PR_Enablement_Bulk.py', 'Add_Geotag_or_Update_Lat_Long_to_CA.py',
+                    'Add_Subcompany_Permissons_To_Variety.py',
+                    'Bulk_Delete_Assets.py', 'Bulk_Delete_Farmers.py', 'CA_Close_and_Delete.py',
+                    'Enable_Or_Disable_User.py', 'PR_Enablement.py', 'PR_and_Weather_Enablement.py',
+                    'Update_Asset_Tags.py', 'Update_Farmer_Tags.py',
+                    'Update_Farmer_Details.py', 'Update_Asset_Details.py',
+                    'Update_Farmer_Additional_Attribute.py', 'Update_Asset_Additional_Attribute.py',
+                    'Update_Asset_Address.py', 'Update_Farmer_Address.py',
+                    'Delete_Asset_Tags.py', 'Delete_Farmer_Tags.py',
+                    'Remove_Variety_Data.py', 'Area_Audit_To_CA.py', 'Area_Audit_Removal.py',
+                    'Split_CAs.py', 'AddTagsWithNewAPI.py', 'Add_Cropstages_to_Variety.py',
+                    'Add_Seed_Grades_to_Variety.py', 'Update_Farmer_Number_Data.py',
+                    'Add_Users.py', 'Add_Varieties_or_Sub_Varieties.py',
+                    'Edit_Plans_in_Variety_with_or_without_recurring.py',
+                    'RefreshPlans.py', 'Farmer_Refresh_EditandSave.py',
+                    'Asset_Refresh_EditandSave.py', 'Enable_Cropin_Connect.py',
+                    'Delete_Users.py'
+                ];
+                if (scriptsWithDelay.includes(selectedScript.name)) {
                     timeConfig.style.display = 'block';
                 } else {
                     timeConfig.style.display = 'none';

@@ -31,6 +31,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     
     base_api_url = base_api_url.rstrip('/')
 
+    delay_time = float(config.get("delay_time", 1))  # seconds, configurable via UI
+
     log(f"📂 Loading input file: {input_excel_file}")
     try:
         df = pd.read_excel(input_excel_file)
@@ -94,7 +96,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Response"] = str(e)
             failure_count += 1
 
-        time.sleep(1) # Rate limit protection
+        time.sleep(delay_time)  # Rate limit protection
 
     try:
         df.to_excel(output_excel_file, index=False)

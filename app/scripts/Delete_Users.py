@@ -45,6 +45,8 @@ def run(input_excel, output_excel, config, log_callback=None):
         "Content-Type": "application/json"
     }
 
+    delay_time = float(config.get("delay_time", 5))
+
     log(f"Reading input file: {input_excel}")
     try:
         df = pd.read_excel(input_excel)
@@ -111,7 +113,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         df.at[first_index, "Processed_User_Ids"] = ids_param
         df.at[first_index, "API_Response"] = response_text
         
-        time.sleep(DELAY_SECONDS)
+        time.sleep(delay_time)
 
     log("Saving output file...")
     try:

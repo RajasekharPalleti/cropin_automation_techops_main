@@ -14,7 +14,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log_callback(msg)
         print(msg)
 
-    delay_time = 2 # seconds
+    delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
 
     # Configuration
     token = config.get("token")

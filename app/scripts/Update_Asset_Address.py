@@ -37,7 +37,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     
     put_url_final = api_url
     get_url_base = api_url
-    
+
+    delay_time = float(config.get("delay_time", 1))  # seconds, configurable via UI
+
     # Attribute Keys (Dynamic) - These will be keys inside "address" dict
     attr_keys = config.get("attr_keys", [])
     valid_keys_map = {} # {index: key_name}
@@ -185,7 +187,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 response_str = str(e) + error_details
                 log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}{error_details}")
 
-            time.sleep(1)
+            time.sleep(delay_time)
             results.append((index, status, response_str))
 
         return results

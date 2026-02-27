@@ -39,6 +39,8 @@ def run(input_excel, output_excel, config, log_callback=None):
         "Content-Type": "application/json"
     }
 
+    delay_time = float(config.get("delay_time", 5))
+
     log(f"Reading input file: {input_excel}")
     try:
         df = pd.read_excel(input_excel)
@@ -121,7 +123,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             df.loc[batch_index, "Response"] = str(e)
             log(f"❌ Exception: {e}")
 
-        time.sleep(DELAY)
+        time.sleep(delay_time)
 
     log("Saving output file...")
     try:

@@ -27,6 +27,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default Asset API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
+    delay_time = float(config.get("delay_time", 0.2))  # seconds, configurable via UI
+
     # Attribute Keys from Config
     # config['attr_keys'] should be a list [key1, key2, key3, key4]
     attr_keys = config.get("attr_keys", [])
@@ -120,7 +122,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 continue
 
             # 2. PUT Update
-            time.sleep(0.2)
+            time.sleep(delay_time)
             
             # Application/json Multipart
             multipart_data = {
@@ -138,7 +140,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Status"] = f"Failed: {err_msg}"
             log(f"❌ Failed for {asset_id}: {err_msg}")
 
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     try:
         df.to_excel(output_excel_file, index=False)

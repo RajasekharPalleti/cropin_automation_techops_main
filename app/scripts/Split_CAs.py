@@ -45,6 +45,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         "Content-Type": "application/json"
     }
 
+    delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
+
     # =========================
     # LOAD EXCEL
     # =========================
@@ -146,7 +148,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[i, "status"] = "❌ Failed"
                 df.at[i, "Response"] = f"{response.status_code} - {response.text}"
                 
-            time.sleep(2) # Reduced sleep a bit from 10s to 2s for efficiency, user can adjust if strictly needed.
+            time.sleep(delay_time)  # configurable via UI
 
         except Exception as e:
             log(f"❌ Error processing row {i+2}: {e}")

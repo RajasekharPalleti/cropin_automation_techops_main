@@ -9,7 +9,7 @@ import requests
 
 import time
 
-def post_data_to_api(post_api_url, access_token_bearer, input_excel_file, output_excel_file, log_callback=None):
+def post_data_to_api(post_api_url, access_token_bearer, input_excel_file, output_excel_file, log_callback=None, delay_time=0.5):
     def log(msg):
         if log_callback:
             log_callback(msg)
@@ -70,7 +70,7 @@ def post_data_to_api(post_api_url, access_token_bearer, input_excel_file, output
             log(f"Error processing {row.iloc[0]}: {e}")
 
         # Wait for 0.5 second before the next iteration
-        time.sleep(0.5)
+        time.sleep(delay_time)
 
     # Save the updated DataFrame with status to a new Excel file
     log("Saving updated DataFrame to a new Excel file...")
@@ -100,6 +100,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("Warning: No token found in config. Authentication might have failed or not run.")
         # We allow it to proceed potentially, or fail inside post_data_to_api
     
+    delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
     log(f"Starting execution with API: {api_url}")
     
-    post_data_to_api(api_url, token, input_excel_file, output_excel_file, log_callback=log_callback)
+    post_data_to_api(api_url, token, input_excel_file, output_excel_file, log_callback=log_callback, delay_time=delay_time)

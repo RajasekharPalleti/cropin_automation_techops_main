@@ -37,6 +37,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         "Content-Type": "application/json"
     }
 
+    delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
+
     log("Reading Excel file...")
     try:
         df = pd.read_excel(input_excel_file)
@@ -115,7 +117,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     status_code = 0
                 if plot_risk_response is None: plot_risk_response = MockResponse()
 
-            time.sleep(0.5)
+            time.sleep(delay_time)
 
             # 2. Send Weather API request
             log(f"📡 Sending Weather API request for CroppableAreaId: {croppable_area_id}")
@@ -157,7 +159,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "status"] = f"⚠️ Error: {error_message}"
             log(f"⚠️ Error in row {index + 1}: {error_message}")
 
-        time.sleep(2)
+        time.sleep(delay_time)
 
     # Save output
     log("🎯 Processing completed. Saving output file...")
