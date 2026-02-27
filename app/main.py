@@ -372,7 +372,7 @@ async def list_scripts():
     scripts = []
     # Define default Configs (URL + Label + Input Requirement)
     default_configs = {
-        "AddTagsWithNewAPI.py": {
+        "Add_Tags_With_New_API.py": {
             "url": "https://cloud.cropin.in/services/master/api/tags",
             "label": "Post Api Url",
             "requires_input": True
@@ -402,7 +402,7 @@ async def list_scripts():
             "label": "Base Api Url",
             "requires_input": True
         },
-        "RefreshPlans.py": {
+        "Refresh_Plans.py": {
             "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
             "label": "Base Api Url",
             "requires_input": True
@@ -526,12 +526,12 @@ async def list_scripts():
             "label": "Base Api Url",
             "requires_input": True
         },
-        "Farmer_Refresh_EditandSave.py": {
+        "Farmer_Refresh_Edit_and_Save.py": {
             "url": "https://cloud.cropin.in/services/farm/api/farmers",
             "label": "Base Api Url",
             "requires_input": True
         },
-        "Asset_Refresh_EditandSave.py": {
+        "Asset_Refresh_Edit_and_Save.py": {
             "url": "https://cloud.cropin.in/services/farm/api/assets",
             "label": "Base Api Url",
             "requires_input": True
@@ -540,6 +540,13 @@ async def list_scripts():
             "url": "https://cloud.cropin.in/services/farm/api/farmers",
             "label": "Base Api Url",
             "url2": "https://cloud.cropin.in/services/master/api/filter?type=FARMER&size=10000",
+            "label2": "Tag Filter API Url",
+            "requires_input": True
+        },
+        "Delete_CA_Tags.py": {
+            "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
+            "label": "Base Api Url",
+            "url2": "https://cloud.cropin.in/services/master/api/filter?type=CA&size=10000",
             "label2": "Tag Filter API Url",
             "requires_input": True
         },
