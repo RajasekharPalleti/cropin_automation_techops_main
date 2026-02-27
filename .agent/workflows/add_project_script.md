@@ -8,6 +8,7 @@ Follow these steps strictly whenever adding a new script:
     - Analyze the provided script logic.
     - Ensure it fits the project structure (`run` function signature).
     - functionality should use the `token` from `config` for authentication.
+    - delay_time should be used for time delay
     - Adapt hardcoded values to be configurable.
     - Add default URL if the url is not from configuration.
     - Add log_callback as other scripts.
