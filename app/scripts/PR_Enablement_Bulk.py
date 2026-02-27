@@ -78,7 +78,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # BATCH PROCESSING
     # =========================
     for start in range(0, len(df), BATCH_SIZE):
-        time_delay = config.get("time_delay", 5)
+        time_delay = float(config.get("delay_time", 5))
         end = start + BATCH_SIZE
         batch_df = df.iloc[start:end]
 
