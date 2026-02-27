@@ -7,6 +7,104 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusArea = document.getElementById('status-area');
     const generateTemplateBtn = document.getElementById('generate-template-btn');
 
+    // =============================================
+    // GENERIC CUSTOM SELECT UTILITY
+    // Converts any native <select> into a green-themed custom dropdown.
+    // Keeps the original <select> hidden so any existing JS that reads
+    // .value from it continues to work unchanged.
+    // =============================================
+    function initCustomSelect(selectEl) {
+        if (!selectEl || selectEl.dataset.customized) return;
+        selectEl.dataset.customized = 'true';
+        selectEl.style.display = 'none';
+
+        // Build wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-dropdown custom-select-wrapper';
+
+        // Selected display
+        const selected = document.createElement('div');
+        selected.className = 'dropdown-selected';
+
+        const selectedText = document.createElement('span');
+        const defaultOpt = selectEl.options[selectEl.selectedIndex];
+        selectedText.textContent = defaultOpt ? defaultOpt.text : '';
+
+        const arrow = document.createElement('span');
+        arrow.className = 'arrow';
+        arrow.textContent = '▼';
+
+        selected.appendChild(selectedText);
+        selected.appendChild(arrow);
+
+        // Menu
+        const menu = document.createElement('div');
+        menu.className = 'dropdown-menu';
+
+        const list = document.createElement('ul');
+        list.className = 'dropdown-list';
+
+        Array.from(selectEl.options).forEach(opt => {
+            const li = document.createElement('li');
+            li.textContent = opt.text;
+            li.dataset.value = opt.value;
+            if (opt.selected) li.classList.add('selected-item');
+            li.addEventListener('click', () => {
+                selectedText.textContent = opt.text;
+                selectEl.value = opt.value;
+                // Dispatch change event so any existing listeners still fire
+                selectEl.dispatchEvent(new Event('change'));
+                // Highlight active item
+                list.querySelectorAll('li').forEach(el => el.classList.remove('selected-item'));
+                li.classList.add('selected-item');
+                menu.classList.remove('show');
+                selected.classList.remove('active');
+            });
+            list.appendChild(li);
+        });
+
+        menu.appendChild(list);
+        wrapper.appendChild(selected);
+        wrapper.appendChild(menu);
+
+        // Toggle open/close
+        selected.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = menu.classList.contains('show');
+            // Close all other custom selects first
+            document.querySelectorAll('.custom-select-wrapper .dropdown-menu.show').forEach(m => {
+                m.classList.remove('show');
+                m.previousElementSibling.classList.remove('active');
+            });
+            if (!isOpen) {
+                menu.classList.add('show');
+                selected.classList.add('active');
+            }
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target)) {
+                menu.classList.remove('show');
+                selected.classList.remove('active');
+            }
+        });
+
+        // Insert after the hidden select
+        selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+    }
+
+    // Convert all config-area selects (excludes the script/env custom dropdowns which are already custom)
+    [
+        'use-farmer-id',
+        'attr-count-select',
+        'addr-count-select',
+        'removal-count-select',
+        'force-crop-audited',
+        'worker-count',
+        'ca-action-select'
+    ].forEach(id => initCustomSelect(document.getElementById(id)));
+
     // Mobile Sidebar Toggle
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
     const mainSidebar = document.querySelector('.sidebar');
@@ -519,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             closeEnvDropdown();
         });
     });
+
 
     // --- Auth Validation Helper ---
     function checkAuthAndAlert() {
