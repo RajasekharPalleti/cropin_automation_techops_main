@@ -437,7 +437,14 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=7"></script>
+    <!-- JS Modules — loaded in dependency order (defer preserves order) -->
+    <script src="/static/js/ui.js" defer></script>
+    <script src="/static/js/wake_lock.js" defer></script>
+    <script src="/static/js/session.js" defer></script>
+    <script src="/static/js/sse.js" defer></script>
+    <script src="/static/js/execution.js" defer></script>
+    <script src="/static/js/backup.js" defer></script>
+    <script src="/static/js/app.js" defer></script>
 </body>
 
 </html>
