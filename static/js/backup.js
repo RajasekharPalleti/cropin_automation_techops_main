@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => {
                 console.error('Failed to fetch backups:', err);
                 document.querySelectorAll('.loading-indicator').forEach(el => el.remove());
+                window.showToast('Failed to load Google Drive backups. Check console.', 'error');
                 if (reset) {
                     if (uploadedList) uploadedList.innerHTML = '<li class="empty-state">Failed to load backups. Error: ' + err.message + '</li>';
                     if (downloadedList) downloadedList.innerHTML = '<li class="empty-state">Failed to load backups.</li>';

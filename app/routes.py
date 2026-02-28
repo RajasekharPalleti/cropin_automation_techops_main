@@ -216,6 +216,16 @@ async def list_scripts():
                 "requires_input": config.get("requires_input", True),
                 "description": description,
                 "input_description": input_description,
+                # Dynamic UI Flags
+                "show_extended_config": config.get("show_extended_config", False),
+                "extended_config_type": config.get("extended_config_type", ""),
+                "show_pr_weather": config.get("show_pr_weather", False),
+                "show_attribute_config": config.get("show_attribute_config", False),
+                "show_address_config": config.get("show_address_config", False),
+                "show_area_audit": config.get("show_area_audit", False),
+                "show_variety_removal": config.get("show_variety_removal", False),
+                "show_ca_close_delete": config.get("show_ca_close_delete", False),
+                "show_time_delay": config.get("show_time_delay", True)
             })
 
     scripts.sort(key=lambda x: x["name"])

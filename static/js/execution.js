@@ -43,8 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     stopBtn.style.cssText = 'display: none; background-color: #ff4444; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;';
     if (runContainer) runContainer.appendChild(stopBtn);
 
-    stopBtn.addEventListener('click', () => {
-        if (!confirm('Are you sure you want to stop the running process?')) return;
+    stopBtn.addEventListener('click', async () => {
+        if (!(await window.showConfirm('Stop Process', 'Are you sure you want to stop the running process?'))) return;
 
         stopBtn.disabled = true;
         stopBtn.textContent = 'Stopping...';
@@ -53,7 +53,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clientId = window.getClientId ? window.getClientId() : sessionStorage.getItem('clientId');
         fetch('/api/stop/' + clientId, { method: 'POST' })
-            .catch(err => console.error('Stop request failed:', err));
+            .catch(err => {
+                console.error('Stop request failed:', err);
+                window.showToast('Failed to reach server to stop the process.', 'error');
+            });
 
         // Close SSE immediately
         if (window.closeSSE) window.closeSSE();
@@ -78,10 +81,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------
     window.addEventListener('beforeunload', (e) => {
         if (sessionStorage.getItem('is_script_running') === 'true') {
-            const msg = 'Script is running! Refreshing or Closing the browser is NOT allowed. Please wait.';
+            window.showToast('WARNING: A script is currently running! If you leave or refresh this page now, the process may be interrupted and your session will be lost. Please wait for the script to finish.', 'warning', 'Do Not Close Page');
             e.preventDefault();
-            e.returnValue = msg;
-            return msg;
         }
     });
 
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sessionStorage.getItem('is_script_running') === 'true') {
             if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.metaKey && e.key === 'r')) {
                 e.preventDefault();
-                alert('Refresh is disabled while the script is running!');
+                window.showToast('Refresh is disabled while the script is running!', 'warning');
             }
         }
     });
@@ -128,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----------------------------------------------------------------
     function handleFile(file) {
         if (!scriptSelect.value) {
-            alert('Please select a script first.');
+            window.showToast('Please select a script first.', 'error');
             return;
         }
 
@@ -192,15 +193,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(r => r.json())
                 .then(data => {
                     if (data.found) {
-                        alert('SESSION ACTIVE: A script is already running on this machine.\n\nYou cannot start a new session until the current one finishes or is Force Reset.');
-                        if (confirm('Do you want to join the running session?')) {
-                            if (window.setClientId) window.setClientId(data.client_id);
-                            sessionStorage.setItem('is_script_running', 'true');
-                            sessionStorage.setItem('running_script_name', data.script_name || '');
-                            location.reload();
-                        } else {
-                            closeConfirmation();
-                        }
+                        window.showToast('SESSION ACTIVE: A script is already running on this machine.\n\nYou cannot start a new session until the current one finishes or is Force Reset.', 'error', 'Action Blocked');
+                        window.showConfirm('Session Active', 'Do you want to join the running session?').then(agreed => {
+                            if (agreed) {
+                                if (window.setClientId) window.setClientId(data.client_id);
+                                sessionStorage.setItem('is_script_running', 'true');
+                                sessionStorage.setItem('running_script_name', data.script_name || '');
+                                location.reload();
+                            } else {
+                                closeConfirmation();
+                            }
+                        });
                     } else {
                         closeConfirmation();
                         executeScriptLogic();
@@ -362,8 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const rc = document.getElementById('run-container');
         if (rc) rc.appendChild(resetBtn);
 
-        resetBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to force reset the session? Any running task logs will be disconnected.')) {
+        resetBtn.addEventListener('click', async () => {
+            const confirmed = await window.showConfirm('Force Reset', 'Are you sure you want to force reset the session? Any running task logs will be disconnected.');
+            if (confirmed) {
                 sessionStorage.setItem('is_script_running', 'false');
                 sessionStorage.removeItem('running_script_name');
                 if (window.releaseWakeLock) window.releaseWakeLock();

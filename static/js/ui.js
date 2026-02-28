@@ -162,3 +162,152 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
+// =========================================================
+// TOAST NOTIFICATIONS
+// Replaces standard blocking alert() with modern sliding toasts
+// =========================================================
+window.showToast = function (message, type = 'info', title = null) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+
+    const defaultTitle = title || (type.charAt(0).toUpperCase() + type.slice(1));
+
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+            <div class="toast-title">${defaultTitle}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+    `;
+
+    container.appendChild(toast);
+
+    // Trigger reflow to ensure the transition fires
+    toast.offsetHeight;
+    toast.classList.add('show');
+
+    // Auto remove after 10 seconds
+    const hideTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentElement) toast.remove();
+        }, 400); // match css transition time
+    }, 10000);
+
+    // Dismiss early on click
+    toast.onclick = () => {
+        clearTimeout(hideTimeout);
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentElement) toast.remove();
+        }, 400);
+    };
+};
+
+// =========================================================
+// Custom Async Confirm Modal
+// Replaces standard blocking confirm() with a modern async modal
+// Returns a Promise that resolves to true (proceed) or false (cancel)
+// =========================================================
+window.showConfirm = function (title, message) {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'block';
+        modal.style.zIndex = '3000'; // Make sure it sits above other modals
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px; text-align: center; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <div class="modal-header" style="border-bottom: none; justify-content: center; padding-top: 25px;">
+                    <h2 style="font-size: 1.4em; color: #333; margin: 0;">${title}</h2>
+                </div>
+                <div class="modal-body" style="padding: 10px 25px 25px 25px;">
+                    <p style="margin-bottom: 25px; font-size: 1.05em; color: #555; line-height: 1.4;">${message}</p>
+                    <div style="display: flex; justify-content: center; gap: 12px;">
+                        <button class="btn-secondary" id="dynamic-confirm-cancel" style="flex: 1; padding: 10px 0;">Cancel</button>
+                        <button class="btn-primary" id="dynamic-confirm-ok" style="flex: 1; padding: 10px 0;">Yes, Proceed</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const cleanup = (result) => {
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.remove();
+                resolve(result);
+            }, 200);
+        };
+
+        modal.querySelector('#dynamic-confirm-cancel').onclick = () => cleanup(false);
+        modal.querySelector('#dynamic-confirm-ok').onclick = () => cleanup(true);
+    });
+};
+
+// =========================================================
+window.saveFormState = function () {
+    const state = {
+        tenant: document.getElementById('tenant-code')?.value || '',
+        username: document.getElementById('username')?.value || '',
+        env: document.getElementById('environment')?.value || 'prod1',
+        apiUrl: document.getElementById('put-api-url')?.value || '',
+        dataset: document.getElementById('dataset')?.value || '',
+        loadType: document.getElementById('load-type')?.value || '',
+        delayTime: document.getElementById('delay-time-input')?.value || '1',
+    };
+    localStorage.setItem('cropin_automation_state', JSON.stringify(state));
+};
+
+window.loadFormState = function () {
+    const saved = localStorage.getItem('cropin_automation_state');
+    if (!saved) return;
+
+    try {
+        const state = JSON.parse(saved);
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && val) el.value = val;
+        };
+
+        setVal('tenant-code', state.tenant);
+        setVal('username', state.username);
+        setVal('environment', state.env);
+        setVal('put-api-url', state.apiUrl);
+        setVal('dataset', state.dataset);
+        setVal('load-type', state.loadType);
+        setVal('delay-time-input', state.delayTime);
+
+        // Update generic custom dropdowns if they exist
+        const envSelect = document.getElementById('environment');
+
+        // Handle specifically our hardcoded Environment dropdown from app.js
+        if (envSelect && state.env) {
+            const envSelectedText = document.getElementById('env-selected-text');
+            const envList = document.getElementById('env-list');
+
+            if (envSelectedText && envList) {
+                const listItems = envList.querySelectorAll('li');
+                const matchingItem = Array.from(listItems).find(li => li.getAttribute('data-value') === state.env);
+
+                if (matchingItem) {
+                    envSelectedText.textContent = matchingItem.textContent;
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse saved form state:", e);
+    }
+};

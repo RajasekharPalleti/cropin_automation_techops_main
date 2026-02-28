@@ -20,6 +20,17 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    // 1) Initialize UI State (Deferred slightly to ensure ui.js is parsed)
+    setTimeout(() => {
+        if (window.loadFormState) window.loadFormState();
+
+        // Bind form state saving to all inputs
+        document.querySelectorAll('input:not([type="file"]), select').forEach(el => {
+            el.addEventListener('change', window.saveFormState);
+            el.addEventListener('input', window.saveFormState);
+        });
+    }, 100);
+
     // DOM refs
     const configToggle = document.getElementById('config-toggle');
     const configContent = document.getElementById('config-content');
@@ -83,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!userIn.value.trim()) missing.push('Username');
         if (!passIn.value.trim()) missing.push('Password');
         if (missing.length > 0) {
-            alert('Please enter valid ' + missing.join(', ') + ' to proceed.');
+            window.showToast('Please enter valid ' + missing.join(', ') + ' to proceed.', 'error');
             return false;
         }
         return true;
@@ -162,36 +173,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Extended config visibility toggles
             const extendedConfigDiv = document.getElementById('extended-config');
-            if (selectedScript.name === 'Add_Users.py') {
+            if (selectedScript.show_extended_config) {
                 extendedConfigDiv.style.display = 'block';
-                document.getElementById('dataset').closest('.input-group').style.display = 'none';
-                document.getElementById('load-type').closest('.input-group').style.display = 'none';
-                document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
-                document.querySelector('label[for="x-api-key"]').textContent = 'Google API Key';
-            } else if (selectedScript.name === 'GetDiscrollsData.py') {
-                extendedConfigDiv.style.display = 'block';
-                document.getElementById('dataset').closest('.input-group').style.display = 'block';
-                document.getElementById('load-type').closest('.input-group').style.display = 'block';
-                document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
-                document.querySelector('label[for="x-api-key"]').textContent = 'X-API-KEY';
+                if (selectedScript.extended_config_type === 'add_users') {
+                    document.getElementById('dataset').closest('.input-group').style.display = 'none';
+                    document.getElementById('load-type').closest('.input-group').style.display = 'none';
+                    document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
+                    document.querySelector('label[for="x-api-key"]').textContent = 'Google API Key';
+                } else if (selectedScript.extended_config_type === 'get_discrolls') {
+                    document.getElementById('dataset').closest('.input-group').style.display = 'block';
+                    document.getElementById('load-type').closest('.input-group').style.display = 'block';
+                    document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
+                    document.querySelector('label[for="x-api-key"]').textContent = 'X-API-KEY';
+                }
             } else {
                 extendedConfigDiv.style.display = 'none';
             }
 
-            const prScripts = ['PR_Enablement.py', 'PR_and_Weather_Enablement.py', 'PR_Enablement_Bulk.py'];
             const toggle = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? 'block' : 'none'; };
 
-            toggle('pr-weather-config', prScripts.includes(selectedScript.name));
-
-            const attrScripts = ['Update_Asset_Additional_Attribute.py', 'Update_Farmer_Additional_Attribute.py',
-                'Update_Farmer_Details.py', 'Update_Asset_Details.py', 'Update_Farmer_Number_Data.py'];
-            toggle('attribute-config', attrScripts.includes(selectedScript.name));
-
-            toggle('address-config', ['Update_Farmer_Address.py', 'Update_Asset_Address.py'].includes(selectedScript.name));
-            toggle('area-audit-config', selectedScript.name === 'Area_Audit_To_CA.py');
-            toggle('variety-removal-config', selectedScript.name === 'Remove_Variety_Data.py');
-            toggle('ca-close-delete-config', selectedScript.name === 'CA_Close_and_Delete.py');
-            toggle('time-delay-config', selectedScript.name?.endsWith('.py') ?? false);
+            toggle('pr-weather-config', selectedScript.show_pr_weather);
+            toggle('attribute-config', selectedScript.show_attribute_config);
+            toggle('address-config', selectedScript.show_address_config);
+            toggle('area-audit-config', selectedScript.show_area_audit);
+            toggle('variety-removal-config', selectedScript.show_variety_removal);
+            toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
+            toggle('time-delay-config', selectedScript.show_time_delay);
 
             // Count dropdowns
             const setupCountDropdown = (selectId, groupPrefix, max = 4) => {
@@ -274,10 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
         dropdownList.innerHTML = '';
         if (filtered.length > 0) {
             filtered.forEach(scriptObj => {
+                const scriptName = scriptObj.name;
+                let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
+                displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
+
                 const li = document.createElement('li');
-                li.textContent = scriptObj.name;
-                li.dataset.value = scriptObj.name;
-                li.addEventListener('click', () => selectScript(scriptObj.name));
+                li.textContent = displayName;
+                li.dataset.value = scriptName;
+                li.addEventListener('click', () => selectScript(scriptName, displayName));
                 dropdownList.appendChild(li);
             });
         } else {
@@ -327,6 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => {
             envSelectedText.textContent = item.textContent;
             envNativeSelect.value = item.getAttribute('data-value');
+            envNativeSelect.dispatchEvent(new Event('change'));
             closeEnvDropdown();
         });
     });
@@ -343,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (selectedScript && selectedScript.requires_input !== false) {
                 if (!window.currentUploadedFilename) {
-                    alert('No file uploaded');
+                    window.showToast('No file uploaded', 'error');
                     return;
                 }
             }
@@ -368,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (generateTemplateBtn) {
         generateTemplateBtn.addEventListener('click', () => {
             if (!scriptSelect.value) {
-                alert('Please select a script first.');
+                window.showToast('Please select a script first.', 'error');
                 return;
             }
 
@@ -401,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         templateInfoBox.style.color = 'red';
                         templateInfoBox.textContent = 'Template Error: ' + err.message;
                     }
-                    alert('Template Error: ' + err.message);
+                    window.showToast('Template Error: ' + err.message, 'error');
                 });
         });
     }

@@ -29,10 +29,10 @@ Follow these steps strictly whenever adding a new script:
     - Define all required columns/headers that the script expects.
 
 3. **Configuration & URL Configuralization**
-    - Modify `app/main.py` to register the script in `default_configs`.
-    - Extract API URLs and make them configurable (add to `url`, `url2`, etc., in the config dictionary).
-    - Ensure `static/js/app.js` handles the new script selection to populate the configuration fields (Primary URL, Secondary URL, etc.).
-    - If new inputs are needed, add them to `static/index.html` and update `app.js` to hide/show them.
+    - Open `app/script_configs.py`.
+    - Add a new block inside the `SCRIPT_CONFIGS` dictionary with the script name as the key (e.g., `"New_Script.py": { ... }`).
+    - Define the base API URL (`url`, `url2`), the display labels (`label`, `label2`), and any necessary boolean UI flags (e.g., `"show_pr_weather": True`, `"show_address_config": True`).
+    - The frontend (`static/js/app.js` and `index.html`) will *automatically* render the required configuration fields based on these flags! No JavaScript or HTML changes are needed.
 
 4. **Final System Verification**
     - Verify the script is listed in the UI.
