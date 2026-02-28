@@ -153,8 +153,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                                 id_status_list.append({"id": it["id"], "status": it["status"]})
 
                     closed_api_summary = id_status_list or close_json or resp_close.text
-                    df.at[first_row_index, "closed_api_http_status"] = close_status_code
-                    df.at[first_row_index, "closed_api_status"] = json.dumps(closed_api_summary, default=str)
+                    
+                    for chunk_idx in idx_chunk:
+                        df.at[chunk_idx, "closed_api_http_status"] = str(close_status_code)
+                        df.at[chunk_idx, "closed_api_status"] = json.dumps(closed_api_summary, default=str)
                     
                     if close_status_code == 200:
                         log(f"    ✅ Close Success (HTTP {close_status_code})")
@@ -163,14 +165,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                 except Exception as e:
                     log(f"    ❌ Close Error: {str(e)}")
-                    df.at[first_row_index, "closed_api_http_status"] = "Error"
-                    df.at[first_row_index, "closed_api_status"] = str(e)
+                    for chunk_idx in idx_chunk:
+                        df.at[chunk_idx, "closed_api_http_status"] = "Error"
+                        df.at[chunk_idx, "closed_api_status"] = str(e)
+
 
                 time.sleep(delay_time)
 
-            # --- 2) DELETE PROJECT-ASSETS API ---
+            # --- 2) DELETE CROPPABLE AREA API ---
             if "delete" in ca_action:
-                log(f"    🗑️ Deleting {len(ca_chunk)} project-assets...")
+                log(f"    🗑️ Deleting {len(ca_chunk)} croppable_areas...")
                 delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids"
                 delete_params = {"ids": asset_ids_param, "croppableAreaIds": ca_ids_param}
 
@@ -201,8 +205,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         "deleted": is_deleted
                     }
 
-                    df.at[first_row_index, "delete_api_http_status"] = delete_status_code
-                    df.at[first_row_index, "delete_api_status"] = json.dumps(delete_info, default=str)
+                    for chunk_idx in idx_chunk:
+                        df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
+                        df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
 
                     if is_deleted:
                         log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
@@ -211,8 +216,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                 except Exception as e:
                     log(f"    ❌ Delete Error: {str(e)}")
-                    df.at[first_row_index, "delete_api_http_status"] = "Error"
-                    df.at[first_row_index, "delete_api_status"] = str(e)
+                    for chunk_idx in idx_chunk:
+                        df.at[chunk_idx, "delete_api_http_status"] = "Error"
+                        df.at[chunk_idx, "delete_api_status"] = str(e)
+
 
                 time.sleep(delay_time)
 
