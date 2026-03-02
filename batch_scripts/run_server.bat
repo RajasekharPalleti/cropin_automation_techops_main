@@ -15,6 +15,9 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
+echo "Starting Auto-Updater (Runs daily at 12:00 AM)..."
+nohup python3 auto_update.py >/dev/null 2>&1 &
+
 echo "Installing/Updating requirements..."
 pip3 install -r requirements.txt
 python3 -m app.main
@@ -25,6 +28,10 @@ exit 0
 echo Starting Cropin Automation Server...
 echo Open http://localhost:4444 or http://<your-ip>:4444 in your browser.
 pushd %~dp0\..\
+
+echo Starting Auto-Updater (Runs daily at 12:00 AM)...
+start /b python auto_update.py >nul 2>&1
+
 echo Installing/Updating requirements...
 pip install -r requirements.txt
 python -m app.main

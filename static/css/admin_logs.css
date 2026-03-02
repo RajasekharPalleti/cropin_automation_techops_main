@@ -1,0 +1,159 @@
+/* 
+  admin_logs.css 
+  Styles for the easter egg Server Logs floating console. 
+  Matches the Cropin TechOps Theme (Roboto, #009ade, #333).
+*/
+
+.admin-console-wrapper {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 600px;
+    height: 400px;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    display: none;
+    /* Hidden by default */
+    flex-direction: column;
+    z-index: 9999;
+    font-family: 'Roboto', sans-serif;
+    overflow: hidden;
+    transition: width 0.3s, height 0.3s, bottom 0.3s, right 0.3s, top 0.3s, left 0.3s;
+}
+
+.admin-console-wrapper.fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    border-radius: 0;
+    transform: none !important;
+}
+
+.admin-console-wrapper.minimized {
+    width: 300px;
+    height: 40px;
+    bottom: 0;
+    right: 20px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+}
+
+.admin-console-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: grab;
+    user-select: none;
+}
+
+.admin-console-header:active {
+    cursor: grabbing;
+}
+
+.admin-console-title {
+    font-weight: 500;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.admin-console-title .material-icons {
+    color: #009ade;
+    font-size: 18px;
+}
+
+.admin-console-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.admin-console-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.admin-console-btn:hover {
+    background-color: #e2e8f0;
+    color: #333;
+}
+
+.admin-console-btn.close:hover {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+/* Toolbar (Search) */
+.admin-console-toolbar {
+    padding: 8px 15px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #ffffff;
+    display: flex;
+}
+
+.admin-console-wrapper.minimized .admin-console-toolbar {
+    display: none;
+}
+
+.admin-search-input {
+    width: 100%;
+    padding: 6px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: monospace;
+}
+
+.admin-search-input:focus {
+    border-color: #009ade;
+}
+
+/* Log Content Area */
+.admin-console-body {
+    flex: 1;
+    background-color: #1e1e1e;
+    /* Dark theme for logs */
+    color: #d4d4d4;
+    padding: 10px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.admin-console-wrapper.minimized .admin-console-body {
+    display: none;
+}
+
+.admin-log-line {
+    word-break: break-all;
+    white-space: pre-wrap;
+    margin-bottom: 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.admin-log-line.search-match {
+    background-color: rgba(0, 154, 222, 0.3);
+    color: #ffffff;
+    font-weight: bold;
+}

@@ -1,4 +1,18 @@
-INFO:     Started server process [7092]
+INFO:     127.0.0.1:51513 - "GET /api/backups?page_size=100 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52970 - "GET /api/backups?page_size=100 HTTP/1.1" 200 OK
+BackupManager: Refreshing expired user credentials...
+file_cache is only supported with oauth2client<4.0.0
+BackupManager: Successfully authenticated with Google Drive (User Credentials).
+INFO:     Started server process [18708]
 INFO:     Waiting for application startup.
+Execute Clean up temporary directories...
+Executing Scheduled Backup Cleanup (Retention Policy: 3 Months)...
+BackupManager: Starting cleanup of files older than 90 days...
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:4444 (Press CTRL+C to quit)
+INFO:     Uvicorn running on http://0.0.0.0:4444 (Press CTRL+C to quit)
+BackupManager: No old files found to delete.
+INFO:     127.0.0.1:63175 - "GET /api/server_logs?offset_line=0&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63175 - "GET /api/server_logs/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61424 - "GET /api/server_logs?offset_line=0&limit=1000 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61424 - "GET /api/server_logs/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56921 - "GET /api/backups?page_size=100 HTTP/1.1" 200 OK

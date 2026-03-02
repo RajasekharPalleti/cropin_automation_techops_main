@@ -174,11 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeConfirmModal) closeConfirmModal.addEventListener('click', closeConfirmation);
     if (cancelRunBtn) cancelRunBtn.addEventListener('click', closeConfirmation);
 
-    window.addEventListener('click', (event) => {
-        if (event.target === confirmModal) return; // Don't close confirmation on outside click
-        const backupModal = document.getElementById('backup-modal');
-        if (event.target === backupModal) backupModal.style.display = 'none';
-    });
+    // Modals now only close via their specific close buttons or actions.
 
     if (confirmRunBtn) {
         confirmRunBtn.addEventListener('click', () => {

@@ -20,6 +20,63 @@ import importlib.util
 import importlib.metadata
 import os
 import re
+import logging
+import logging.handlers
+import datetime
+
+# ---------------------------------------------------------------------------
+# Setup Logger to write everything to server.log and console
+# ---------------------------------------------------------------------------
+
+class LoggerWriter:
+    def __init__(self, logger, level, original_stream=None):
+        self.logger = logger
+        self.level = level
+        self._original = original_stream
+        self._buffer = ""
+
+    def write(self, message):
+        self._buffer += message
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            line_str = line.rstrip()
+            if line_str != "":
+                # Prevent infinite recursion if the internal logger fails and writes to stderr
+                if '--- Logging error ---' in line_str or 'RecursionError' in line_str:
+                    sys.__stderr__.write(line_str + '\n')
+                    continue
+                self.logger.log(self.level, line_str)
+
+    def flush(self):
+        if self._buffer.rstrip() != "":
+            self.logger.log(self.level, self._buffer.rstrip())
+            self._buffer = ""
+        if self._original:
+            self._original.flush()
+            
+    def isatty(self):
+        return False
+        
+    def __getattr__(self, name):
+        if self._original:
+            return getattr(self._original, name)
+        raise AttributeError(f"'LoggerWriter' object has no attribute '{name}'")
+
+# Ensure basic configuration sends all Python root logs to server.log
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s', # Keep it simple so it matches what user sees in terminal
+    handlers=[
+        logging.handlers.RotatingFileHandler(
+            "server.log", maxBytes=10 * 1024 * 1024, backupCount=1, encoding="utf-8"
+        ),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Redirect standard prints and errors to the logger
+sys.stdout = LoggerWriter(logging.getLogger(), logging.INFO, sys.stdout)
+sys.stderr = LoggerWriter(logging.getLogger(), logging.ERROR, sys.stderr)
 
 
 # ---------------------------------------------------------------------------

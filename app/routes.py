@@ -153,6 +153,42 @@ async def stop_execution(client_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Server control endpoints for Auto-Updater
+# ---------------------------------------------------------------------------
+
+@router.get("/api/server/status")
+async def get_server_status():
+    """Check how many background script jobs are currently running."""
+    return {"active_jobs": len(manager.active_tasks)}
+
+
+@router.post("/api/server/shutdown")
+async def shutdown_server():
+    """Request the Uvicorn server to shut down via stop_server.bat."""
+    import os
+    import subprocess
+    import threading
+
+    def kill_server():
+        print("Shutdown requested via API. Executing stop_server.bat...")
+        try:
+            bat_path = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
+            if os.path.exists(bat_path):
+                # We pipe 'echo .' to bypass the 'pause' at the end of the bat file
+                subprocess.Popen(f'echo. | "{bat_path}"', shell=True)
+            else:
+                print(f"{bat_path} not found! Doing hard exit.")
+                os._exit(0)
+        except Exception as e:
+            print(f"Error running batch script: {e}")
+            os._exit(0)
+
+    # Run in a background thread so the HTTP response can be sent first
+    threading.Timer(2.0, kill_server).start()
+    return {"status": "shutting_down", "message": "Server will shut down via stop_server.bat in 2 seconds."}
+
+
+# ---------------------------------------------------------------------------
 # Session recovery
 # ---------------------------------------------------------------------------
 
@@ -370,6 +406,101 @@ async def execute_script(
         import traceback
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {str(e)}"})
+
+
+# ---------------------------------------------------------------------------
+# Server Logs Viewer Route
+# ---------------------------------------------------------------------------
+
+@router.get("/api/server_logs")
+async def get_server_logs(offset_line: int = 0, limit: int = 1000):
+    """
+    Returns lines from the server.log file, reading from the end backwards.
+    - offset_line: How many lines from the end to skip (default 0 = latest logs). 
+                   e.g., offset_line=1000 means skip the last 1000 lines and get the block before that.
+    - limit: How many lines to return in this batch (default 1000).
+    """
+    log_path = "server.log"
+    if not os.path.exists(log_path):
+        return {"logs": ["Log file not found."], "total_lines": 0}
+
+    try:
+        lines = []
+        # Attempt to load older rotated logs first
+        if os.path.exists("server.log.1"):
+            with open("server.log.1", "r", encoding="utf-8", errors="replace") as f:
+                lines.extend(f.readlines())
+                
+        # Load the current active logs
+        if os.path.exists("server.log"):
+            with open("server.log", "r", encoding="utf-8", errors="replace") as f:
+                lines.extend(f.readlines())
+            
+        total_lines = len(lines)
+        
+        # If the offset pushes us past the start of the file, we return nothing
+        if offset_line >= total_lines:
+            return {"logs": [], "total_lines": total_lines}
+        
+        # Start and end indexes for our slice
+        end_idx = total_lines - offset_line
+        start_idx = max(0, end_idx - limit)
+        
+        # Slice the list of lines
+        chunk = lines[start_idx:end_idx]
+        
+        return {
+            "logs": chunk,
+            "total_lines": total_lines,
+            "returned_count": len(chunk)
+        }
+            
+    except Exception as e:
+        return {"logs": [f"Error reading log file: {str(e)}"], "total_lines": 0}
+
+
+@router.get("/api/server_logs/stream")
+async def stream_server_logs(request: Request):
+    """
+    SSE endpoint that pushes new lines from server.log to the client as they are written.
+    """
+    from fastapi.responses import StreamingResponse
+    import asyncio
+    
+    log_path = "server.log"
+
+    async def event_generator():
+        # Wait a moment if file doesn't exist yet before crashing
+        if not os.path.exists(log_path):
+            await asyncio.sleep(1)
+            
+        if not os.path.exists(log_path):
+            yield f"data: Log file not found.\n\n"
+            return
+
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            # Move immediately to the end of the file, we only want *new* logs from here on
+            f.seek(0, os.SEEK_END)
+            
+            while True:
+                # If client disconnected, stop generating
+                if await request.is_disconnected():
+                    break
+                    
+                line = f.readline()
+                if line:
+                    # SSE format requires "data: <payload>\n\n"
+                    # We send just the raw line and let the frontend format it
+                    import json
+                    # We wrap the payload in JSON to safely encode newlines and quotes
+                    payload = json.dumps({"line": line.rstrip()})
+                    yield f"data: {payload}\n\n"
+                else:
+                    # Wait briefly before trying again
+                    await asyncio.sleep(0.5)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 
 
 # ---------------------------------------------------------------------------
