@@ -123,9 +123,6 @@ def main_loop():
     # Schedule to run every day at Midnight (12:00 AM)
     schedule.every().day.at("00:00").do(execute_update_process)
     
-    # Schedule to run every day at Noon (12:00 PM)
-    schedule.every().day.at("12:00").do(execute_update_process)
-    
     while True:
         schedule.run_pending()
         time.sleep(60) # Check planner once a minute

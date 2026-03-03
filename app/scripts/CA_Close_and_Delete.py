@@ -175,13 +175,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             # --- 2) DELETE CROPPABLE AREA API ---
             if "delete" in ca_action:
                 log(f"    🗑️ Deleting {len(ca_chunk)} croppable_areas...")
-                delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids"
-                delete_params = {"ids": asset_ids_param, "croppableAreaIds": ca_ids_param}
+                # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
+                delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={asset_ids_param}&croppableAreaIds={ca_ids_param}"
 
                 try:
-                    resp_delete = requests.delete(delete_url, headers=headers, params=delete_params, timeout=120)
+                    resp_delete = requests.delete(delete_url, headers=headers, timeout=120)
                     delete_status_code = resp_delete.status_code
-                    delete_text = resp_delete.text
 
                     try:
                         delete_json = resp_delete.json()
