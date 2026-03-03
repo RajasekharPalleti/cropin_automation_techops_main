@@ -170,7 +170,7 @@ async def shutdown_server():
     import threading
 
     def kill_server():
-        print("Shutdown requested via API. Executing stop_server.bat...")
+        print("Shutdown requested via API. Executing stop_server.bat... wait for 10 mins to deployment and refresh the browser for new changes")
         try:
             bat_path = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
             if os.path.exists(bat_path):
