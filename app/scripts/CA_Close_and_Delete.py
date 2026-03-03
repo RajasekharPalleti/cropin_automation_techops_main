@@ -122,11 +122,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             # --- 1) CLOSE CA API ---
             if "close" in ca_action:
                 log(f"    🔒 Closing {len(ca_chunk)} croppable areas...")
-                close_url = f"{base_url}/croppable-areas/closed"
-                close_params = {"reasonId": 4, "ids": ca_ids_param}
+                close_url = f"{base_url}/croppable-areas/closed?reasonId=4&ids={ca_ids_param}"
 
                 try:
-                    resp_close = requests.get(close_url, headers=headers, params=close_params, timeout=60)
+                    resp_close = requests.get(close_url, headers=headers, timeout=60)
                     close_status_code = resp_close.status_code
                     
                     try:
