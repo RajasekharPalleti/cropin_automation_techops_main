@@ -92,7 +92,8 @@ def execute_update_process():
     # 3. Pull the latest code from Git
     try:
         print("Pulling latest changes from Git (origin main)...")
-        subprocess.check_call(["git", "pull", "origin", "main"])
+        subprocess.check_call(["git", "fetch", "origin", "main"])
+        subprocess.check_call(["git", "reset", "--hard", "origin/main"])
         print("Git pull successful!")
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Git pull failed with code {e.returncode}. Aborting update.")

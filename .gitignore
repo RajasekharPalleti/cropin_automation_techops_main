@@ -7,3 +7,4 @@ outputs/
 *.xlsx
 !sample_templates/*.xlsx
 ~$*.xlsx
+*.log
