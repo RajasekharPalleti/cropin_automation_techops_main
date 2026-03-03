@@ -60,7 +60,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             return
 
     project_col = lower_cols["project_id"]
-    asset_col = lower_cols["project_asset_id"]
+    project_asset_col = lower_cols["project_asset_id"]
     ca_col = lower_cols["croppable_area_id"]
 
     # Ensure only relevant status columns based on action mode
@@ -75,11 +75,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     # Clean and Format Data
     df[project_col] = df[project_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)
-    df[asset_col] = df[asset_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)
+    df[project_asset_col] = df[project_asset_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)
     df[ca_col] = df[ca_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)
 
-    # Filter out empty CA IDs
-    df = df[df[ca_col].notna() & (df[ca_col] != "") & (df[ca_col] != "nan")]
+    # Filter out empty required IDs
+    df = df[
+        (df[ca_col].notna()) & (df[ca_col].str.strip() != "") & (df[ca_col].str.lower() != "nan") &
+        (df[project_col].notna()) & (df[project_col].str.strip() != "") & (df[project_col].str.lower() != "nan") &
+        (df[project_asset_col].notna()) & (df[project_asset_col].str.strip() != "") & (df[project_asset_col].str.lower() != "nan")
+    ]
     df.reset_index(drop=True, inplace=True)
 
     if df.empty:
@@ -97,27 +101,27 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     log(f"🔄 Found {total_projects} projects to process.")
 
     for p_idx, (project_id, group) in enumerate(grouped, 1):
-        asset_ids_all = group[asset_col].tolist()
+        project_asset_ids_all = group[project_asset_col].tolist()
         ca_ids_all = group[ca_col].tolist()
         indices_all = group.index.tolist()
 
         log(f"\n📁 Project {project_id} ({p_idx}/{total_projects}) | Total Items: {len(ca_ids_all)}")
 
-        for offset, (asset_chunk, ca_chunk, idx_chunk) in enumerate(
-                zip(chunk_list(asset_ids_all, batch_size),
+        for offset, (project_asset_chunk, ca_chunk, idx_chunk) in enumerate(
+                zip(chunk_list(project_asset_ids_all, batch_size),
                     chunk_list(ca_ids_all, batch_size),
                     chunk_list(indices_all, batch_size))):
 
             first_row_index = idx_chunk[0]
             ca_ids_param = ",".join(map(str, ca_chunk))
-            asset_ids_param = ",".join(map(str, asset_chunk))
+            project_asset_ids_param = ",".join(map(str, project_asset_chunk))
 
             log(f"  🔁 Batch {offset + 1} | Items: {len(ca_chunk)}")
 
             # Log each row being processed in this batch
-            for row_idx, (ca_id, asset_id) in enumerate(zip(ca_chunk, asset_chunk)):
+            for row_idx, (ca_id, project_asset_id) in enumerate(zip(ca_chunk, project_asset_chunk)):
                 excel_row = idx_chunk[row_idx] + 2  # +2: 1 for header, 1 for 0-based index
-                log(f"    📌 Row {excel_row} | project_id: {project_id} | croppable_area_id: {ca_id} | project_asset_id: {asset_id}")
+                log(f"    📌 Row {excel_row} | project_id: {project_id} | croppable_area_id: {ca_id} | project_asset_id: {project_asset_id}")
 
             # --- 1) CLOSE CA API ---
             if "close" in ca_action:
@@ -125,7 +129,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 close_url = f"{base_url}/croppable-areas/closed?reasonId=4&ids={ca_ids_param}"
 
                 try:
-                    resp_close = requests.get(close_url, headers=headers, timeout=60)
+                    resp_close = requests.get(close_url, headers=headers, timeout=600)
                     close_status_code = resp_close.status_code
                     
                     try:
@@ -175,10 +179,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             if "delete" in ca_action:
                 log(f"    🗑️ Deleting {len(ca_chunk)} croppable_areas...")
                 # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
-                delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={asset_ids_param}&croppableAreaIds={ca_ids_param}"
+                delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param}&croppableAreaIds={ca_ids_param}"
 
                 try:
-                    resp_delete = requests.delete(delete_url, headers=headers, timeout=120)
+                    resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
                     delete_status_code = resp_delete.status_code
 
                     try:

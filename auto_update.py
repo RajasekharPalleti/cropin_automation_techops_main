@@ -3,6 +3,26 @@ import requests
 import subprocess
 import os
 import schedule
+import sys
+import datetime
+
+def safe_log_print(*args, **kwargs):
+    msg = " ".join(str(a) for a in args)
+    # Output to standard console (in case it's run manually)
+    sys.stdout.write(msg + "\n")
+    sys.stdout.flush()
+    
+    # Append to server.log safely (opens and closes to avoid locking it permanently)
+    try:
+        with open("server.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        # Ignore errors if the file is locked for a split second by the main server
+        pass
+
+# Override print to ensure all existing print statements go to the logger
+print = safe_log_print
+
 
 STATUS_URL = "http://127.0.0.1:4444/api/server/status"
 SHUTDOWN_URL = "http://127.0.0.1:4444/api/server/shutdown"
@@ -31,7 +51,17 @@ def execute_update_process():
             print("--------------------------------------------------")
             return
             
-        print("Deployment check passed. Proceeding with update...")
+        print("Deployment check passed. Checking for new changes in Git...")
+        local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+        remote_hash = subprocess.check_output(["git", "rev-parse", "origin/main"]).decode("utf-8").strip()
+        
+        if local_hash == remote_hash:
+            print("No new changes found in Git. Local branch is up to date.")
+            print("Aborting daily update cycle to prevent unnecessary restarts.")
+            print("--------------------------------------------------")
+            return
+            
+        print(f"New changes found (Local: {local_hash[:7]} -> Remote: {remote_hash[:7]}). Proceeding with update...")
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Failed to fetch deployment.config from Git. Code: {e.returncode}. Aborting.")
         return
@@ -59,7 +89,7 @@ def execute_update_process():
             
         time.sleep(15 * 60) # Wait 15 minutes (900 seconds) before checking again
 
-    # 2. Pull the latest code from Git
+    # 3. Pull the latest code from Git
     try:
         print("Pulling latest changes from Git (origin main)...")
         subprocess.check_call(["git", "pull", "origin", "main"])
@@ -68,7 +98,7 @@ def execute_update_process():
         print(f"ERROR: Git pull failed with code {e.returncode}. Aborting update.")
         return
 
-    # 3. Stop the Server (via API to gracefully finish whatever it is doing before death)
+    # 4. Stop the Server (via API to gracefully finish whatever it is doing before death)
     print("Initiating Server Shutdown via stop_server.bat...")
     try:
         requests.post(SHUTDOWN_URL, timeout=5)
@@ -79,7 +109,7 @@ def execute_update_process():
     # Give the batch script or OS 10 seconds to fully kill the process and free port 4444
     time.sleep(10)
 
-    # 4. Start the Server again
+    # 5. Start the Server again
     print("Starting Server via run_server.bat...")
     try:
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
@@ -92,7 +122,7 @@ def execute_update_process():
     except Exception as e:
         print(f"ERROR running run_server.bat: {e}")
         
-    # 5. Restart Ngrok to ensure the tunnel is fresh
+    # 6. Restart Ngrok to ensure the tunnel is fresh
     print("Restarting Ngrok tunnel...")
     try:
         # Kill any existing ngrok processes
@@ -118,7 +148,7 @@ def execute_update_process():
     os._exit(0)
 
 def main_loop():
-    print("Auto-updater started. Scheduled to run twice daily at 00:00 (12:00 AM) and 12:00 (12:00 PM).")
+    print("Auto-updater started. Scheduled to run twice daily at 00:00 (12:00 AM).")
     
     # Schedule to run every day at Midnight (12:00 AM)
     schedule.every().day.at("00:00").do(execute_update_process)

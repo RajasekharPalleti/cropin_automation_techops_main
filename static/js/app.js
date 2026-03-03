@@ -276,8 +276,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search filter
     searchInput.addEventListener('click', e => e.stopPropagation());
     searchInput.addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtered = scriptsData.filter(s => s.name.toLowerCase().includes(term));
+        // Split the search query by any whitespace or non-alphanumeric characters like _ or -
+        const tokens = e.target.value.toLowerCase().split(/[\s_\-]+/).filter(t => t.trim() !== '');
+
+        const filtered = scriptsData.filter(s => {
+            // Re-create the exact display name used in the UI
+            let displayName = s.name.replace('.py', '').replace(/_/g, ' ');
+            displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+            const searchableText = (s.name + ' ' + displayName).toLowerCase();
+
+            // Script matches if EVERY token typed by the user is found in either the name or display name
+            return tokens.every(token => searchableText.includes(token));
+        });
         dropdownList.innerHTML = '';
         if (filtered.length > 0) {
             filtered.forEach(scriptObj => {
