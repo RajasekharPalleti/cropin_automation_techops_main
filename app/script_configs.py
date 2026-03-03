@@ -246,6 +246,11 @@ SCRIPT_CONFIGS = {
         "requires_input": True,
         "show_ca_close_delete": True,
     },
+    "Check_and_Delete_Area_Audit_Outside_India.py": {
+        "url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
+        "label": "Base Api Url",
+        "requires_input": True,
+    },
 }
 
 # Fallback config used when a script is not listed in SCRIPT_CONFIGS above.
