@@ -99,6 +99,23 @@ document.addEventListener('DOMContentLoaded', () => {
         'ca-action-select'
     ].forEach(id => initCustomSelect(document.getElementById(id)));
 
+    // =========================================================
+    // ENFORCE NUMERIC LIMITS FOR BATCH SIZE
+    // =========================================================
+    const batchInput = document.getElementById('ca-batch-size');
+    if (batchInput) {
+        batchInput.addEventListener('change', () => {
+            let val = parseInt(batchInput.value);
+            if (isNaN(val) || val < 1) batchInput.value = 1;
+            else if (val > 100) {
+                batchInput.value = 100;
+                if (window.showToast) {
+                    window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
+                }
+            }
+        });
+    }
+
 
     // =========================================================
     // MOBILE SIDEBAR TOGGLE

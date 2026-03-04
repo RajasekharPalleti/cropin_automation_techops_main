@@ -291,6 +291,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const forceCropAudited = document.getElementById('force-crop-audited')?.value || 'none';
         const clientId = window.getClientId ? window.getClientId() : sessionStorage.getItem('clientId');
 
+        let caBatchSizeRaw = parseInt(document.getElementById('ca-batch-size')?.value);
+        if (isNaN(caBatchSizeRaw) || caBatchSizeRaw < 1) caBatchSizeRaw = 50;
+        if (caBatchSizeRaw > 100) {
+            window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
+            document.getElementById('ca-batch-size').value = 100;
+            caBatchSizeRaw = 100;
+        }
+
         const config = {
             username: document.getElementById('username').value,
             password: document.getElementById('password').value,
@@ -300,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
             second_base_api_url: document.getElementById('second-base-api-url')?.value || '',
             x_api_key: document.getElementById('x-api-key')?.value || '',
             ca_action: document.getElementById('ca-action-select')?.value || 'none',
-            ca_batch_size: parseInt(document.getElementById('ca-batch-size')?.value) || 50,
+            ca_batch_size: caBatchSizeRaw,
             ca_x_api_key: document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS',
             use_farmer_id: useFarmerId,
             attr_keys: attrKeys,
