@@ -32,7 +32,7 @@ def run(input_excel, output_excel, config, log_callback=None):
     except:
         delay_time = 1
 
-    api_url = config.get("url")
+    api_url = config.get("base_api_url")
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/croppable-areas" # Default
         log(f"Using default CA API URL: {api_url}")

@@ -83,15 +83,15 @@
 
                     <div id="config-fields-container" style="display: none;">
                         <div class="input-group">
-                            <label for="put-api-url">Put/Post Api Url</label>
-                            <input type="text" id="put-api-url"
+                            <label for="base-api-url">Put/Post Api Url</label>
+                            <input type="text" id="base-api-url"
                                 placeholder="https://cloud.cropin.in/services/master/api/tags"
                                 value="https://cloud.cropin.in/services/master/api/tags">
                         </div>
 
                         <div class="input-group" id="group-secondary-url" style="display: none;">
-                            <label for="secondary-api-url">Secondary Api Url</label>
-                            <input type="text" id="secondary-api-url" placeholder="https://..." value="">
+                            <label for="second-base-api-url">Secondary Api Url</label>
+                            <input type="text" id="second-base-api-url" placeholder="https://..." value="">
                         </div>
 
                         <div id="extended-config" style="display: none;">
@@ -274,6 +274,17 @@
                                     <option value="only delete CA">Only Delete CA</option>
                                     <option value="close and delete CA" selected>Close and Delete CA</option>
                                 </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="ca-batch-size">Batch Size (Max 100)</label>
+                                <input type="number" id="ca-batch-size" placeholder="Default 50" value="50" min="1"
+                                    max="100">
+                            </div>
+                            <div class="input-group">
+                                <label for="ca-x-api-key">X-API-Key</label>
+                                <input type="text" id="ca-x-api-key"
+                                    placeholder="SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS"
+                                    value="SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS">
                             </div>
                         </div>
                     </div>

@@ -9,7 +9,7 @@ import requests
 
 import time
 
-def post_data_to_api(post_api_url, access_token_bearer, input_excel_file, output_excel_file, log_callback=None, delay_time=0.5):
+def post_data_to_api(base_api_url, access_token_bearer, input_excel_file, output_excel_file, log_callback=None, delay_time=0.5):
     def log(msg):
         if log_callback:
             log_callback(msg)
@@ -54,7 +54,7 @@ def post_data_to_api(post_api_url, access_token_bearer, input_excel_file, output
         # Make the POST request
         try:
             log(f"Adding Tag {row.iloc[0]} to the API ...")
-            response = requests.post(post_api_url, headers=headers, json=payload)
+            response = requests.post(base_api_url, headers=headers, json=payload)
             # Record the status and full response of the request
             if response.status_code == 201:
                 df.at[index, 'Status'] = 'Success'
@@ -89,12 +89,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log_callback(msg)
         print(msg)
 
-    api_url = config.get("post_api_url")
+    api_url = config.get("base_api_url")
     # The token is injected into config by main.py after authentication
     token = config.get("token")
     
     if not api_url:
-        raise ValueError("Configuration 'post_api_url' is missing.")
+        raise ValueError("Configuration 'base_api_url' is missing.")
     
     if not token:
         log("Warning: No token found in config. Authentication might have failed or not run.")

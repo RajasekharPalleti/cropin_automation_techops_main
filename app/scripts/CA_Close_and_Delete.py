@@ -32,7 +32,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("❌ No token provided in configuration or invalid token.")
         return
 
-    base_url = config.get("url")
+    base_url = config.get("base_api_url")
     if not base_url:
         base_url = "https://cloud.cropin.in/services/farm/api"
         log(f"Using default API URL: {base_url}")
@@ -41,7 +41,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     ca_action = config.get("ca_action", "close and delete CA")
     log(f"🚀 CA Action Mode: {ca_action}")
 
-    batch_size = 50
+    batch_size = int(config.get("ca_batch_size", 50))
     delay_time = float(config.get("delay_time", 5))  # seconds, configurable via UI
 
     log(f"📘 Loading Excel file: {input_excel_file}")
@@ -90,10 +90,13 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("⚠️ No valid data to process after cleaning.")
         return
 
+    ca_x_api_key = config.get("ca_x_api_key", "SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS")
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-api-key": ca_x_api_key
     }
 
     grouped = df.groupby(project_col)
@@ -138,28 +141,31 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         close_json = None
 
                     # Summary Extraction
-                    id_status_list = []
-                    if isinstance(close_json, dict):
-                        def extract(obj):
-                            if isinstance(obj, dict):
-                                if "id" in obj and "status" in obj:
-                                    id_status_list.append({"id": obj["id"], "status": obj["status"]})
-                                for v in obj.values():
-                                    extract(v)
-                            elif isinstance(obj, list):
-                                for x in obj:
-                                    extract(x)
-                        extract(close_json)
-                    elif isinstance(close_json, list):
-                        for it in close_json:
-                            if isinstance(it, dict) and "id" in it and "status" in it:
-                                id_status_list.append({"id": it["id"], "status": it["status"]})
+                    ca_status_map = {}
+                    def extract(obj):
+                        if isinstance(obj, dict):
+                            if "id" in obj and "status" in obj:
+                                ca_status_map[str(obj["id"])] = str(obj["status"])
+                            for v in obj.values():
+                                extract(v)
+                        elif isinstance(obj, list):
+                            for x in obj:
+                                extract(x)
 
-                    closed_api_summary = id_status_list or close_json or resp_close.text
+                    if isinstance(close_json, (dict, list)):
+                        extract(close_json)
                     
-                    for chunk_idx in idx_chunk:
+                    for row_idx, chunk_idx in enumerate(idx_chunk):
+                        current_ca_id = str(ca_chunk[row_idx])
                         df.at[chunk_idx, "closed_api_http_status"] = str(close_status_code)
-                        df.at[chunk_idx, "closed_api_status"] = json.dumps(closed_api_summary, default=str)
+                        
+                        if current_ca_id in ca_status_map:
+                            df.at[chunk_idx, "closed_api_status"] = ca_status_map[current_ca_id]
+                        else:
+                            if ca_status_map:
+                                df.at[chunk_idx, "closed_api_status"] = "Not found in response"
+                            else:
+                                df.at[chunk_idx, "closed_api_status"] = json.dumps(close_json or resp_close.text, default=str)
                     
                     if close_status_code == 200:
                         log(f"    ✅ Close Success (HTTP {close_status_code})")
@@ -214,7 +220,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     if is_deleted:
                         log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
                     else:
-                        log(f"    ❌ Delete Failed (HTTP {delete_status_code})")
+                        error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
+                        log(f"    ❌ Delete Failed (HTTP {delete_status_code}) | Response: {error_detail[:500]}")
 
                 except Exception as e:
                     log(f"    ❌ Delete Error: {str(e)}")

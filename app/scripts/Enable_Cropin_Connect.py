@@ -91,7 +91,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         payload = farmer_ids
 
         # Determine API URL
-        base_url = config.get("url")
+        base_url = config.get("base_api_url")
         if not base_url:
             base_url = API_URL
             log("ℹ️ Using default API URL.")

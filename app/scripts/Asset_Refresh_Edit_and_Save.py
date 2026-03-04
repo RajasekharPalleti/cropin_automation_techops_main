@@ -22,7 +22,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         log("❌ No token provided.")
         return
 
-    api_url = config.get("url")
+    api_url = config.get("base_api_url")
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/assets"
         log(f"Using default Asset API URL: {api_url}")

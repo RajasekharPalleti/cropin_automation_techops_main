@@ -17,7 +17,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     # Configuration
     token = config.get("token")
-    base_url = config.get("post_api_url")
+    base_url = config.get("base_api_url")
     
     if not token:
         log("❌ Failed to retrieve access token. Process terminated.")

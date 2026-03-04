@@ -24,7 +24,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             print(msg)
 
     token = config.get("token")
-    api_url = config.get("url")
+    api_url = config.get("base_api_url")
     worker_count = config.get("worker_count", 2)
     thread_delay = float(config.get("delay_time", 1))
     

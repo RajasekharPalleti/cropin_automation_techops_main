@@ -43,7 +43,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         return
     
     # Use configured URL or default
-    api_url = config.get("post_api_url")
+    api_url = config.get("base_api_url")
     delay_time = float(config.get("delay_time", 0.3))  # seconds, configurable via UI
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/plans"

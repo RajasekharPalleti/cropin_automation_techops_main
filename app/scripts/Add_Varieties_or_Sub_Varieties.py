@@ -21,7 +21,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("No token provided in configuration.")
         return
 
-    post_api_url = config.get("post_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
+    base_api_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
 
     delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
 
@@ -148,7 +148,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 payload['parentId'] = parent_id
 
             log(f"Adding variety: {name}...")
-            response = requests.post(post_api_url, headers=headers, json=payload)
+            response = requests.post(base_api_url, headers=headers, json=payload)
 
             if response.status_code == 201:
                 df.at[index, 'Status'] = 'Success'

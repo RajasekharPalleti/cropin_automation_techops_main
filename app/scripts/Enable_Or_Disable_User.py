@@ -31,7 +31,7 @@ def run(input_excel_path, output_excel_path, config, log_callback=None):
             log_callback(msg)
         print(msg, flush=True)
 
-    api_base_url = config.get("url")
+    api_base_url = config.get("base_api_url")
     
     if not api_base_url or pd.isna(api_base_url):
          api_base_url = "https://cloud.cropin.in/services/user/api/users"

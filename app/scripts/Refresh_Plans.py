@@ -35,7 +35,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     # Derive URLs from config
     # Default Base: https://cloud.cropin.in/services/farm/api/croppable-areas/
-    base_url = config.get("post_api_url", "").strip().rstrip('/')
+    base_url = config.get("base_api_url", "").strip().rstrip('/')
     if not base_url:
         base_url = "https://cloud.cropin.in/services/farm/api/croppable-areas"
         log(f"⚠️ No Base URL provided, defaulting to: {base_url}")

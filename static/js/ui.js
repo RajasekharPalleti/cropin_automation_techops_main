@@ -263,10 +263,12 @@ window.saveFormState = function () {
         tenant: document.getElementById('tenant-code')?.value || '',
         username: document.getElementById('username')?.value || '',
         env: document.getElementById('environment')?.value || 'prod1',
-        apiUrl: document.getElementById('put-api-url')?.value || '',
+        apiUrl: document.getElementById('base-api-url')?.value || '',
         dataset: document.getElementById('dataset')?.value || '',
         loadType: document.getElementById('load-type')?.value || '',
         delayTime: document.getElementById('delay-time-input')?.value || '1',
+        caBatchSize: document.getElementById('ca-batch-size')?.value || '50',
+        caXApiKey: document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS',
     };
     localStorage.setItem('cropin_automation_state', JSON.stringify(state));
 };
@@ -285,10 +287,12 @@ window.loadFormState = function () {
         setVal('tenant-code', state.tenant);
         setVal('username', state.username);
         setVal('environment', state.env);
-        setVal('put-api-url', state.apiUrl);
+        setVal('base-api-url', state.apiUrl);
         setVal('dataset', state.dataset);
         setVal('load-type', state.loadType);
         setVal('delay-time-input', state.delayTime);
+        setVal('ca-batch-size', state.caBatchSize);
+        setVal('ca-x-api-key', state.caXApiKey);
 
         // Update generic custom dropdowns if they exist
         const envSelect = document.getElementById('environment');

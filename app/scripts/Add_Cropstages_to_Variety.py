@@ -22,8 +22,8 @@ def run(input_excel, output_excel, config, log_callback=None):
 
     # Use URLs from config if provided, otherwise default to the ones in the prompt (or make them configurable)
     # The user prompt had specific URLs.
-    cropstage_url = config.get("secondary_api_url", "https://cloud.cropin.in/services/farm/api/crop-stages")
-    variety_url = config.get("post_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
+    cropstage_url = config.get("second_base_api_url", "https://cloud.cropin.in/services/farm/api/crop-stages")
+    variety_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
 
     delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
 

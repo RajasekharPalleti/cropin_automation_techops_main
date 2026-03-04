@@ -26,7 +26,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         return
 
     # API URL
-    api_url = config.get("post_api_url")
+    api_url = config.get("base_api_url")
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/assets"
         log(f"Using default Asset API URL: {api_url}")

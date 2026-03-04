@@ -24,7 +24,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Base URL from config
     # Users provided example: https://cloud.cropin.in/services/farm/api/croppable-areas/{ca_id}/area-audit
     # The config should ideally provide: https://cloud.cropin.in/services/farm/api/croppable-areas
-    base_api_url = config.get("post_api_url")
+    base_api_url = config.get("base_api_url")
     if not base_api_url:
         base_api_url = "https://cloud.cropin.in/services/farm/api/croppable-areas"
         log(f"Using default Base URL: {base_api_url}")

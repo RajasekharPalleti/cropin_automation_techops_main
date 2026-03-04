@@ -33,7 +33,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # =========================
     # Default to projects base URL
     default_url = "https://cloud.cropin.in/services/farm/api/projects"
-    base_api_url = config.get("post_api_url")
+    base_api_url = config.get("base_api_url")
     if not base_api_url:
         base_api_url = default_url
         log(f"Using default URL: {base_api_url}")

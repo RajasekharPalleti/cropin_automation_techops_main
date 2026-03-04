@@ -105,12 +105,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         else:
             print(msg)
 
-    api_url = config.get("url") or config.get("post_api_url")
-    tag_api_url = config.get("url2") or config.get("tag_api_url")
+    api_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/assets")
+    second_base_api_url = config.get("second_base_api_url", "https://cloud.cropin.in/services/master/api/filter?type=ASSET&size=10000")
     token = config.get("token")
 
     if not api_url:
-        log("Error: API URL not configured.")
+        log("Error: 'base_api_url' not configured.")
         return
     if not token:
         log("Error: Authorization token missing.")
@@ -121,7 +121,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # 2. Setup
     log(f"Fetching Tag Map from Master API...")
     try:
-        tag_name_map = fetch_asset_tag_map(token, tag_api_url)
+        tag_name_map = fetch_asset_tag_map(token, second_base_api_url)
     except Exception as e:
         log(f"❌ Failed to fetch tags: {e}")
         return

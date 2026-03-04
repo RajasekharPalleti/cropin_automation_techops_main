@@ -22,7 +22,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("❌ No token provided in configuration.")
         return
 
-    user_api_url = config.get("post_api_url")
+    user_api_url = config.get("base_api_url")
     if not user_api_url:
         user_api_url = "https://cloud.cropin.in/services/user/api/users/images"
         log(f"Using default User API URL: {user_api_url}")

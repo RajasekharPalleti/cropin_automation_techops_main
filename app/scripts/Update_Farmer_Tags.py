@@ -147,11 +147,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         else:
             print(msg)
 
-    api_url = config.get("post_api_url")
+    api_url = config.get("base_api_url")
     token = config.get("token")
 
     if not api_url:
-        log("Error: 'post_api_url' not configured.")
+        log("Error: 'base_api_url' not configured.")
         return
     if not token:
         log("Error: Authorization token missing.")

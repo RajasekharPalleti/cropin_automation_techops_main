@@ -155,17 +155,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedScript = scriptsData.find(s => s.name === value);
         if (selectedScript) {
             // Primary URL
-            if (selectedScript.url) document.getElementById('put-api-url').value = selectedScript.url;
-            const label = document.querySelector('label[for="put-api-url"]');
+            if (selectedScript.base_api_url) document.getElementById('base-api-url').value = selectedScript.base_api_url;
+            const label = document.querySelector('label[for="base-api-url"]');
             if (label && selectedScript.label) label.textContent = selectedScript.label;
 
             // Secondary URL
             const secGroup = document.getElementById('group-secondary-url');
-            const secInput = document.getElementById('secondary-api-url');
-            const secLabel = document.querySelector('label[for="secondary-api-url"]');
-            if (selectedScript.url2) {
+            const secInput = document.getElementById('second-base-api-url');
+            const secLabel = document.querySelector('label[for="second-base-api-url"]');
+            if (selectedScript.second_base_api_url) {
                 secGroup.style.display = 'block';
-                secInput.value = selectedScript.url2;
+                secInput.value = selectedScript.second_base_api_url;
                 if (secLabel) secLabel.textContent = selectedScript.label2 || 'Secondary Api Url';
             } else {
                 secGroup.style.display = 'none';

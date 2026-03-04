@@ -24,13 +24,13 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
             print(message)
 
     try:
-        token = config_dict.get("token")
-        base_url = config_dict.get("url", "https://cloud.cropin.in/services/farm/api/varieties")
+        token = config.get("token")
+        base_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
 
-        delay_time = float(config_dict.get("delay_time", 0.5))  # seconds, configurable via UI
+        delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
 
         # Get list of fields to clear
-        fields_to_remove = config_dict.get("fields_to_remove", [])
+        fields_to_remove = config.get("fields_to_remove", [])
         
         if not fields_to_remove:
             log("⚠️ No fields selected for removal. Please configure fields in the UI.")

@@ -29,7 +29,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # =========================
     # Default to user provided partial URL if not in config, but fixing domain
     default_url = "https://cloud.cropin.in/services/farm/api/croppable-areas/plot-risk/batch"
-    plot_risk_url = config.get("post_api_url")
+    plot_risk_url = config.get("base_api_url")
     if not plot_risk_url:
         plot_risk_url = default_url
         log(f"Using default URL: {plot_risk_url}")

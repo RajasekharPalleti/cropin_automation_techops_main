@@ -267,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startLine.textContent = '> Starting execution...';
         if (consoleContent) consoleContent.appendChild(startLine);
 
-        const postApiUrl = document.getElementById('put-api-url').value;
+        const baseApiUrl = document.getElementById('base-api-url').value;
         const useFarmerId = document.getElementById('use-farmer-id').value;
         const scriptNameForCfg = scriptSelect.value;
         const attrCount = parseInt(document.getElementById('attr-count-select').value) || 1;
@@ -296,10 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
             password: document.getElementById('password').value,
             environment: document.getElementById('environment').value,
             tenant_code: document.getElementById('tenant-code').value,
-            post_api_url: postApiUrl,
-            secondary_api_url: document.getElementById('secondary-api-url')?.value || '',
+            base_api_url: baseApiUrl,
+            second_base_api_url: document.getElementById('second-base-api-url')?.value || '',
             x_api_key: document.getElementById('x-api-key')?.value || '',
             ca_action: document.getElementById('ca-action-select')?.value || 'none',
+            ca_batch_size: parseInt(document.getElementById('ca-batch-size')?.value) || 50,
+            ca_x_api_key: document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS',
             use_farmer_id: useFarmerId,
             attr_keys: attrKeys,
             fields_to_remove: attrKeys,

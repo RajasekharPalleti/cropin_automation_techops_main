@@ -22,9 +22,9 @@ def run(input_excel, output_excel, config, log_callback=None):
 
     # Configuration for URLs
     # variety_url is typically the primary "Base Api Url" or "Post Api Url" in the UI config
-    variety_url = config.get("post_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
+    variety_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
     # seed_grade_url is the secondary URL
-    seed_grade_url = config.get("secondary_api_url", "https://cloud.cropin.in/services/farm/api/seed-grades")
+    seed_grade_url = config.get("second_base_api_url", "https://cloud.cropin.in/services/farm/api/seed-grades")
 
     delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
 

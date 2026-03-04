@@ -245,9 +245,9 @@ async def list_scripts():
             config = SCRIPT_CONFIGS.get(filename, DEFAULT_SCRIPT_CONFIG)
             scripts.append({
                 "name": filename,
-                "url": config["url"],
+                "base_api_url": config.get("base_api_url"),
                 "label": config["label"],
-                "url2": config.get("url2"),
+                "second_base_api_url": config.get("second_base_api_url"),
                 "label2": config.get("label2"),
                 "requires_input": config.get("requires_input", True),
                 "description": description,

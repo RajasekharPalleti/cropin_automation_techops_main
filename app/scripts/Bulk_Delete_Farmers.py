@@ -22,7 +22,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("❌ No token provided in configuration.")
         return
 
-    api_url = config.get("post_api_url")
+    api_url = config.get("base_api_url")
     if not api_url:
         api_url = "https://cloud.cropin.in/services/farm/api/farmers/bulk"
         log(f"Using default API URL: {api_url}")
