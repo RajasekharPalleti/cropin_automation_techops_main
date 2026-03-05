@@ -148,6 +148,7 @@ async def stop_execution(client_id: str):
     """Request cancellation of a running script for a given client."""
     if manager.is_active(client_id):
         manager.request_cancel(client_id)
+        await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
         return {"status": "stopping", "message": "Stop requested. Process will terminate shortly."}
     return {"status": "ignored", "message": "No active process found."}
 
@@ -195,17 +196,18 @@ async def get_active_jobs():
 
 @router.post("/api/server/stop_all")
 async def stop_all_jobs():
-    """Request cancellation of all running scripts."""
+    """Request cancellation of all running scripts and immediately notify each client."""
     stopped_count = 0
     active_clients = list(manager.active_tasks)
-    
+
     for client_id in active_clients:
         if not manager.is_cancelled(client_id):
             manager.request_cancel(client_id)
+            await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
             stopped_count += 1
-            
+
     return {
-        "status": "success", 
+        "status": "success",
         "message": f"Stop requested for {stopped_count} active process(es).",
         "stopped_count": stopped_count
     }
@@ -512,41 +514,62 @@ async def get_server_logs(offset_line: int = 0, limit: int = 1000):
 async def stream_server_logs(request: Request):
     """
     SSE endpoint that pushes new lines from server.log to the client as they are written.
+    Handles log rotation: when server.log is rotated (renamed to server.log.1 and a new
+    server.log is created), the stream detects the size shrinkage and reopens the file.
     """
     from fastapi.responses import StreamingResponse
     import asyncio
-    
+    import json
+
     log_path = "server.log"
 
     async def event_generator():
-        # Wait a moment if file doesn't exist yet before crashing
+        # Wait if file doesn't exist yet
         if not os.path.exists(log_path):
             await asyncio.sleep(1)
-            
+
         if not os.path.exists(log_path):
-            yield f"data: Log file not found.\n\n"
+            yield f"data: {json.dumps({'line': '[Stream] Log file not found.'})}\n\n"
             return
 
-        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-            # Move immediately to the end of the file, we only want *new* logs from here on
-            f.seek(0, os.SEEK_END)
-            
+        f = open(log_path, "r", encoding="utf-8", errors="replace")
+        # Seek to end — we only want *new* lines from this point on
+        f.seek(0, os.SEEK_END)
+        current_pos = f.tell()
+
+        try:
             while True:
-                # If client disconnected, stop generating
+                # Disconnect check
                 if await request.is_disconnected():
                     break
-                    
+
+                # --- Rotation detection ---
+                # If the file has shrunk below our position, it was rotated.
+                try:
+                    file_size = os.path.getsize(log_path)
+                except OSError:
+                    file_size = 0
+
+                if file_size < current_pos:
+                    # Log was rotated — reopen and tail from the beginning of new file
+                    f.close()
+                    await asyncio.sleep(0.5)  # brief wait for new file to be created
+                    f = open(log_path, "r", encoding="utf-8", errors="replace")
+                    f.seek(0, os.SEEK_END)
+                    current_pos = f.tell()
+                    # Notify the browser that a rotation happened
+                    yield f"data: {json.dumps({'line': '[Log rotated — continuing with new server.log]'})}\n\n"
+                    continue
+
                 line = f.readline()
                 if line:
-                    # SSE format requires "data: <payload>\n\n"
-                    # We send just the raw line and let the frontend format it
-                    import json
-                    # We wrap the payload in JSON to safely encode newlines and quotes
+                    current_pos = f.tell()
                     payload = json.dumps({"line": line.rstrip()})
                     yield f"data: {payload}\n\n"
                 else:
-                    # Wait briefly before trying again
                     await asyncio.sleep(0.5)
+        finally:
+            f.close()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

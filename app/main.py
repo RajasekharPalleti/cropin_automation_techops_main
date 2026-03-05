@@ -68,7 +68,7 @@ logging.basicConfig(
     format='%(message)s', # Keep it simple so it matches what user sees in terminal
     handlers=[
         logging.handlers.RotatingFileHandler(
-            "server.log", maxBytes=10 * 1024 * 1024, backupCount=1, encoding="utf-8"
+            "server.log", maxBytes=15 * 1024 * 1024, backupCount=1, encoding="utf-8"
         ),
         logging.StreamHandler(sys.stdout)
     ]

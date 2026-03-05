@@ -119,6 +119,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // --- Job force-stopped by admin ---
+            if (msgData.startsWith('JOB_STOPPED::')) {
+                const reason = msgData.split('::')[1] || 'Closed forcefully by admin.';
+
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.style.color = '#ff8c00';
+                line.style.fontWeight = '600';
+                line.textContent = '> ⚠ ADMIN ACTION: ' + reason + ' Script execution terminated.';
+                fragment.appendChild(line);
+
+                if (window.releaseWakeLock) window.releaseWakeLock();
+
+                setTimeout(() => {
+                    if (statusArea) statusArea.innerHTML = '<div style="color: #ff8c00; font-weight:600;">⚠ Stopped by Admin</div>';
+                    if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = '▶ Run Script'; }
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    sessionStorage.setItem('is_script_running', 'false');
+
+                    // Generate a fresh client ID for the next run
+                    const newId = 'client_' + Math.random().toString(36).slice(2, 11);
+                    if (window.setClientId) window.setClientId(newId);
+                    console.log('New Client ID generated after admin stop:', newId);
+                }, 0);
+                return;
+            }
+
             // --- Normal log line ---
             const logLine = document.createElement('div');
             logLine.className = 'console-line';

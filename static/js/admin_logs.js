@@ -270,11 +270,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
         </div>
-        <div class="admin-console-toolbar">
-            <input type="text" class="admin-search-input" id="admin-search-input" placeholder="Search logs (e.g., 'ERROR', 'INFO')...">
+        <div class="admin-console-toolbar" style="display:flex;align-items:center;gap:8px;">
+            <input type="text" class="admin-search-input" id="admin-search-input"
+                   placeholder="Search logs (e.g., 'ERROR', 'INFO')..." style="flex:1;">
+            <span id="admin-logs-counter"
+                  style="font-size:0.75em;color:#888;white-space:nowrap;padding:2px 6px;background:#1e1e1e;border-radius:4px;border:1px solid #333;"
+                  title="Lines currently shown / total lines in log files">— / —</span>
         </div>
-        <div class="admin-console-body" id="admin-console-body">
-            <!-- Logs will be populated here -->
+        <div id="admin-console-body-wrap" style="position:relative;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="admin-console-body" id="admin-console-body"></div>
+            <!-- Jump to Latest button — visible only when scrolled up -->
+            <button id="admin-jump-latest"
+                    style="display:none;position:absolute;bottom:10px;right:12px;z-index:10;
+                           background:#0d6efd;color:#fff;border:none;border-radius:20px;
+                           padding:6px 14px;font-size:0.8em;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);
+                           display:none;align-items:center;gap:4px;">
+                <span class="material-icons" style="font-size:1em;vertical-align:middle;">arrow_downward</span>
+                Jump to Latest
+            </button>
         </div>
     `;
     document.body.appendChild(consoleWrapper);
@@ -285,11 +298,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const logsCloseBtn = document.getElementById('admin-console-close');
     const logsBody = document.getElementById('admin-console-body');
     const logsSearchInput = document.getElementById('admin-search-input');
+    const logsCounter = document.getElementById('admin-logs-counter');
+    const jumpLatestBtn = document.getElementById('admin-jump-latest');
 
     let isPolling = false;
     let logsCache = [];
     let isLoadingOlder = false;
-    let currentOffset = 0;
+    // olderLogsOffset: how many lines from the END of the combined file we have already fetched
+    // (only updated by startPolling initial fetch + fetchOlderLogs — NOT by live SSE lines)
+    let olderLogsOffset = 0;
     let totalServerLines = 0;
     let eventSource = null;
     const MAX_LOG_LINES = 5000;
@@ -318,29 +335,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Search ---
     logsSearchInput.addEventListener('input', () => renderLogs(false));
 
-    // --- Infinite scroll (older logs) ---
+    // --- Jump to Latest button ---
+    jumpLatestBtn.addEventListener('click', () => {
+        scrollToBottom();
+        jumpLatestBtn.style.display = 'none';
+    });
+
+    // --- Infinite scroll (older logs) + Jump to Latest visibility ---
     logsBody.addEventListener('scroll', () => {
-        if (logsBody.scrollTop <= 10 && !isLoadingOlder && currentOffset < totalServerLines) {
+        const isNearTop = logsBody.scrollTop <= 10;
+        const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 60;
+
+        // Show / hide Jump to Latest
+        jumpLatestBtn.style.display = isNearBottom ? 'none' : 'flex';
+
+        // Load older logs when scrolled to top
+        if (isNearTop && !isLoadingOlder && olderLogsOffset < totalServerLines) {
             fetchOlderLogs();
         }
     });
 
+    // Helper: update line counter badge
+    function updateCounter() {
+        const showing = logsCache.length;
+        const total = totalServerLines || 0;
+        logsCounter.textContent = `${showing.toLocaleString()} / ${total.toLocaleString()} lines`;
+    }
+
     function startPolling() {
         if (isPolling) return;
         isPolling = true;
+        logsCounter.textContent = 'Loading...';
         fetch(`/api/server_logs?offset_line=0&limit=${BATCH_SIZE}`)
             .then(r => r.json())
             .then(data => {
                 if (data.logs) {
                     logsCache = data.logs;
-                    currentOffset = data.returned_count;
-                    totalServerLines = data.total_lines;
+                    olderLogsOffset = data.returned_count || 0;
+                    totalServerLines = data.total_lines || 0;
+                    updateCounter();
                     renderLogs(true);
                 }
                 openStream();
             })
             .catch(err => {
                 logsCache = [`[Live Viewer] Network error fetching initial logs: ${err.message}`];
+                updateCounter();
                 renderLogs(false);
             });
     }
@@ -352,10 +392,10 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const data = JSON.parse(event.data);
                 const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
-                logsCache.push(data.line + "\\n");
-                currentOffset++;
+                logsCache.push(data.line);
                 totalServerLines++;
                 manageMemory();
+                updateCounter();
                 renderLogs(wasScrolledToBottom);
             } catch (e) {
                 console.error("SSE Parse error", e);
@@ -374,22 +414,36 @@ document.addEventListener('DOMContentLoaded', () => {
     function fetchOlderLogs() {
         isLoadingOlder = true;
         const loadingDiv = document.createElement('div');
-        loadingDiv.innerText = "Loading older logs...";
-        loadingDiv.style.cssText = 'text-align:center;color:#888;font-style:italic;';
+        loadingDiv.id = 'logs-loading-older';
+        loadingDiv.innerText = "⏳ Loading older logs...";
+        loadingDiv.style.cssText = 'text-align:center;color:#888;font-style:italic;padding:6px;';
         logsBody.insertBefore(loadingDiv, logsBody.firstChild);
-        fetch(`/api/server_logs?offset_line=${currentOffset}&limit=${BATCH_SIZE}`)
+
+        fetch(`/api/server_logs?offset_line=${olderLogsOffset}&limit=${BATCH_SIZE}`)
             .then(r => r.json())
             .then(data => {
+                const indicator = document.getElementById('logs-loading-older');
+                if (indicator) indicator.remove();
+
                 if (data.logs && data.logs.length > 0) {
                     const oldScrollHeight = logsBody.scrollHeight;
                     logsCache = data.logs.concat(logsCache);
-                    currentOffset += data.returned_count;
+                    olderLogsOffset += data.returned_count;
                     totalServerLines = data.total_lines;
                     manageMemory();
+                    updateCounter();
                     renderLogs(false);
                     logsBody.scrollTop = logsBody.scrollHeight - oldScrollHeight;
                 } else {
-                    if (logsBody.firstChild === loadingDiv) logsBody.removeChild(loadingDiv);
+                    // All historical logs loaded — show a banner at the very top
+                    const allLoadedDiv = document.getElementById('logs-all-loaded');
+                    if (!allLoadedDiv) {
+                        const banner = document.createElement('div');
+                        banner.id = 'logs-all-loaded';
+                        banner.style.cssText = 'text-align:center;color:#28a745;font-size:0.82em;padding:8px;border-bottom:1px solid #333;font-style:italic;';
+                        banner.textContent = '✅ Beginning of logs reached. All historical records are shown.';
+                        logsBody.insertBefore(banner, logsBody.firstChild);
+                    }
                 }
             })
             .catch(err => console.error("Error loading older logs:", err))
@@ -437,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopAllWrapper = document.createElement('div');
     stopAllWrapper.className = 'admin-console-wrapper';
     stopAllWrapper.id = 'stop-all-console';
-    stopAllWrapper.style.cssText = 'bottom:20px;right:20px;width:520px;height:380px;';
+    stopAllWrapper.style.cssText = 'bottom:20px;right:20px;width:560px;height:420px;';
     stopAllWrapper.innerHTML = `
         <div class="admin-console-header" id="stopall-header">
             <div class="admin-console-title">
@@ -448,19 +502,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button class="admin-console-btn minimize" id="stopall-minimize" title="Minimize/Restore">
                     <span class="material-icons">horizontal_rule</span>
                 </button>
-                <button class="admin-console-btn close" id="stopall-close" title="Close">
+                <button class="admin-console-btn close" id="stopall-close" title="Close Window">
                     <span class="material-icons">close</span>
                 </button>
             </div>
         </div>
-        <div class="admin-console-body" id="stopall-body" style="background:#f8f9fa;color:#333;padding:15px;flex:1;overflow-y:auto;">
-            <p style="margin:0 0 12px;color:#555;font-size:0.9em;">Below are the scripts currently running on the server:</p>
-            <div id="stopall-jobs-list" style="margin-bottom:15px;">
+        <div class="admin-console-body" id="stopall-body" style="background:#f8f9fa;color:#333;padding:15px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0;">
+
+            <!-- Job list -->
+            <p style="margin:0 0 10px;color:#555;font-size:0.88em;">Scripts currently running on the server:</p>
+            <div id="stopall-jobs-list" style="flex:1;overflow-y:auto;margin-bottom:10px;">
                 <!-- Jobs populated by JS -->
             </div>
-            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid #dee2e6;">
-                <button id="stopall-cancel-btn" class="btn-secondary" style="padding:8px 16px;">Close</button>
-                <button id="stopall-trigger-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Stop All Processes</button>
+
+            <!-- Inline confirmation banner (hidden by default) -->
+            <div id="stopall-confirm-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 14px;margin-bottom:10px;">
+                <p style="margin:0 0 10px;font-weight:600;color:#856404;font-size:0.92em;">
+                    ⚠ Are you sure you want to stop ALL running processes?
+                </p>
+                <p style="margin:0 0 12px;color:#666;font-size:0.82em;">This will forcefully terminate all active scripts for all users and cannot be undone.</p>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="stopall-confirm-cancel" class="btn-secondary" style="padding:6px 14px;font-size:0.85em;">Cancel</button>
+                    <button id="stopall-confirm-proceed" class="btn-primary" style="background:#dc3545;padding:6px 14px;font-size:0.85em;">Stop All</button>
+                </div>
+            </div>
+
+            <!-- Footer buttons -->
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid #dee2e6;flex-shrink:0;">
+                <button id="stopall-dismiss-btn" class="btn-secondary" style="padding:8px 16px;">Dismiss</button>
+                <button id="stopall-closeall-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Close All</button>
             </div>
         </div>
     `;
@@ -468,56 +538,124 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stopAllHeader = document.getElementById('stopall-header');
     const stopAllMinimizeBtn = document.getElementById('stopall-minimize');
-    const stopAllCloseBtn = document.getElementById('stopall-close');
+    const stopAllCloseBtn = document.getElementById('stopall-close');   // window X
     const stopAllJobsList = document.getElementById('stopall-jobs-list');
-    const stopAllCancelBtn = document.getElementById('stopall-cancel-btn');
-    const stopAllTriggerBtn = document.getElementById('stopall-trigger-btn');
+    const stopAllConfirmBanner = document.getElementById('stopall-confirm-banner');
+    const stopConfirmCancelBtn = document.getElementById('stopall-confirm-cancel');
+    const stopConfirmProceedBtn = document.getElementById('stopall-confirm-proceed');
+    const stopAllDismissBtn = document.getElementById('stopall-dismiss-btn');
+    const stopAllCloseAllBtn = document.getElementById('stopall-closeall-btn');
+
+    // Helper: hide the confirmation banner
+    function hideConfirmBanner() {
+        stopAllConfirmBanner.style.display = 'none';
+        stopConfirmProceedBtn.disabled = false;
+        stopConfirmProceedBtn.textContent = 'Stop All';
+    }
+
+    // Helper: update the Close All button state based on job count
+    function syncCloseAllBtn(hasJobs) {
+        stopAllCloseAllBtn.disabled = !hasJobs;
+        stopAllCloseAllBtn.style.opacity = hasJobs ? '1' : '0.5';
+        stopAllCloseAllBtn.style.cursor = hasJobs ? 'pointer' : 'not-allowed';
+    }
 
     const stopAllWindow = setupFloatingWindow({
         wrapper: stopAllWrapper,
         header: stopAllHeader,
         minimizeBtn: stopAllMinimizeBtn,
-        closeBtn: stopAllCloseBtn,
+        // X button: if jobs running, show confirm; else just close
+        closeBtn: null,        // we wire it manually below
         bottomOffset: '20px',
         minimizedWidth: '300px',
     });
 
+    // Wire window X button manually so we can intercept
+    stopAllCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hasJobs = stopAllJobsList.querySelectorAll('li').length > 0;
+        if (hasJobs) {
+            // Show the confirmation banner instead of closing silently
+            stopAllConfirmBanner.style.display = 'block';
+            stopAllConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            stopAllWindow.hide();
+        }
+    });
+
+    // ---- Load jobs function ----
     function loadActiveJobs() {
-        stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:10px;">Fetching running processes...</div>';
+        hideConfirmBanner();
+        stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes...</div>';
+        syncCloseAllBtn(false);
+
         fetch('/api/server/active_jobs')
             .then(res => res.json())
             .then(data => {
                 const jobs = data.jobs || [];
                 if (jobs.length === 0) {
-                    stopAllJobsList.innerHTML = '<div style="text-align:center;color:#28a745;padding:20px;font-weight:500;">No background processes are currently running.</div>';
-                    stopAllTriggerBtn.disabled = true;
-                    stopAllTriggerBtn.style.opacity = '0.5';
-                    stopAllTriggerBtn.style.cursor = 'not-allowed';
-                } else {
-                    let html = '<ul style="list-style-type:none;padding:0;margin:0;">';
-                    jobs.forEach(job => {
-                        html += `
-                            <li style="padding:10px;border-bottom:1px solid #e0e0e0;background:#fff;margin-bottom:5px;border-radius:4px;">
-                                <div style="font-weight:bold;color:#333;margin-bottom:4px;">${job.script_name}</div>
-                                <div style="font-size:0.85em;color:#666;">
-                                    User <strong>${job.user}</strong> at Tenant <strong>${job.tenant}</strong>
-                                </div>
-                                <div style="font-size:0.75em;color:#999;margin-top:2px;">ID: ${job.client_id}</div>
-                            </li>`;
-                    });
-                    html += '</ul>';
-                    stopAllJobsList.innerHTML = html;
-                    stopAllTriggerBtn.disabled = false;
-                    stopAllTriggerBtn.style.opacity = '1';
-                    stopAllTriggerBtn.style.cursor = 'pointer';
+                    stopAllJobsList.innerHTML = '<div style="text-align:center;color:#28a745;padding:30px;font-weight:500;">✅ No background processes are currently running.</div>';
+                    syncCloseAllBtn(false);
+                    return;
                 }
+
+                // Build job rows with individual Cancel button
+                let html = '<ul style="list-style-type:none;padding:0;margin:0;">';
+                jobs.forEach(job => {
+                    html += `
+                        <li data-client-id="${job.client_id}"
+                            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e0e0e0;background:#fff;margin-bottom:5px;border-radius:6px;gap:10px;">
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-weight:600;color:#333;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${job.script_name}">${job.script_name}</div>
+                                <div style="font-size:0.82em;color:#666;">
+                                    User <strong>${job.user}</strong> · Tenant <strong>${job.tenant}</strong>
+                                </div>
+                                <div style="font-size:0.72em;color:#aaa;margin-top:2px;">ID: ${job.client_id}</div>
+                            </div>
+                            <button class="cancel-job-btn btn-secondary"
+                                    data-client-id="${job.client_id}"
+                                    style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;background:#fff;border:1px solid #dc3545;color:#dc3545;cursor:pointer;white-space:nowrap;">
+                                Cancel
+                            </button>
+                        </li>`;
+                });
+                html += '</ul>';
+                stopAllJobsList.innerHTML = html;
+                syncCloseAllBtn(true);
+
+                // Wire individual Cancel buttons
+                stopAllJobsList.querySelectorAll('.cancel-job-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const clientId = btn.getAttribute('data-client-id');
+                        btn.disabled = true;
+                        btn.textContent = 'Stopping…';
+                        fetch(`/api/stop/${clientId}`, { method: 'POST' })
+                            .then(res => res.json())
+                            .then(() => {
+                                // Remove the row and refresh after a short delay
+                                const li = btn.closest('li');
+                                if (li) {
+                                    li.style.opacity = '0.4';
+                                    li.style.pointerEvents = 'none';
+                                }
+                                setTimeout(() => loadActiveJobs(), 1500);
+                            })
+                            .catch(err => {
+                                console.error('Cancel job error:', err);
+                                btn.disabled = false;
+                                btn.textContent = 'Cancel';
+                            });
+                    });
+                });
             })
             .catch(err => {
                 console.error('Failed to fetch active jobs:', err);
-                stopAllJobsList.innerHTML = '<div style="text-align:center;color:#dc3545;padding:10px;">Error fetching active processes. Please try again.</div>';
+                stopAllJobsList.innerHTML = '<div style="text-align:center;color:#dc3545;padding:20px;">❌ Error fetching active processes. Please try again.</div>';
+                syncCloseAllBtn(false);
             });
     }
 
+    // ---- Toggle Stop All console ----
     function toggleStopAllConsole() {
         if (!stopAllWindow.isVisible()) {
             stopAllWindow.show();
@@ -530,43 +668,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    stopAllCancelBtn.addEventListener('click', () => stopAllWindow.hide());
-
-    stopAllTriggerBtn.addEventListener('click', () => {
-        // Show the confirmation modal (stays in HTML as a standard overlay)
-        const confirmModal = document.getElementById('stop-all-confirm-modal');
-        if (confirmModal) confirmModal.style.display = 'block';
+    // ---- Dismiss button: just hide the panel ----
+    stopAllDismissBtn.addEventListener('click', () => {
+        hideConfirmBanner();
+        stopAllWindow.hide();
     });
 
-    // --- Confirmation Modal Wiring ---
-    const stopAllConfirmModal = document.getElementById('stop-all-confirm-modal');
-    const closeStopAllConfirm = document.getElementById('close-stop-all-confirm');
-    const cancelConfirmBtn = document.getElementById('cancel-stop-all-confirm-btn');
-    const proceedStopAllBtn = document.getElementById('proceed-stop-all-btn');
+    // ---- Close All button: show confirmation banner ----
+    stopAllCloseAllBtn.addEventListener('click', () => {
+        if (stopAllCloseAllBtn.disabled) return;
+        stopAllConfirmBanner.style.display = 'block';
+        stopAllConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
 
-    if (closeStopAllConfirm) closeStopAllConfirm.addEventListener('click', () => stopAllConfirmModal.style.display = 'none');
-    if (cancelConfirmBtn) cancelConfirmBtn.addEventListener('click', () => stopAllConfirmModal.style.display = 'none');
+    // ---- Confirmation Banner — Cancel ----
+    stopConfirmCancelBtn.addEventListener('click', () => hideConfirmBanner());
 
-    if (proceedStopAllBtn) {
-        proceedStopAllBtn.addEventListener('click', () => {
-            proceedStopAllBtn.disabled = true;
-            proceedStopAllBtn.innerHTML = 'Stopping...';
-            fetch('/api/server/stop_all', { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    stopAllConfirmModal.style.display = 'none';
-                    alert(`Success: ${data.message}`);
-                    loadActiveJobs(); // Refresh the list
-                })
-                .catch(err => {
-                    console.error("Error stopping jobs:", err);
-                    alert("An error occurred while trying to stop processes.");
-                })
-                .finally(() => {
-                    proceedStopAllBtn.disabled = false;
-                    proceedStopAllBtn.innerHTML = 'Yes, Stop All';
-                });
-        });
-    }
+    // ---- Confirmation Banner — Stop All (confirmed) ----
+    stopConfirmProceedBtn.addEventListener('click', () => {
+        stopConfirmProceedBtn.disabled = true;
+        stopConfirmProceedBtn.textContent = 'Stopping…';
+
+        fetch('/api/server/stop_all', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                hideConfirmBanner();
+                // Refresh the list to show all stopped
+                loadActiveJobs();
+            })
+            .catch(err => {
+                console.error('Error stopping all jobs:', err);
+                stopConfirmProceedBtn.disabled = false;
+                stopConfirmProceedBtn.textContent = 'Stop All';
+            });
+    });
 
 });
+
+
