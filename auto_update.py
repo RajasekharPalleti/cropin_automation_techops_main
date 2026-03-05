@@ -79,7 +79,7 @@ def execute_update_process():
                     print(f"[{time.strftime('%H:%M:%S')}] No active jobs running. Safe to proceed with update.")
                     break
                 else:
-                    print(f"[{time.strftime('%H:%M:%S')}] Wait: {active_jobs} jobs are currently running. Checking again in 15 minutes...")
+                    print(f"[{time.strftime('%H:%M:%S')}] Wait: {active_jobs} jobs are currently running. Checking again in 30 minutes...")
             else:
                 print(f"[{time.strftime('%H:%M:%S')}] Warning: Server returned status {response.status_code}. Is it running?")
                 break
@@ -87,7 +87,7 @@ def execute_update_process():
             print(f"[{time.strftime('%H:%M:%S')}] Server is currently offline. Proceeding to update anyway.")
             break
             
-        time.sleep(15 * 60) # Wait 15 minutes (900 seconds) before checking again
+        time.sleep(30 * 60) # Wait 30 minutes (1800 seconds) before checking again
 
     # 3. Pull the latest code from Git
     try:
@@ -149,7 +149,7 @@ def execute_update_process():
     os._exit(0)
 
 def main_loop():
-    print("Auto-updater started. Scheduled to run twice daily at 00:00 (12:00 AM).")
+    print("Auto-updater started. Scheduled to run daily at 00:00 (12:00 AM).")
     
     # Schedule to run every day at Midnight (12:00 AM)
     schedule.every().day.at("00:00").do(execute_update_process)

@@ -162,6 +162,55 @@ async def get_server_status():
     return {"active_jobs": len(manager.active_tasks)}
 
 
+@router.get("/api/server/active_jobs")
+async def get_active_jobs():
+    """Get details of all currently running background script jobs."""
+    jobs = []
+    
+    for client_id in list(manager.active_tasks):
+        script_name = manager.client_script_map.get(client_id, "Unknown Script")
+        machine_key = manager.client_machine_map.get(client_id)
+        
+        tenant = "unknown"
+        user = "unknown"
+        machine_id = "unknown"
+        
+        if machine_key:
+            parts = machine_key.split(":")
+            if len(parts) >= 3:
+                tenant = parts[0]
+                user = parts[1]
+                machine_id = parts[2]
+                
+        jobs.append({
+            "client_id": client_id,
+            "script_name": script_name,
+            "tenant": tenant,
+            "user": user,
+            "machine_id": machine_id
+        })
+        
+    return {"jobs": jobs}
+
+
+@router.post("/api/server/stop_all")
+async def stop_all_jobs():
+    """Request cancellation of all running scripts."""
+    stopped_count = 0
+    active_clients = list(manager.active_tasks)
+    
+    for client_id in active_clients:
+        if not manager.is_cancelled(client_id):
+            manager.request_cancel(client_id)
+            stopped_count += 1
+            
+    return {
+        "status": "success", 
+        "message": f"Stop requested for {stopped_count} active process(es).",
+        "stopped_count": stopped_count
+    }
+
+
 @router.post("/api/server/shutdown")
 async def shutdown_server():
     """Request the Uvicorn server to shut down via stop_server.bat."""
