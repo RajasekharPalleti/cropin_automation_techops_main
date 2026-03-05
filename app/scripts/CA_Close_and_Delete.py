@@ -155,6 +155,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                     if isinstance(close_json, (dict, list)):
                         extract(close_json)
+
+                    log(f"    📤 Processed IDs ({len(ca_chunk)}): {', '.join(map(str, ca_chunk))}")
+                    log(f"    📥 Response IDs  ({len(ca_status_map)}): {', '.join(ca_status_map.keys()) if ca_status_map else 'None'}")
+                    _missed = set(map(str, ca_chunk)) - set(ca_status_map.keys())
+                    log(f"    📝 IDs missed in response ({len(_missed)}): {', '.join(_missed) if _missed else 'None'}")
                     
                     for row_idx, chunk_idx in enumerate(idx_chunk):
                         current_ca_id = str(ca_chunk[row_idx])
