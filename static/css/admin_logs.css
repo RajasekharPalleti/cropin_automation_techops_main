@@ -157,3 +157,16 @@
     color: #ffffff;
     font-weight: bold;
 }
+
+/* Mobile Responsiveness for Admin Console */
+@media (max-width: 768px) {
+    .admin-console-wrapper:not(.fullscreen) {
+        width: calc(100vw - 40px);
+        max-width: 100vw;
+    }
+    
+    .admin-console-wrapper.minimized {
+        width: calc(100vw - 40px);
+        max-width: 100vw;
+    }
+}

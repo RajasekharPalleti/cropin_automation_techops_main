@@ -183,54 +183,80 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
             # --- 2) DELETE CROPPABLE AREA API ---
             if "delete" in ca_action:
-                log(f"    🗑️ Deleting {len(ca_chunk)} croppable_areas...")
-                # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
-                delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param}&croppableAreaIds={ca_ids_param}"
+                ca_chunk_for_delete = []
+                project_asset_chunk_for_delete = []
+                idx_chunk_for_delete = []
 
-                try:
-                    resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
-                    delete_status_code = resp_delete.status_code
+                if "close" in ca_action:
+                    for row_idx, chunk_idx in enumerate(idx_chunk):
+                        status = str(df.at[chunk_idx, "closed_api_status"]).strip().lower()
+                        if status == "closed":
+                            ca_chunk_for_delete.append(ca_chunk[row_idx])
+                            project_asset_chunk_for_delete.append(project_asset_chunk[row_idx])
+                            idx_chunk_for_delete.append(chunk_idx)
+                        else:
+                            df.at[chunk_idx, "delete_api_http_status"] = "Skipped"
+                            df.at[chunk_idx, "delete_api_status"] = "Skipped (Not closed)"
+                else:
+                    ca_chunk_for_delete = ca_chunk
+                    project_asset_chunk_for_delete = project_asset_chunk
+                    idx_chunk_for_delete = idx_chunk
+
+                if not ca_chunk_for_delete:
+                    if "close" in ca_action:
+                        log(f"    ⚠️ No croppable areas were successfully closed in this batch. Skipping delete.")
+                else:
+                    ca_ids_param_delete = ",".join(map(str, ca_chunk_for_delete))
+                    project_asset_ids_param_delete = ",".join(map(str, project_asset_chunk_for_delete))
+
+                    log(f"    🗑️ Deleting {len(ca_chunk_for_delete)} croppable_areas...")
+                    # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
+                    delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param_delete}&croppableAreaIds={ca_ids_param_delete}"
 
                     try:
-                        delete_json = resp_delete.json()
-                    except:
-                        delete_json = None
+                        resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
+                        delete_status_code = resp_delete.status_code
 
-                    deletable = None
-                    non_deletable = None
-                    is_deleted = False
+                        try:
+                            delete_json = resp_delete.json()
+                        except:
+                            delete_json = None
 
-                    if delete_status_code in (200, 204) and isinstance(delete_json, dict):
-                        deletable = delete_json.get("deletable")
-                        non_deletable = delete_json.get("nonDeletable")
-                        if deletable is not None and non_deletable is not None:
-                            is_deleted = True
+                        deletable = None
+                        non_deletable = None
+                        is_deleted = False
 
-                    delete_info = {
-                        "http_status": delete_status_code,
-                        "deletable": deletable,
-                        "nonDeletable": non_deletable,
-                        "deleted": is_deleted
-                    }
+                        if delete_status_code in (200, 204) and isinstance(delete_json, dict):
+                            deletable = delete_json.get("deletable")
+                            non_deletable = delete_json.get("nonDeletable")
+                            if deletable is not None and non_deletable is not None:
+                                is_deleted = True
 
-                    for chunk_idx in idx_chunk:
-                        df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
-                        df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
+                        delete_info = {
+                            "http_status": delete_status_code,
+                            "deletable": deletable,
+                            "nonDeletable": non_deletable,
+                            "deleted": is_deleted
+                        }
 
-                    if is_deleted:
-                        log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
-                    else:
-                        error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
-                        log(f"    ❌ Delete Failed (HTTP {delete_status_code}) | Response: {error_detail[:500]}")
+                        for chunk_idx in idx_chunk_for_delete:
+                            df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
+                            df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
 
-                except Exception as e:
-                    log(f"    ❌ Delete Error: {str(e)}")
-                    for chunk_idx in idx_chunk:
-                        df.at[chunk_idx, "delete_api_http_status"] = "Error"
-                        df.at[chunk_idx, "delete_api_status"] = str(e)
+                        if is_deleted:
+                            log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
+                        else:
+                            error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
+                            log(f"    ❌ Delete Failed (HTTP {delete_status_code}) | Response: {error_detail[:500]}")
+
+                    except Exception as e:
+                        log(f"    ❌ Delete Error: {str(e)}")
+                        for chunk_idx in idx_chunk_for_delete:
+                            df.at[chunk_idx, "delete_api_http_status"] = "Error"
+                            df.at[chunk_idx, "delete_api_status"] = str(e)
 
 
-                time.sleep(delay_time)
+                    time.sleep(delay_time)
 
             # Live save to output
             try:
