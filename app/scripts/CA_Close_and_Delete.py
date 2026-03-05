@@ -131,6 +131,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 log(f"    🔒 Closing {len(ca_chunk)} croppable areas...")
                 close_url = f"{base_url}/croppable-areas/closed?reasonId=4&ids={ca_ids_param}"
 
+                start_time_close = time.time()
                 try:
                     resp_close = requests.get(close_url, headers=headers, timeout=600)
                     close_status_code = resp_close.status_code
@@ -167,13 +168,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                             else:
                                 df.at[chunk_idx, "closed_api_status"] = json.dumps(close_json or resp_close.text, default=str)
                     
+                    elapsed_close = time.time() - start_time_close
                     if close_status_code == 200:
-                        log(f"    ✅ Close Success (HTTP {close_status_code})")
+                        log(f"    ✅ Close Success (HTTP {close_status_code}) in {elapsed_close:.2f}s")
                     else:
-                        log(f"    ⚠️ Close Warning (HTTP {close_status_code})")
+                        log(f"    ⚠️ Close Warning (HTTP {close_status_code}) in {elapsed_close:.2f}s")
 
                 except Exception as e:
-                    log(f"    ❌ Close Error: {str(e)}")
+                    elapsed_close = time.time() - start_time_close
+                    log(f"    ❌ Close Error: {str(e)} in {elapsed_close:.2f}s")
                     for chunk_idx in idx_chunk:
                         df.at[chunk_idx, "closed_api_http_status"] = "Error"
                         df.at[chunk_idx, "closed_api_status"] = str(e)
@@ -214,6 +217,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
                     delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param_delete}&croppableAreaIds={ca_ids_param_delete}"
 
+                    start_time_delete = time.time()
                     try:
                         resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
                         delete_status_code = resp_delete.status_code
@@ -244,14 +248,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                             df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
                             df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
 
+                        elapsed_delete = time.time() - start_time_delete
                         if is_deleted:
-                            log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable})")
+                            log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable}) in {elapsed_delete:.2f}s")
                         else:
                             error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
-                            log(f"    ❌ Delete Failed (HTTP {delete_status_code}) | Response: {error_detail[:500]}")
+                            log(f"    ❌ Delete Failed (HTTP {delete_status_code}) in {elapsed_delete:.2f}s | Response: {error_detail[:500]}")
 
                     except Exception as e:
-                        log(f"    ❌ Delete Error: {str(e)}")
+                        elapsed_delete = time.time() - start_time_delete
+                        log(f"    ❌ Delete Error: {str(e)} in {elapsed_delete:.2f}s")
                         for chunk_idx in idx_chunk_for_delete:
                             df.at[chunk_idx, "delete_api_http_status"] = "Error"
                             df.at[chunk_idx, "delete_api_status"] = str(e)
