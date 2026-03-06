@@ -1,9 +1,9 @@
 
 """
-Updates tags associated with farmers.
+Updates tags associated with croppable areas (CAs).
 
 Inputs:
-Excel file with 'farmer_id' and 'tags' (list or comma-separated).
+Excel file with 'ca_id' and 'tags' (list or comma-separated).
 """
 
 import json
@@ -41,13 +41,15 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
         else:
             print(msg)
 
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}",
+    "Content-Type": "application/json"
+    }
     results = []
 
     for index, row in df_chunk.iterrows():
 
         try:
-            farmer_id = row.iloc[0]  # Column A: Farmer ID
+            ca_id = row.iloc[0]  # Column A: CA ID
             raw_tags = row.iloc[2]  # Column C: Tags, Example: " [1, 2, 3] "
         except IndexError:
              status = "Skipped: Row missing columns"
@@ -57,27 +59,27 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
         status = ""
         response_str = ""
 
-        farmer_tags = parse_tags(raw_tags)
+        ca_tags = parse_tags(raw_tags)
 
-        if pd.isna(farmer_id):
-            status = "Skipped: Missing Farmer ID"
+        if pd.isna(ca_id):
+            status = "Skipped: Missing CA ID"
             results.append((index, status, response_str))
             continue
 
         try:
-            get_response = requests.get(f"{api_url}/{farmer_id}", headers=headers, timeout=timeout)
+            get_response = requests.get(f"{api_url}/{ca_id}", headers=headers, timeout=timeout)
             get_response.raise_for_status()
-            farmer_data = get_response.json()
+            ca_data = get_response.json()
 
-            if "data" in farmer_data and isinstance(farmer_data["data"], dict):
-                existing_tags = farmer_data["data"].get("tags", [])
+            if "data" in ca_data and isinstance(ca_data["data"], dict):
+                existing_tags = ca_data["data"].get("tags", [])
                 if existing_tags is None:
                     existing_tags = []
 
                 # Merge logic: Append new tags if they don't exist
                 updated_tags = list(existing_tags)
                 to_add = []
-                for tag in farmer_tags:
+                for tag in ca_tags:
                     if tag not in existing_tags:
                         to_add.append(tag)
                         updated_tags.append(tag)
@@ -87,7 +89,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
                     results.append((index, status, response_str))
                     continue
 
-                farmer_data["data"]["tags"] = updated_tags
+                ca_data["data"]["tags"] = updated_tags
             else:
                 status = "Failed: No data property in response"
                 results.append((index, status, response_str))
@@ -95,20 +97,16 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
 
             time.sleep(delay_time)
 
-            multipart_data = {
-                "dto": (None, json.dumps(farmer_data), "application/json")
-            }
-
-            put_response = requests.put(api_url, headers=headers, files=multipart_data, timeout=timeout)
+            put_response = requests.put(api_url, headers=headers, json=ca_data, timeout=timeout)
 
             if put_response.status_code in [200, 201, 204]:
                 status = "Success"
                 response_str = put_response.text[:500]
-                log(f"[Thread {thread_id}] Updated Farmer {farmer_id}")
+                log(f"[Thread {thread_id}] Updated CA {ca_id}")
             else:
                 status = f"Failed: {put_response.status_code}"
                 response_str = put_response.text[:500]
-                log(f"[Thread {thread_id}] Failed to update Farmer {farmer_id}: {put_response.status_code}")
+                log(f"[Thread {thread_id}] Failed to update CA {ca_id}: {put_response.status_code}")
 
         except requests.exceptions.RequestException as e:
             status = f"Failed: {str(e)}"
@@ -116,7 +114,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
                 response_str = f"{e.response.status_code} - {e.response.text}"
             else:
                 response_str = str(e)
-            log(f"[Thread {thread_id}] Error for farmer {farmer_id}: {response_str[:100]}")
+            log(f"[Thread {thread_id}] Error for CA {ca_id}: {response_str[:100]}")
 
         time.sleep(delay_time)
         results.append((index, status, response_str))

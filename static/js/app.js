@@ -199,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('variety-removal-config', selectedScript.show_variety_removal);
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
             toggle('time-delay-config', selectedScript.show_time_delay);
+            toggle('threading-config', selectedScript.show_threading);
 
             // Count dropdowns
             const setupCountDropdown = (selectId, groupPrefix, max = 4) => {

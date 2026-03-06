@@ -14,6 +14,25 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 import ast
 
+def parse_tags(raw):
+    """Accept: 122  |  123,231  |  [123,231,456]"""
+    if raw is None:
+        return []
+    import pandas as pd
+    if isinstance(raw, float) and pd.isna(raw):
+        return []
+    s = str(raw).strip().strip("[]").strip()
+    if not s:
+        return []
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+    result = []
+    for p in parts:
+        try:
+            result.append(int(float(p)))
+        except ValueError:
+            pass
+    return result
+
 def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeout=30, delay_time=1):
     
     def log(msg):
@@ -39,22 +58,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
         status = ""
         response_str = ""
 
-        # Convert string to actual list
-        asset_tags = []
-        if pd.isna(raw_tags):
-             asset_tags = [] # Or skip? User code didn't explicitly handle NaN tags well, but ast.literal_eval on NaN might fail.
-        elif isinstance(raw_tags, str):
-            try:
-                asset_tags = ast.literal_eval(raw_tags.strip())
-            except Exception:
-                asset_tags = [] # Fallback
-        else:
-            # If it's already a list or number (pandas sometimes infers)
-            if isinstance(raw_tags, list):
-                asset_tags = raw_tags
-            else:
-                 # Try wrapping single value? User code: asset_tags = raw_tags
-                 asset_tags = raw_tags
+        asset_tags = parse_tags(raw_tags)
 
         if pd.isna(asset_id):
             status = "Skipped: Missing Asset ID"
@@ -140,6 +144,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     api_url = config.get("base_api_url")
     token = config.get("token")
+    worker_count = int(config.get("worker_count", 4))
 
     if not api_url:
         log("Error: 'base_api_url' not configured.")
@@ -165,8 +170,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     n = len(df)
     log(f"Total rows to process: {n}")
     
-    # Split into maximum 4 chunks (User used 2, but 4 is generally fine, let's stick to user preference if desired, but 4 is safe)
-    max_workers = 4
+    # Split into configured chunks
+    max_workers = worker_count
     chunk_size = (n + max_workers - 1) // max_workers # ceiling division
     
     chunks = []
