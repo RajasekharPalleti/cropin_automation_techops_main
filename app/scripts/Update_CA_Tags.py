@@ -50,11 +50,14 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
 
         try:
             ca_id = row.iloc[0]  # Column A: CA ID
+            ca_name = row.iloc[1] if len(row) > 1 else "" # Column B: CA Name
             raw_tags = row.iloc[2]  # Column C: Tags, Example: " [1, 2, 3] "
         except IndexError:
              status = "Skipped: Row missing columns"
              results.append((index, status, "IndexError"))
              continue
+
+        row_num = index + 2
 
         status = ""
         response_str = ""
@@ -102,11 +105,11 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
             if put_response.status_code in [200, 201, 204]:
                 status = "Success"
                 response_str = put_response.text[:500]
-                log(f"[Thread {thread_id}] Updated CA {ca_id}")
+                log(f"[Row {row_num}] Updated CA '{ca_name}' ({ca_id})")
             else:
                 status = f"Failed: {put_response.status_code}"
                 response_str = put_response.text[:500]
-                log(f"[Thread {thread_id}] Failed to update CA {ca_id}: {put_response.status_code}")
+                log(f"[Row {row_num}] Failed to update CA '{ca_name}' ({ca_id}): {put_response.status_code}")
 
         except requests.exceptions.RequestException as e:
             status = f"Failed: {str(e)}"
@@ -114,7 +117,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
                 response_str = f"{e.response.status_code} - {e.response.text}"
             else:
                 response_str = str(e)
-            log(f"[Thread {thread_id}] Error for CA {ca_id}: {response_str[:100]}")
+            log(f"[Row {row_num}] Error for CA '{ca_name}' ({ca_id}): {response_str[:100]}")
 
         time.sleep(delay_time)
         results.append((index, status, response_str))
