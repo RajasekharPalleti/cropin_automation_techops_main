@@ -46,8 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let _isMinimized = false;
         let _isMaximized = false;
 
-        // Click-to-front on any interaction
+        // Click-to-front on any interaction (mouse + touch)
         wrapper.addEventListener('mousedown', () => bringToFront(wrapper));
+        wrapper.addEventListener('touchstart', () => bringToFront(wrapper), { passive: true });
 
         // --- Drag State ---
         let isDragging = false;
@@ -105,6 +106,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.style.bottom = '20px';
             }
         });
+
+        // --- Touch Drag (mobile) ---
+        let touchStartX = 0, touchStartY = 0;
+        let touchTransformX = 0, touchTransformY = 0;
+
+        header.addEventListener('touchstart', (e) => {
+            if (_isMinimized || _isMaximized) return;
+            const t = e.touches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+            // Freeze to absolute position
+            const rect = wrapper.getBoundingClientRect();
+            if (wrapper.style.bottom !== 'auto') {
+                wrapper.style.bottom = 'auto';
+                wrapper.style.right = 'auto';
+                wrapper.style.left = rect.left + 'px';
+                wrapper.style.top = rect.top + 'px';
+                touchTransformX = 0;
+                touchTransformY = 0;
+            }
+            wrapper.style.transition = 'none';
+        }, { passive: true });
+
+        header.addEventListener('touchmove', (e) => {
+            if (_isMinimized || _isMaximized) return;
+            e.preventDefault();
+            const t = e.touches[0];
+            const dx = t.clientX - touchStartX;
+            const dy = t.clientY - touchStartY;
+            wrapper.style.transform = `translate(${touchTransformX + dx}px, ${touchTransformY + dy}px)`;
+        }, { passive: false });
+
+        header.addEventListener('touchend', (e) => {
+            const t = e.changedTouches[0];
+            touchTransformX += t.clientX - touchStartX;
+            touchTransformY += t.clientY - touchStartY;
+            wrapper.style.transition = 'width 0.3s, height 0.3s, bottom 0.3s, right 0.3s';
+            // Snap back if off-screen
+            const rect = wrapper.getBoundingClientRect();
+            if (rect.top < 0 || rect.left < 0 || rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
+                wrapper.style.transform = 'translate(0,0)';
+                touchTransformX = 0; touchTransformY = 0;
+                wrapper.style.left = 'auto'; wrapper.style.top = 'auto';
+                wrapper.style.right = bottomOffset; wrapper.style.bottom = '20px';
+            }
+        }, { passive: true });
 
         // --- Minimize / Restore ---
         function toggleMinimize() {
@@ -277,18 +324,20 @@ document.addEventListener('DOMContentLoaded', () => {
                   style="font-size:0.75em;color:#888;white-space:nowrap;padding:2px 6px;background:#1e1e1e;border-radius:4px;border:1px solid #333;"
                   title="Lines currently shown / total lines in log files">— / —</span>
         </div>
-        <div id="admin-console-body-wrap" style="position:relative;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- body-wrap: flex:1 so it fills remaining height; overflow visible so Jump button is not clipped -->
+        <div id="admin-console-body-wrap" style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;overflow:visible;">
             <div class="admin-console-body" id="admin-console-body"></div>
-            <!-- Jump to Latest button — visible only when scrolled up -->
-            <button id="admin-jump-latest"
-                    style="display:none;position:absolute;bottom:10px;right:12px;z-index:10;
-                           background:#0d6efd;color:#fff;border:none;border-radius:20px;
-                           padding:6px 14px;font-size:0.8em;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);
-                           display:none;align-items:center;gap:4px;">
-                <span class="material-icons" style="font-size:1em;vertical-align:middle;">arrow_downward</span>
-                Jump to Latest
-            </button>
         </div>
+        <!-- Jump to Latest: positioned absolute to the wrapper, not the body-wrap, so it's never clipped -->
+        <button id="admin-jump-latest"
+                style="display:none;position:absolute;bottom:18px;right:18px;z-index:20;
+                       background:#0d6efd;color:#fff;border:none;border-radius:20px;
+                       padding:8px 16px;font-size:0.82em;cursor:pointer;
+                       box-shadow:0 3px 10px rgba(0,0,0,0.35);
+                       align-items:center;gap:5px;">
+            <span class="material-icons" style="font-size:1em;vertical-align:middle;">arrow_downward</span>
+            Jump to Latest
+        </button>
     `;
     document.body.appendChild(consoleWrapper);
 
@@ -308,8 +357,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // (only updated by startPolling initial fetch + fetchOlderLogs — NOT by live SSE lines)
     let olderLogsOffset = 0;
     let totalServerLines = 0;
+    let hasMoreOldLogs = true;   // set false when backend confirms no more older lines
     let eventSource = null;
-    const MAX_LOG_LINES = 5000;
+    const MAX_LOG_LINES = 20000;   // max lines held in memory (increased for deep-history browsing)
     const BATCH_SIZE = 1000;
 
     const logsWindow = setupFloatingWindow({
@@ -332,8 +382,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Search ---
-    logsSearchInput.addEventListener('input', () => renderLogs(false));
+    // ---- Search state ----
+    let isSearchMode = false;       // true when search results are showing
+    let searchResults = [];         // lines returned from search API
+    let searchNextOffset = 0;       // offset for next search page
+    let searchHasMore = false;      // more results available?
+    let isLoadingSearch = false;    // prevent concurrent search fetches
+    let searchDebounceTimer = null;
+
+    // --- Search input: debounced, hits full-file API ---
+    logsSearchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        const term = logsSearchInput.value.trim();
+
+        if (!term) {
+            // Exit search mode — go back to normal live view
+            isSearchMode = false;
+            searchResults = [];
+            searchNextOffset = 0;
+            searchHasMore = false;
+            logsCounter.textContent = `${logsCache.length.toLocaleString()} / ${totalServerLines.toLocaleString()} lines`;
+            renderCacheView(false);
+            return;
+        }
+
+        searchDebounceTimer = setTimeout(() => {
+            isSearchMode = true;
+            searchResults = [];
+            searchNextOffset = 0;
+            searchHasMore = false;
+            logsCounter.textContent = 'Searching…';
+            logsBody.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">🔍 Searching both log files…</div>';
+            fetchSearchPage(term, 0);
+        }, 350);
+    });
 
     // --- Jump to Latest button ---
     jumpLatestBtn.addEventListener('click', () => {
@@ -341,17 +423,23 @@ document.addEventListener('DOMContentLoaded', () => {
         jumpLatestBtn.style.display = 'none';
     });
 
-    // --- Infinite scroll (older logs) + Jump to Latest visibility ---
+    // --- Scroll: top → load older history (normal mode) | bottom → load more search results (search mode) ---
     logsBody.addEventListener('scroll', () => {
         const isNearTop = logsBody.scrollTop <= 10;
         const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 60;
 
-        // Show / hide Jump to Latest
-        jumpLatestBtn.style.display = isNearBottom ? 'none' : 'flex';
+        jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom) ? 'flex' : 'none';
 
-        // Load older logs when scrolled to top
-        if (isNearTop && !isLoadingOlder && olderLogsOffset < totalServerLines) {
-            fetchOlderLogs();
+        if (isSearchMode) {
+            // Bottom scroll → load next search page
+            if (isNearBottom && searchHasMore && !isLoadingSearch) {
+                fetchSearchPage(logsSearchInput.value.trim(), searchNextOffset);
+            }
+        } else {
+            // Top scroll → load older log history
+            if (isNearTop && !isLoadingOlder && hasMoreOldLogs && olderLogsOffset < totalServerLines) {
+                fetchOlderLogs();
+            }
         }
     });
 
@@ -365,6 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startPolling() {
         if (isPolling) return;
         isPolling = true;
+        hasMoreOldLogs = true;
         logsCounter.textContent = 'Loading...';
         fetch(`/api/server_logs?offset_line=0&limit=${BATCH_SIZE}`)
             .then(r => r.json())
@@ -394,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
                 logsCache.push(data.line);
                 totalServerLines++;
-                manageMemory();
+                trimOldest();   // live lines added at back — trim oldest from front
                 updateCounter();
                 renderLogs(wasScrolledToBottom);
             } catch (e) {
@@ -430,11 +519,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     logsCache = data.logs.concat(logsCache);
                     olderLogsOffset += data.returned_count;
                     totalServerLines = data.total_lines;
-                    manageMemory();
+                    hasMoreOldLogs = data.has_more !== false;  // false only when backend explicitly says no more
+                    // Trim from the BACK (newest end) to preserve the old lines we just prepended
+                    trimNewest();
                     updateCounter();
                     renderLogs(false);
                     logsBody.scrollTop = logsBody.scrollHeight - oldScrollHeight;
                 } else {
+                    hasMoreOldLogs = false;  // backend returned empty — we've reached the beginning
                     // All historical logs loaded — show a banner at the very top
                     const allLoadedDiv = document.getElementById('logs-all-loaded');
                     if (!allLoadedDiv) {
@@ -450,36 +542,108 @@ document.addEventListener('DOMContentLoaded', () => {
             .finally(() => { isLoadingOlder = false; });
     }
 
-    function manageMemory() {
+    // Trim oldest lines (from FRONT) — used when SSE appends new lines at the back
+    function trimOldest() {
         if (logsCache.length > MAX_LOG_LINES) {
             const overage = logsCache.length - MAX_LOG_LINES;
             logsCache = logsCache.slice(overage);
         }
     }
 
-    function renderLogs(forceScrollToBottom = false) {
-        const searchTerm = logsSearchInput.value.toLowerCase().trim();
+    // Trim newest lines (from BACK) — used when prepending historical lines at the front
+    // so we don't discard the old history we just loaded
+    function trimNewest() {
+        if (logsCache.length > MAX_LOG_LINES) {
+            logsCache = logsCache.slice(0, MAX_LOG_LINES);
+        }
+    }
+
+    // ---- Full-file search fetch (paginated) ----
+    function fetchSearchPage(term, offset) {
+        if (!term || isLoadingSearch) return;
+        isLoadingSearch = true;
+
+        fetch(`/api/server_logs/search?q=${encodeURIComponent(term)}&offset=${offset}&limit=1000`)
+            .then(r => r.json())
+            .then(data => {
+                searchResults = searchResults.concat(data.results || []);
+                searchNextOffset = data.next_offset || (offset + (data.results || []).length);
+                searchHasMore = data.has_more || false;
+
+                // Update counter badge
+                const total = data.total_matched || 0;
+                logsCounter.textContent = `${searchResults.length.toLocaleString()} / ${total.toLocaleString()} matches`;
+
+                renderSearchView(term, offset === 0);
+            })
+            .catch(err => {
+                logsBody.innerHTML = `<div style="color:#dc3545;padding:20px;text-align:center;">❌ Search error: ${err.message}</div>`;
+            })
+            .finally(() => { isLoadingSearch = false; });
+    }
+
+    // ---- Render search results into the log body ----
+    function renderSearchView(term, resetScroll = false) {
+        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedTerm, 'gi');
+
+        let html = '';
+
+        if (searchResults.length === 0) {
+            html = `<div style="color:#888;text-align:center;padding:30px;">No matches found for <strong>${term}</strong> in server logs.</div>`;
+        } else {
+            // Header banner
+            html += `<div style="text-align:center;color:#888;font-size:0.8em;padding:6px;border-bottom:1px solid #333;font-style:italic;">
+                        🔍 Showing ${searchResults.length.toLocaleString()} match${searchResults.length !== 1 ? 'es' : ''} for &ldquo;${term}&rdquo;
+                        ${searchHasMore ? ' — scroll down for more' : ' — all matches shown'}
+                     </div>`;
+
+            searchResults.forEach(line => {
+                const safeLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const highlighted = safeLine.replace(regex, m =>
+                    `<span style="background:yellow;color:#000;border-radius:2px;padding:0 2px;">${m}</span>`);
+                html += `<div class="admin-log-line search-match">${highlighted}</div>`;
+            });
+
+            if (searchHasMore) {
+                html += `<div id="search-load-more-indicator"
+                              style="text-align:center;color:#888;font-style:italic;padding:10px;">
+                            ↓ Scroll down to load more matches
+                          </div>`;
+            } else {
+                html += `<div style="text-align:center;color:#28a745;font-size:0.8em;padding:8px;border-top:1px solid #333;font-style:italic;">
+                            ✅ All matches shown
+                         </div>`;
+            }
+        }
+
+        logsBody.innerHTML = html;
+        if (resetScroll) logsBody.scrollTop = 0;
+    }
+
+    // ---- Render normal cache view (non-search mode) ----
+    function renderCacheView(forceScrollToBottom = false) {
         let html = '';
         logsCache.forEach(line => {
             if (line.includes('/api/server_logs')) return;
-            const lowerLine = line.toLowerCase();
-            const isMatch = searchTerm !== '' && lowerLine.includes(searchTerm);
-            if (searchTerm === '' || isMatch) {
-                let safeLine = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                if (searchTerm !== '' && isMatch) {
-                    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-                    safeLine = safeLine.replace(regex, m => `<span style="background-color:yellow;color:black;">${m}</span>`);
-                }
-                html += `<div class="admin-log-line ${isMatch && searchTerm !== '' ? 'search-match' : ''}">${safeLine}</div>`;
-            }
+            const safeLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `<div class="admin-log-line">${safeLine}</div>`;
         });
-        if (html === '' && searchTerm !== '') {
-            html = '<div style="color:#888;text-align:center;padding:20px;">No logs match your search.</div>';
-        }
+        if (!html) html = '<div style="color:#888;text-align:center;padding:20px;">No logs available.</div>';
+
         const isAtBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
         logsBody.innerHTML = html;
         if ((forceScrollToBottom || isAtBottom) && !logsWindow.isMinimized && !isLoadingOlder) {
             scrollToBottom();
+        }
+    }
+
+    // ---- renderLogs: dispatch to the right renderer ----
+    function renderLogs(forceScrollToBottom = false) {
+        if (isSearchMode) {
+            renderSearchView(logsSearchInput.value.trim(), false);
+        } else {
+            renderCacheView(forceScrollToBottom);
         }
     }
 
@@ -491,7 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopAllWrapper = document.createElement('div');
     stopAllWrapper.className = 'admin-console-wrapper';
     stopAllWrapper.id = 'stop-all-console';
-    stopAllWrapper.style.cssText = 'bottom:20px;right:20px;width:560px;height:420px;';
+    // No inline width/height — CSS fully controls sizing at all breakpoints
     stopAllWrapper.innerHTML = `
         <div class="admin-console-header" id="stopall-header">
             <div class="admin-console-title">
@@ -501,6 +665,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="admin-console-controls">
                 <button class="admin-console-btn minimize" id="stopall-minimize" title="Minimize/Restore">
                     <span class="material-icons">horizontal_rule</span>
+                </button>
+                <button class="admin-console-btn" id="stopall-maximize" title="Maximize/Restore">
+                    <span class="material-icons">fullscreen</span>
                 </button>
                 <button class="admin-console-btn close" id="stopall-close" title="Close Window">
                     <span class="material-icons">close</span>
@@ -518,19 +685,19 @@ document.addEventListener('DOMContentLoaded', () => {
             <!-- Inline confirmation banner (hidden by default) -->
             <div id="stopall-confirm-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 14px;margin-bottom:10px;">
                 <p style="margin:0 0 10px;font-weight:600;color:#856404;font-size:0.92em;">
-                    ⚠ Are you sure you want to stop ALL running processes?
+                    ⚠ Are you sure you want to terminate ALL running processes?
                 </p>
                 <p style="margin:0 0 12px;color:#666;font-size:0.82em;">This will forcefully terminate all active scripts for all users and cannot be undone.</p>
                 <div style="display:flex;justify-content:flex-end;gap:10px;">
                     <button id="stopall-confirm-cancel" class="btn-secondary" style="padding:6px 14px;font-size:0.85em;">Cancel</button>
-                    <button id="stopall-confirm-proceed" class="btn-primary" style="background:#dc3545;padding:6px 14px;font-size:0.85em;">Stop All</button>
+                    <button id="stopall-confirm-proceed" class="btn-primary" style="background:#dc3545;padding:6px 14px;font-size:0.85em;">Terminate All</button>
                 </div>
             </div>
 
             <!-- Footer buttons -->
             <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid #dee2e6;flex-shrink:0;">
                 <button id="stopall-dismiss-btn" class="btn-secondary" style="padding:8px 16px;">Dismiss</button>
-                <button id="stopall-closeall-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Close All</button>
+                <button id="stopall-closeall-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Terminate All</button>
             </div>
         </div>
     `;
@@ -538,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const stopAllHeader = document.getElementById('stopall-header');
     const stopAllMinimizeBtn = document.getElementById('stopall-minimize');
-    const stopAllCloseBtn = document.getElementById('stopall-close');   // window X
+    const stopAllCloseBtn = document.getElementById('stopall-close');
     const stopAllJobsList = document.getElementById('stopall-jobs-list');
     const stopAllConfirmBanner = document.getElementById('stopall-confirm-banner');
     const stopConfirmCancelBtn = document.getElementById('stopall-confirm-cancel');
@@ -546,47 +713,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopAllDismissBtn = document.getElementById('stopall-dismiss-btn');
     const stopAllCloseAllBtn = document.getElementById('stopall-closeall-btn');
 
-    // Helper: hide the confirmation banner
+    // ---- Helper: hide the Close All confirmation banner ----
     function hideConfirmBanner() {
         stopAllConfirmBanner.style.display = 'none';
         stopConfirmProceedBtn.disabled = false;
-        stopConfirmProceedBtn.textContent = 'Stop All';
+        stopConfirmProceedBtn.textContent = 'Terminate All';
     }
 
-    // Helper: update the Close All button state based on job count
+    // ---- Helper: enable/disable Close All button based on job count ----
     function syncCloseAllBtn(hasJobs) {
         stopAllCloseAllBtn.disabled = !hasJobs;
         stopAllCloseAllBtn.style.opacity = hasJobs ? '1' : '0.5';
         stopAllCloseAllBtn.style.cursor = hasJobs ? 'pointer' : 'not-allowed';
     }
 
+    // ---- Helper: show "closing in progress" overlay, then reload after delayMs ----
+    function showClosingAndReload(message, delayMs) {
+        hideConfirmBanner();
+        stopAllJobsList.innerHTML = `
+            <div style="text-align:center;padding:40px 20px;">
+                <div style="font-size:2em;margin-bottom:12px;">⏳</div>
+                <div style="font-weight:600;color:#dc3545;font-size:1em;margin-bottom:8px;">${message}</div>
+                <div style="color:#888;font-size:0.85em;">Refreshing in ${Math.round(delayMs / 1000)} second(s)…</div>
+            </div>`;
+        syncCloseAllBtn(false);
+        setTimeout(() => loadActiveJobs(), delayMs);
+    }
+
+    const stopAllMaximizeBtn = document.getElementById('stopall-maximize');
+
     const stopAllWindow = setupFloatingWindow({
         wrapper: stopAllWrapper,
         header: stopAllHeader,
         minimizeBtn: stopAllMinimizeBtn,
-        // X button: if jobs running, show confirm; else just close
-        closeBtn: null,        // we wire it manually below
+        maximizeBtn: stopAllMaximizeBtn,
+        closeBtn: stopAllCloseBtn,   // X = just closes window, no intercept
         bottomOffset: '20px',
-        minimizedWidth: '300px',
+        minimizedWidth: '280px',
+        onClose: () => hideConfirmBanner(),
     });
 
-    // Wire window X button manually so we can intercept
-    stopAllCloseBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const hasJobs = stopAllJobsList.querySelectorAll('li').length > 0;
-        if (hasJobs) {
-            // Show the confirmation banner instead of closing silently
-            stopAllConfirmBanner.style.display = 'block';
-            stopAllConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-            stopAllWindow.hide();
-        }
-    });
-
-    // ---- Load jobs function ----
+    // ---- Load jobs ----
     function loadActiveJobs() {
         hideConfirmBanner();
-        stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes...</div>';
+        stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes…</div>';
         syncCloseAllBtn(false);
 
         fetch('/api/server/active_jobs')
@@ -599,51 +769,92 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Build job rows with individual Cancel button
                 let html = '<ul style="list-style-type:none;padding:0;margin:0;">';
                 jobs.forEach(job => {
                     html += `
-                        <li data-client-id="${job.client_id}"
-                            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e0e0e0;background:#fff;margin-bottom:5px;border-radius:6px;gap:10px;">
-                            <div style="flex:1;min-width:0;">
-                                <div style="font-weight:600;color:#333;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${job.script_name}">${job.script_name}</div>
-                                <div style="font-size:0.82em;color:#666;">
-                                    User <strong>${job.user}</strong> · Tenant <strong>${job.tenant}</strong>
+                        <li data-client-id="${job.client_id}" id="job-row-${job.client_id}"
+                            style="border-bottom:1px solid #e0e0e0;background:#fff;margin-bottom:5px;border-radius:6px;overflow:hidden;">
+
+                            <!-- Main row: info + Cancel button -->
+                            <div class="job-main-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:10px;">
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-weight:600;color:#333;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${job.script_name}">${job.script_name}</div>
+                                    <div style="font-size:0.82em;color:#666;">
+                                        User <strong>${job.user}</strong> · Tenant <strong>${job.tenant}</strong>
+                                    </div>
+                                    <div style="font-size:0.72em;color:#aaa;margin-top:2px;">ID: ${job.client_id}</div>
                                 </div>
-                                <div style="font-size:0.72em;color:#aaa;margin-top:2px;">ID: ${job.client_id}</div>
+                                <button class="cancel-job-btn"
+                                        data-client-id="${job.client_id}"
+                                        style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;
+                                               background:#fff;border:1px solid #dc3545;color:#dc3545;
+                                               cursor:pointer;white-space:nowrap;">
+                                    Cancel
+                                </button>
                             </div>
-                            <button class="cancel-job-btn btn-secondary"
-                                    data-client-id="${job.client_id}"
-                                    style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;background:#fff;border:1px solid #dc3545;color:#dc3545;cursor:pointer;white-space:nowrap;">
-                                Cancel
-                            </button>
+
+                            <!-- Per-row "Are you sure?" confirmation (hidden by default) -->
+                            <div class="job-cancel-confirm" style="display:none;background:#fff3cd;border-top:1px solid #ffc107;padding:10px 14px;">
+                                <p style="margin:0 0 8px;font-weight:600;color:#856404;font-size:0.88em;">
+                                    ⚠ Stop this process?
+                                </p>
+                                <p style="margin:0 0 10px;color:#666;font-size:0.8em;">
+                                    This will forcefully terminate <strong>${job.script_name}</strong> for <strong>${job.user}</strong>.
+                                </p>
+                                <div style="display:flex;justify-content:flex-end;gap:8px;">
+                                    <button class="job-cancel-no btn-secondary"
+                                            style="padding:5px 12px;font-size:0.82em;">Keep Running</button>
+                                    <button class="job-cancel-yes"
+                                            data-client-id="${job.client_id}"
+                                            style="padding:5px 12px;font-size:0.82em;background:#dc3545;
+                                                   color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                                        Stop Process
+                                    </button>
+                                </div>
+                            </div>
                         </li>`;
                 });
                 html += '</ul>';
                 stopAllJobsList.innerHTML = html;
                 syncCloseAllBtn(true);
 
-                // Wire individual Cancel buttons
+                // Wire Cancel buttons → show per-row confirmation
                 stopAllJobsList.querySelectorAll('.cancel-job-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        const clientId = btn.getAttribute('data-client-id');
+                        const row = document.getElementById(`job-row-${btn.dataset.clientId}`);
+                        if (!row) return;
+                        row.querySelector('.job-cancel-confirm').style.display = 'block';
+                        btn.style.display = 'none';
+                    });
+                });
+
+                // Wire "Keep Running" → dismiss per-row confirmation
+                stopAllJobsList.querySelectorAll('.job-cancel-no').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const confirm = btn.closest('.job-cancel-confirm');
+                        const row = btn.closest('li');
+                        if (confirm) confirm.style.display = 'none';
+                        const cancelBtn = row && row.querySelector('.cancel-job-btn');
+                        if (cancelBtn) cancelBtn.style.display = '';
+                    });
+                });
+
+                // Wire "Stop Process" → call API, then show 5-sec wait state
+                stopAllJobsList.querySelectorAll('.job-cancel-yes').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const clientId = btn.dataset.clientId;
                         btn.disabled = true;
                         btn.textContent = 'Stopping…';
+
                         fetch(`/api/stop/${clientId}`, { method: 'POST' })
                             .then(res => res.json())
                             .then(() => {
-                                // Remove the row and refresh after a short delay
-                                const li = btn.closest('li');
-                                if (li) {
-                                    li.style.opacity = '0.4';
-                                    li.style.pointerEvents = 'none';
-                                }
-                                setTimeout(() => loadActiveJobs(), 1500);
+                                showClosingAndReload('Closing task in progress…', 5000);
                             })
                             .catch(err => {
                                 console.error('Cancel job error:', err);
                                 btn.disabled = false;
-                                btn.textContent = 'Cancel';
+                                btn.textContent = 'Stop Process';
                             });
                     });
                 });
@@ -668,33 +879,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ---- Dismiss button: just hide the panel ----
+    // ---- X button and Dismiss: just close the window ----
+    // (X is already wired via setupFloatingWindow closeBtn above)
     stopAllDismissBtn.addEventListener('click', () => {
         hideConfirmBanner();
         stopAllWindow.hide();
     });
 
-    // ---- Close All button: show confirmation banner ----
+    // ---- Close All: show confirmation banner ----
     stopAllCloseAllBtn.addEventListener('click', () => {
         if (stopAllCloseAllBtn.disabled) return;
         stopAllConfirmBanner.style.display = 'block';
         stopAllConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
-    // ---- Confirmation Banner — Cancel ----
+    // ---- Confirmation Banner — dismiss ----
     stopConfirmCancelBtn.addEventListener('click', () => hideConfirmBanner());
 
-    // ---- Confirmation Banner — Stop All (confirmed) ----
+    // ---- Confirmation Banner — Stop All confirmed ----
     stopConfirmProceedBtn.addEventListener('click', () => {
         stopConfirmProceedBtn.disabled = true;
-        stopConfirmProceedBtn.textContent = 'Stopping…';
+        stopConfirmProceedBtn.textContent = 'Terminating…';
 
         fetch('/api/server/stop_all', { method: 'POST' })
             .then(res => res.json())
-            .then(data => {
-                hideConfirmBanner();
-                // Refresh the list to show all stopped
-                loadActiveJobs();
+            .then(() => {
+                showClosingAndReload('Terminating all tasks in progress…', 5000);
             })
             .catch(err => {
                 console.error('Error stopping all jobs:', err);
@@ -702,6 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 stopConfirmProceedBtn.textContent = 'Stop All';
             });
     });
+
 
 });
 

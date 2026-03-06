@@ -1,57 +1,86 @@
-/* 
-  admin_logs.css 
-  Styles for the easter egg Server Logs floating console. 
-  Matches the Cropin TechOps Theme (Roboto, #009ade, #333).
+/*
+  admin_logs.css
+  Styles for the easter egg Server Logs floating console + Stop All panel.
+  Covers all screen sizes (desktop, tablet, mobile) and all states
+  (normal, minimized, maximized/fullscreen).
 */
 
+/* =========================================================
+   BASE WRAPPER — applies to both panels
+   ========================================================= */
 .admin-console-wrapper {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 600px;
-    height: 400px;
+    /* Default desktop size */
+    width: 620px;
+    height: 420px;
     background-color: #ffffff;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
     display: none;
-    /* Hidden by default */
+    /* hidden by default */
     flex-direction: column;
     z-index: 9999;
     font-family: 'Roboto', sans-serif;
     overflow: hidden;
-    transition: width 0.3s, height 0.3s, bottom 0.3s, right 0.3s, top 0.3s, left 0.3s;
+    transition:
+        width 0.25s ease,
+        height 0.25s ease,
+        bottom 0.25s ease,
+        right 0.25s ease,
+        top 0.25s ease,
+        left 0.25s ease,
+        border-radius 0.2s ease;
 }
 
+/* =========================================================
+   FULLSCREEN / MAXIMIZED
+   ========================================================= */
 .admin-console-wrapper.fullscreen {
     width: 100vw !important;
     height: 100vh !important;
+    /* fallback */
+    height: 100dvh !important;
+    /* mobile: excludes URL bar */
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    border-radius: 0;
+    border-radius: 0 !important;
     transform: none !important;
+    box-shadow: none;
 }
 
+/* =========================================================
+   MINIMIZED — collapses to a title bar at the bottom edge
+   ========================================================= */
 .admin-console-wrapper.minimized {
-    width: 300px;
-    height: 40px;
-    bottom: 0;
-    right: 20px;
+    width: 280px;
+    height: 42px;
+    bottom: 0 !important;
     border-radius: 8px 8px 0 0;
     cursor: pointer;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
 }
 
+/* =========================================================
+   HEADER
+   ========================================================= */
 .admin-console-header {
     background-color: #f8f9fa;
     border-bottom: 1px solid #e0e0e0;
-    padding: 10px 15px;
+    padding: 0 12px;
+    height: 42px;
+    min-height: 42px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: grab;
     user-select: none;
+    flex-shrink: 0;
 }
 
 .admin-console-header:active {
@@ -64,30 +93,44 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .admin-console-title .material-icons {
     color: #009ade;
     font-size: 18px;
+    flex-shrink: 0;
 }
 
 .admin-console-controls {
     display: flex;
-    gap: 10px;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
+/* =========================================================
+   HEADER BUTTONS
+   ========================================================= */
 .admin-console-btn {
     background: none;
     border: none;
     cursor: pointer;
     color: #666;
-    padding: 2px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    transition: background-color 0.2s, color 0.2s;
+    transition: background-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.admin-console-btn .material-icons {
+    font-size: 17px;
 }
 
 .admin-console-btn:hover {
@@ -100,12 +143,27 @@
     color: #d32f2f;
 }
 
-/* Toolbar (Search) */
+.admin-console-btn.minimize:hover {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+/* hide non-close buttons when minimized so only the title + close show */
+.admin-console-wrapper.minimized .admin-console-btn:not(.close) {
+    display: none;
+}
+
+/* =========================================================
+   TOOLBAR (Search bar row)
+   ========================================================= */
 .admin-console-toolbar {
-    padding: 8px 15px;
+    padding: 7px 12px;
     border-bottom: 1px solid #e0e0e0;
     background-color: #ffffff;
     display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .admin-console-wrapper.minimized .admin-console-toolbar {
@@ -113,11 +171,12 @@
 }
 
 .admin-search-input {
-    width: 100%;
-    padding: 6px 12px;
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
     border: 1px solid #ced4da;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
     outline: none;
     transition: border-color 0.2s;
     font-family: monospace;
@@ -127,14 +186,22 @@
     border-color: #009ade;
 }
 
-/* Log Content Area */
+/* =========================================================
+   LOG BODY  (scrollable content area)
+   flex:1 + min-height:0 + height:0 is the correct pattern
+   to make a flex child scrollable on all browsers incl. iOS
+   ========================================================= */
 .admin-console-body {
     flex: 1;
+    min-height: 0;
+    height: 0;
     background-color: #1e1e1e;
-    /* Dark theme for logs */
     color: #d4d4d4;
     padding: 10px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* iOS momentum scroll */
+    overscroll-behavior: contain;
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 13px;
     line-height: 1.5;
@@ -144,6 +211,17 @@
     display: none;
 }
 
+/* Stop All uses a light body */
+#stop-all-console .admin-console-body {
+    background-color: #f8f9fa;
+    color: #333;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.9rem;
+}
+
+/* =========================================================
+   LOG LINES
+   ========================================================= */
 .admin-log-line {
     word-break: break-all;
     white-space: pre-wrap;
@@ -153,32 +231,78 @@
 }
 
 .admin-log-line.search-match {
-    background-color: rgba(0, 154, 222, 0.3);
+    background-color: rgba(0, 154, 222, 0.25);
     color: #ffffff;
-    font-weight: bold;
+    font-weight: 600;
 }
 
-/* Mobile Responsiveness for Admin Console */
+/* =========================================================
+   TABLET  (769px – 1100px)
+   Panel is a bit narrower to sit comfortably without overlapping content
+   ========================================================= */
+@media (min-width: 769px) and (max-width: 1100px) {
+    .admin-console-wrapper:not(.fullscreen):not(.minimized) {
+        width: min(560px, calc(100vw - 40px));
+        height: min(400px, 55vh);
+    }
+}
+
+/* =========================================================
+   MOBILE  (≤ 768px)
+   Fills most of the screen; maximise for true fullscreen
+   ========================================================= */
 @media (max-width: 768px) {
-    .admin-console-wrapper:not(.fullscreen) {
-        width: calc(100vw - 40px);
-        max-width: 100vw;
+    .admin-console-wrapper:not(.fullscreen):not(.minimized) {
+        width: calc(100vw - 24px);
+        height: 55dvh;
+        /* ≈ half the visible screen */
+        right: 12px;
+        bottom: 16px;
     }
 
     .admin-console-wrapper.minimized {
-        width: calc(100vw - 40px);
-        max-width: 100vw;
+        width: calc(100vw - 24px);
+        height: 42px;
+        right: 12px;
+        bottom: 0;
+    }
+
+    /* Bigger tap targets on mobile */
+    .admin-console-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .admin-console-header {
+        padding: 0 10px;
+    }
+
+    /* Fullscreen: smooth touch scroll */
+    .admin-console-wrapper.fullscreen .admin-console-body {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        font-size: 12px;
+        /* slightly smaller font so more lines fit */
     }
 }
 
-/* Stop All Processes Panel — light-theme body override */
-#stop-all-console .admin-console-body {
-    background-color: #f8f9fa;
-    color: #333333;
-    font-family: 'Roboto', sans-serif;
-    font-size: 0.9rem;
-}
+/* =========================================================
+   VERY SMALL SCREENS  (≤ 400px — small Android / iPhone SE)
+   ========================================================= */
+@media (max-width: 400px) {
+    .admin-console-wrapper:not(.fullscreen):not(.minimized) {
+        width: calc(100vw - 16px);
+        height: 60dvh;
+        right: 8px;
+        bottom: 12px;
+    }
 
-#stop-all-console .admin-console-wrapper.minimized .admin-console-body {
-    display: none;
+    .admin-console-wrapper.minimized {
+        width: calc(100vw - 16px);
+        right: 8px;
+    }
+
+    .admin-console-title {
+        font-size: 12px;
+    }
 }

@@ -466,48 +466,121 @@ async def execute_script(
 @router.get("/api/server_logs")
 async def get_server_logs(offset_line: int = 0, limit: int = 1000):
     """
-    Returns lines from the server.log file, reading from the end backwards.
-    - offset_line: How many lines from the end to skip (default 0 = latest logs). 
-                   e.g., offset_line=1000 means skip the last 1000 lines and get the block before that.
-    - limit: How many lines to return in this batch (default 1000).
+    Returns a paginated slice of log lines from the combined server.log.1 + server.log files.
+    Lines are ordered chronologically (oldest first). Pagination works from the END backwards:
+      - offset_line=0          → last `limit` lines (newest)
+      - offset_line=1000       → lines before the last 1000
+    Returns: { logs, total_lines, returned_count, has_more }
     """
-    log_path = "server.log"
-    if not os.path.exists(log_path):
-        return {"logs": ["Log file not found."], "total_lines": 0}
+    def count_lines(path):
+        """Fast line count without loading entire file into memory."""
+        count = 0
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for _ in fh:
+                count += 1
+        return count
+
+    def read_lines_range(path, start, end):
+        """Read only lines[start:end] from a file without loading everything."""
+        result = []
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for i, line in enumerate(fh):
+                if i >= end:
+                    break
+                if i >= start:
+                    result.append(line)
+        return result
 
     try:
-        lines = []
-        # Attempt to load older rotated logs first
-        if os.path.exists("server.log.1"):
-            with open("server.log.1", "r", encoding="utf-8", errors="replace") as f:
-                lines.extend(f.readlines())
-                
-        # Load the current active logs
-        if os.path.exists("server.log"):
-            with open("server.log", "r", encoding="utf-8", errors="replace") as f:
-                lines.extend(f.readlines())
-            
-        total_lines = len(lines)
-        
-        # If the offset pushes us past the start of the file, we return nothing
+        # Build a manifest of (path, line_count) for the files we have, oldest first
+        sources = []
+        for path in ("server.log.1", "server.log"):
+            if os.path.exists(path):
+                sources.append((path, count_lines(path)))
+
+        total_lines = sum(c for _, c in sources)
+
+        if total_lines == 0:
+            return {"logs": [], "total_lines": 0, "returned_count": 0, "has_more": False}
+
         if offset_line >= total_lines:
-            return {"logs": [], "total_lines": total_lines}
-        
-        # Start and end indexes for our slice
-        end_idx = total_lines - offset_line
+            return {"logs": [], "total_lines": total_lines, "returned_count": 0, "has_more": False}
+
+        # Global start/end index within the combined virtual file
+        end_idx   = total_lines - offset_line
         start_idx = max(0, end_idx - limit)
-        
-        # Slice the list of lines
-        chunk = lines[start_idx:end_idx]
-        
+
+        # Now extract only the needed lines by walking sources
+        result = []
+        cursor = 0  # absolute line number at start of current source
+        for (path, line_count) in sources:
+            src_start = cursor
+            src_end   = cursor + line_count
+
+            # Overlap between [start_idx, end_idx) and this source [src_start, src_end)
+            local_start = max(0, start_idx - src_start)
+            local_end   = min(line_count, end_idx - src_start)
+
+            if local_start < local_end:
+                result.extend(read_lines_range(path, local_start, local_end))
+
+            cursor = src_end
+            if cursor >= end_idx:
+                break
+
         return {
-            "logs": chunk,
+            "logs": result,
             "total_lines": total_lines,
-            "returned_count": len(chunk)
+            "returned_count": len(result),
+            "has_more": start_idx > 0,
         }
-            
+
     except Exception as e:
-        return {"logs": [f"Error reading log file: {str(e)}"], "total_lines": 0}
+        return {"logs": [f"Error reading log file: {str(e)}"], "total_lines": 0, "returned_count": 0, "has_more": False}
+
+
+
+@router.get("/api/server_logs/search")
+async def search_server_logs(q: str = "", offset: int = 0, limit: int = 1000):
+    """
+    Full-file search across server.log.1 + server.log (not just the in-memory cache).
+    - q:      search term (case-insensitive)
+    - offset: how many matching lines to skip (for pagination)
+    - limit:  max matching lines to return (default 1000)
+    Returns: { results, total_matched, has_more, next_offset }
+    """
+    if not q.strip():
+        return {"results": [], "total_matched": 0, "has_more": False, "next_offset": 0}
+
+    term = q.strip().lower()
+    matched = []
+    skipped = 0
+    total_matched = 0
+
+    for path in ("server.log.1", "server.log"):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if term in line.lower():
+                        total_matched += 1
+                        if skipped < offset:
+                            skipped += 1
+                            continue
+                        if len(matched) < limit:
+                            matched.append(line.rstrip())
+        except Exception:
+            continue
+
+    has_more = (offset + len(matched)) < total_matched
+
+    return {
+        "results":       matched,
+        "total_matched": total_matched,
+        "has_more":      has_more,
+        "next_offset":   offset + len(matched),
+    }
 
 
 @router.get("/api/server_logs/stream")
