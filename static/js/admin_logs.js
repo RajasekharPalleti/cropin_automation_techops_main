@@ -359,7 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalServerLines = 0;
     let hasMoreOldLogs = true;   // set false when backend confirms no more older lines
     let eventSource = null;
-    const MAX_LOG_LINES = 20000;   // max lines held in memory (increased for deep-history browsing)
     const BATCH_SIZE = 1000;
 
     const logsWindow = setupFloatingWindow({
@@ -483,9 +482,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
                 logsCache.push(data.line);
                 totalServerLines++;
-                trimOldest();   // live lines added at back — trim oldest from front
                 updateCounter();
-                renderLogs(wasScrolledToBottom);
+
+                if (!isSearchMode) {
+                    if (!data.line.includes('/api/server_logs')) {
+                        const safeLine = data.line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        logsBody.insertAdjacentHTML('beforeend', `<div class="admin-log-line">${safeLine}</div>`);
+                        if (wasScrolledToBottom && !logsWindow.isMinimized && !isLoadingOlder) {
+                            scrollToBottom();
+                        }
+                    }
+                }
             } catch (e) {
                 console.error("SSE Parse error", e);
             }
@@ -520,8 +527,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     olderLogsOffset += data.returned_count;
                     totalServerLines = data.total_lines;
                     hasMoreOldLogs = data.has_more !== false;  // false only when backend explicitly says no more
-                    // Trim from the BACK (newest end) to preserve the old lines we just prepended
-                    trimNewest();
                     updateCounter();
                     renderLogs(false);
                     logsBody.scrollTop = logsBody.scrollHeight - oldScrollHeight;
@@ -540,22 +545,6 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => console.error("Error loading older logs:", err))
             .finally(() => { isLoadingOlder = false; });
-    }
-
-    // Trim oldest lines (from FRONT) — used when SSE appends new lines at the back
-    function trimOldest() {
-        if (logsCache.length > MAX_LOG_LINES) {
-            const overage = logsCache.length - MAX_LOG_LINES;
-            logsCache = logsCache.slice(overage);
-        }
-    }
-
-    // Trim newest lines (from BACK) — used when prepending historical lines at the front
-    // so we don't discard the old history we just loaded
-    function trimNewest() {
-        if (logsCache.length > MAX_LOG_LINES) {
-            logsCache = logsCache.slice(0, MAX_LOG_LINES);
-        }
     }
 
     // ---- Full-file search fetch (paginated) ----

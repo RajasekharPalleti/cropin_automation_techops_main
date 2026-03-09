@@ -228,6 +228,10 @@
     margin-bottom: 2px;
     padding: 2px 4px;
     border-radius: 3px;
+    content-visibility: auto;
+    /* Greatly improves performance for 60k+ lines by skipping off-screen rendering */
+    contain-intrinsic-size: 0 19px;
+    /* Approximate height of a log line to prevent scroll jumpiness */
 }
 
 .admin-log-line.search-match {
