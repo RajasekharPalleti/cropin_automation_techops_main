@@ -8,3 +8,7 @@ outputs/
 !sample_templates/*.xlsx
 ~$*.xlsx
 *.log
+
+# Scheduled Tasks Persistence
+scheduled_jobs.json
+scheduled_uploads/

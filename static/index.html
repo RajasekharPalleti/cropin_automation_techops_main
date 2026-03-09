@@ -303,6 +303,8 @@
                     <img src="/static/images/cropin_text.png" alt="Cropin"
                         style="height: 35px; vertical-align: middle; margin-right: 10px;">
                     <h1 style="display: inline; vertical-align: middle; color: #009ade;">TechOps Automation Console</h1>
+                    <button class="backup-btn" id="scheduled-list-btn"
+                        style="margin-right: 10px; background-color: #6a1b9a;">Scheduled List</button>
                     <button class="backup-btn" id="backup-btn">Backup files</button>
                 </div>
             </div>
@@ -360,8 +362,16 @@
                 </div>
 
                 <div class="card step-card step-two">
-                    <h2><span class="material-icons" style="vertical-align: middle;">cloud_upload</span> Upload & Run
-                    </h2>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h2 style="margin: 0;"><span class="material-icons"
+                                style="vertical-align: middle;">cloud_upload</span> Upload & Run</h2>
+                        <button id="open-schedule-modal-btn" disabled
+                            style="display: inline-block; background: #fff; color: #dc3545; border: 1px solid #dc3545; padding: 4px 10px; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 0.8rem; height: 32px; opacity: 0.5; filter: grayscale(1);"><span
+                                class="material-icons"
+                                style="font-size: 1rem; vertical-align: middle; margin-right: 4px;">schedule</span>
+                            Schedule Run</button>
+                    </div>
                     <label style="display:block; margin-bottom:10px; font-weight:500; color:#666;">Upload filled
                         Excel</label>
                     <div class="drop-zone" id="drop-zone">
@@ -467,6 +477,73 @@
                     <button id="cancel-stop-all-confirm-btn" class="btn-secondary">Cancel</button>
                     <button id="proceed-stop-all-btn" class="btn-primary" style="background-color: #dc3545;">Yes, Stop
                         All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Date Picker Modal -->
+    <div id="schedule-run-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>📅 Schedule Script Run</h2>
+                <span class="close" id="close-schedule-run">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">Select the date and time you want this
+                    script to automatically execute. <strong>Note: Times are based on IST (Indian Standard
+                        Time).</strong></p>
+                <div class="input-group">
+                    <label for="schedule-datetime">Run Date & Time</label>
+                    <input type="datetime-local" id="schedule-datetime"
+                        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                        required>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button id="cancel-schedule-run-btn" class="btn-secondary">Cancel</button>
+                    <button id="save-schedule-run-btn" class="btn-primary" style="background-color: #6a1b9a;">Save &
+                        Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Jobs List Modal -->
+    <div id="scheduled-list-modal" class="modal">
+        <div class="modal-content"
+            style="max-width: 800px; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h2>📋 Scheduled & Running Scripts</h2>
+                <span class="close" id="close-scheduled-list">&times;</span>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; border-bottom: 1px solid #ddd; padding: 0 20px; background: #f8f9fa;">
+                <button class="tab-btn active" id="tab-scheduled"
+                    style="padding: 15px 20px; border: none; background: none; border-bottom: 3px solid #009ade; font-weight: 600; color: #009ade; cursor: pointer; font-size: 1rem;">Scheduled
+                    Scripts</button>
+                <button class="tab-btn" id="tab-running"
+                    style="padding: 15px 20px; border: none; background: none; border-bottom: 3px solid transparent; font-weight: 500; color: #666; cursor: pointer; font-size: 1rem;">Running
+                    Scripts</button>
+                <button class="tab-btn" id="tab-history"
+                    style="padding: 15px 20px; border: none; background: none; border-bottom: 3px solid transparent; font-weight: 500; color: #666; cursor: pointer; font-size: 1rem;">Scheduled
+                    History</button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex-grow: 1;">
+                <!-- Scheduled Content -->
+                <div id="content-scheduled" class="tab-content" style="display: block;">
+                    <div id="scheduled-jobs-container">Loading...</div>
+                </div>
+
+                <!-- Running Content -->
+                <div id="content-running" class="tab-content" style="display: none;">
+                    <div id="running-jobs-container">Loading...</div>
+                </div>
+
+                <!-- History Content -->
+                <div id="content-history" class="tab-content" style="display: none;">
+                    <div id="history-jobs-container">No history available.</div>
                 </div>
             </div>
         </div>

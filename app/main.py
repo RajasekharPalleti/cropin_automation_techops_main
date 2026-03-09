@@ -149,6 +149,7 @@ from app.script_configs import (
 )
 from app.state import manager, backup_manager
 from app.routes import router
+from app.scheduler import schedule_runner_task
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +189,7 @@ async def lifespan(app: FastAPI):
                     print(f"Failed to delete {file_path}. Reason: {e}")
 
     asyncio.create_task(periodic_cleanup_task())
+    asyncio.create_task(schedule_runner_task())
     yield
 
 
@@ -197,6 +199,7 @@ async def lifespan(app: FastAPI):
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs("scheduled_uploads", exist_ok=True)
 
 app = FastAPI(lifespan=lifespan)
 

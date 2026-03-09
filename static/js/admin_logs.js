@@ -767,7 +767,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             <!-- Main row: info + Cancel button -->
                             <div class="job-main-row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;gap:10px;">
                                 <div style="flex:1;min-width:0;">
-                                    <div style="font-weight:600;color:#333;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${job.script_name}">${job.script_name}</div>
+                                    <div style="font-weight:600;color:#333;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${job.script_name}">
+                                        ${job.script_name}
+                                        <span style="font-size:0.7em; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; 
+                                                     ${job.type === 'Scheduled' ? 'background:#cce5ff;color:#004085;' : 'background:#e2e3e5;color:#383d41;'}">
+                                            ${job.type || 'Interactive'}
+                                        </span>
+                                    </div>
                                     <div style="font-size:0.82em;color:#666;">
                                         User <strong>${job.user}</strong> · Tenant <strong>${job.tenant}</strong>
                                     </div>

@@ -259,6 +259,13 @@ SCRIPT_CONFIGS = {
         "label": "Base Api Url",
         "requires_input": True,
     },
+    "Delete_Task.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/tasks/bulk",
+        "label": "Delete API URL",
+        "second_base_api_url": "https://cloud.cropin.in/services/farm/api/tasks/croppablearea",
+        "label2": "CA TASK API URL",
+        "requires_input": True,
+    },
 }
 
 # Fallback config used when a script is not listed in SCRIPT_CONFIGS above.

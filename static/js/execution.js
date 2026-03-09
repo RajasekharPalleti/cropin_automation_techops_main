@@ -148,12 +148,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusArea.innerHTML = '<div style="color: green;">Uploaded: ' + file.name + '</div>';
                 if (runContainer) runContainer.style.display = 'flex';
                 if (dropText) dropText.innerHTML = `<strong>${file.name}</strong><p style="color: green;">✅ Uploaded Successfully</p>`;
+                checkScheduleEligibility();
             })
             .catch(err => {
                 statusArea.innerHTML = '<div style="color: red;">Upload Failed: ' + err.message + '</div>';
                 if (dropText) dropText.innerHTML = `<strong>${file.name}</strong><p style="color: red;">❌ Upload Failed</p>`;
+                checkScheduleEligibility();
             });
     }
+
+    // ----------------------------------------------------------------
+    // Schedule Run Eligibility Check
+    // ----------------------------------------------------------------
+    const openScheduleModalBtn = document.getElementById('open-schedule-modal-btn');
+
+    function checkScheduleEligibility() {
+        const tenant = document.getElementById('tenant-code')?.value;
+        const username = document.getElementById('username')?.value;
+        const password = document.getElementById('password')?.value;
+        const scriptSelected = document.getElementById('script-select')?.value;
+
+        if (tenant && username && password && scriptSelected && currentUploadedFilename && openScheduleModalBtn) {
+            openScheduleModalBtn.disabled = false;
+            openScheduleModalBtn.style.opacity = '1';
+            openScheduleModalBtn.style.filter = 'none';
+            openScheduleModalBtn.style.cursor = 'pointer';
+        } else if (openScheduleModalBtn) {
+            openScheduleModalBtn.disabled = true;
+            openScheduleModalBtn.style.opacity = '0.5';
+            openScheduleModalBtn.style.filter = 'grayscale(1)';
+            openScheduleModalBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    // Attach to inputs so they watch actively for typing
+    ['tenant-code', 'username', 'password', 'script-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', checkScheduleEligibility);
+            el.addEventListener('input', checkScheduleEligibility);
+        }
+    });
 
     // ----------------------------------------------------------------
     // Confirmation modal
@@ -259,6 +294,113 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----------------------------------------------------------------
+    // buildScriptConfig — Extracts inputs into the config dictionary
+    // ----------------------------------------------------------------
+    function buildScriptConfig() {
+        // Core fields that are ALWAYS required:
+        const config = {
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+            environment: document.getElementById('environment').value,
+            tenant_code: document.getElementById('tenant-code').value,
+            base_api_url: document.getElementById('base-api-url').value,
+        };
+
+        const scriptNameForCfg = scriptSelect.value;
+        const useFarmerId = document.getElementById('use-farmer-id')?.value;
+        if (useFarmerId) config.use_farmer_id = useFarmerId;
+
+        // 1. Threading Config
+        const threadingContainer = document.getElementById('threading-config');
+        if (threadingContainer && threadingContainer.style.display !== 'none') {
+            config.worker_count = parseInt(document.getElementById('worker-count')?.value) || 1;
+        }
+
+        // 2. Extra Appended Config (PR Weather, Add Users)
+        const extendedConfig = document.getElementById('extended-config');
+        if (extendedConfig && extendedConfig.style.display !== 'none') {
+            const secondBaseApiUrl = document.getElementById('second-base-api-url')?.value;
+            const xApiKey = document.getElementById('x-api-key')?.value;
+            if (secondBaseApiUrl) config.second_base_api_url = secondBaseApiUrl;
+            if (xApiKey) config.x_api_key = xApiKey;
+        }
+
+        // 3. CA Control Config
+        const caControl = document.getElementById('ca-control');
+        if (caControl && caControl.style.display !== 'none') {
+            config.ca_action = document.getElementById('ca-action-select')?.value || 'none';
+
+            let caBatchSizeRaw = parseInt(document.getElementById('ca-batch-size')?.value);
+            if (isNaN(caBatchSizeRaw) || caBatchSizeRaw < 1) caBatchSizeRaw = 50;
+            if (caBatchSizeRaw > 100) {
+                window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
+                document.getElementById('ca-batch-size').value = 100;
+                caBatchSizeRaw = 100;
+            }
+            config.ca_batch_size = caBatchSizeRaw;
+            config.ca_x_api_key = document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS';
+        }
+
+        // 4. Attribute Config (Generic Attributes)
+        const attributeConfig = document.getElementById('attribute-config');
+        if (attributeConfig && attributeConfig.style.display !== 'none') {
+            const attrCount = parseInt(document.getElementById('attr-count-select').value) || 1;
+            let attrKeys = [];
+            ['attr-key-1', 'attr-key-2', 'attr-key-3', 'attr-key-4'].forEach((id, i) => {
+                if (i < attrCount) attrKeys.push(document.getElementById(id)?.value || '');
+            });
+            config.attr_keys = attrKeys;
+            // Many legacy scripts expect 'fields_to_remove' via the exact same array layout
+            config.fields_to_remove = attrKeys;
+        }
+
+        // 5. Address Config
+        const addressConfig = document.getElementById('address-config');
+        if (addressConfig && addressConfig.style.display !== 'none') {
+            const addrCount = parseInt(document.getElementById('addr-count-select').value) || 1;
+            let addrKeys = [];
+            ['address-key-1', 'address-key-2', 'address-key-3', 'address-key-4'].forEach((id, i) => {
+                if (i < addrCount) {
+                    const v = document.getElementById(id)?.value;
+                    if (v) addrKeys.push(v);
+                }
+            });
+            config.attr_keys = addrKeys;
+            config.fields_to_remove = addrKeys;
+        }
+
+        // 6. Area Audit Config
+        const areaAuditConfig = document.getElementById('area-audit-config');
+        if (areaAuditConfig && areaAuditConfig.style.display !== 'none') {
+            config.unit = document.getElementById('area-unit-select')?.value || 'Hectare';
+            config.force_crop_audited = document.getElementById('force-crop-audited')?.value || 'none';
+        }
+
+        // 7. Variety Removal Config
+        const varietyRemovalConfig = document.getElementById('variety-removal-config');
+        if (varietyRemovalConfig && varietyRemovalConfig.style.display !== 'none') {
+            const remCount = parseInt(document.getElementById('removal-count-select')?.value) || 1;
+            let remKeys = [];
+            ['remove-key-1', 'remove-key-2', 'remove-key-3', 'remove-key-4'].forEach((id, i) => {
+                if (i < remCount) {
+                    const v = document.getElementById(id)?.value;
+                    if (v) remKeys.push(v);
+                }
+            });
+            config.attr_keys = remKeys;
+            config.fields_to_remove = remKeys;
+        }
+
+        // 8. Time Delay Config
+        const timeDelayConfig = document.getElementById('time-delay-config');
+        if (timeDelayConfig && timeDelayConfig.style.display !== 'none') {
+            config.delay_time = document.getElementById('delay-time-input')?.value || 1;
+        }
+
+        return config;
+    }
+
+    // ----------------------------------------------------------------
     // startExecution — builds config and POSTs to /api/execute
     // ----------------------------------------------------------------
     function startExecution() {
@@ -267,57 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
         startLine.textContent = '> Starting execution...';
         if (consoleContent) consoleContent.appendChild(startLine);
 
-        const baseApiUrl = document.getElementById('base-api-url').value;
-        const useFarmerId = document.getElementById('use-farmer-id').value;
-        const scriptNameForCfg = scriptSelect.value;
-        const attrCount = parseInt(document.getElementById('attr-count-select').value) || 1;
-
-        let attrKeys = [];
-        if (scriptNameForCfg === 'Update_Farmer_Address.py' || scriptNameForCfg === 'Update_Asset_Address.py') {
-            const addrCount = parseInt(document.getElementById('addr-count-select').value) || 1;
-            ['address-key-1', 'address-key-2', 'address-key-3', 'address-key-4'].forEach((id, i) => {
-                if (i < addrCount) {
-                    const v = document.getElementById(id)?.value;
-                    if (v) attrKeys.push(v);
-                }
-            });
-        } else {
-            ['attr-key-1', 'attr-key-2', 'attr-key-3', 'attr-key-4'].forEach((id, i) => {
-                if (i < attrCount) attrKeys.push(document.getElementById(id)?.value || '');
-            });
-        }
-
-        const areaUnit = document.getElementById('area-unit-select')?.value || 'Hectare';
-        const forceCropAudited = document.getElementById('force-crop-audited')?.value || 'none';
+        const config = buildScriptConfig();
         const clientId = window.getClientId ? window.getClientId() : sessionStorage.getItem('clientId');
-
-        let caBatchSizeRaw = parseInt(document.getElementById('ca-batch-size')?.value);
-        if (isNaN(caBatchSizeRaw) || caBatchSizeRaw < 1) caBatchSizeRaw = 50;
-        if (caBatchSizeRaw > 100) {
-            window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
-            document.getElementById('ca-batch-size').value = 100;
-            caBatchSizeRaw = 100;
-        }
-
-        const config = {
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value,
-            environment: document.getElementById('environment').value,
-            tenant_code: document.getElementById('tenant-code').value,
-            base_api_url: baseApiUrl,
-            second_base_api_url: document.getElementById('second-base-api-url')?.value || '',
-            x_api_key: document.getElementById('x-api-key')?.value || '',
-            ca_action: document.getElementById('ca-action-select')?.value || 'none',
-            ca_batch_size: caBatchSizeRaw,
-            ca_x_api_key: document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS',
-            use_farmer_id: useFarmerId,
-            attr_keys: attrKeys,
-            fields_to_remove: attrKeys,
-            unit: areaUnit,
-            force_crop_audited: forceCropAudited,
-            delay_time: document.getElementById('delay-time-input')?.value || 1,
-            worker_count: parseInt(document.getElementById('worker-count')?.value) || 1,
-        };
 
         const formData = new FormData();
         formData.append('script_name', scriptSelect.value);
@@ -381,6 +474,306 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+
+
+    // ----------------------------------------------------------------
+    // Scheduled Scripts UI & Logic
+    // ----------------------------------------------------------------
+    const scheduleModal = document.getElementById('schedule-run-modal');
+    const closeScheduleModal = document.getElementById('close-schedule-run');
+    const cancelScheduleBtn = document.getElementById('cancel-schedule-run-btn');
+    const saveScheduleBtn = document.getElementById('save-schedule-run-btn');
+    const scheduleDatetime = document.getElementById('schedule-datetime');
+
+    if (openScheduleModalBtn) openScheduleModalBtn.addEventListener('click', () => {
+        if (scheduleModal) scheduleModal.style.display = 'block';
+    });
+
+    const hideScheduleModal = () => { if (scheduleModal) scheduleModal.style.display = 'none'; };
+    if (closeScheduleModal) closeScheduleModal.addEventListener('click', hideScheduleModal);
+    if (cancelScheduleBtn) cancelScheduleBtn.addEventListener('click', hideScheduleModal);
+
+    if (saveScheduleBtn) saveScheduleBtn.addEventListener('click', () => {
+        if (!scheduleDatetime.value) {
+            window.showToast('Please select a date and time.', 'error');
+            return;
+        }
+
+        saveScheduleBtn.disabled = true;
+        saveScheduleBtn.innerHTML = '<span class="spinner"></span> Saving...';
+
+        const config = buildScriptConfig();
+
+        const formData = new FormData();
+        formData.append('script_name', scriptSelect.value);
+        if (currentUploadedFilename) formData.append('input_filename', currentUploadedFilename);
+        formData.append('config', JSON.stringify(config));
+        formData.append('run_time', scheduleDatetime.value);
+
+        fetch('/api/schedule', { method: 'POST', body: formData })
+            .then(r => {
+                if (r.ok) return r.json();
+                return r.json().then(err => { throw new Error(err.detail || 'Failed'); });
+            })
+            .then(data => {
+                window.showToast('Script successfully scheduled!', 'success');
+                hideScheduleModal();
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            })
+            .catch(err => {
+                window.showToast('Failed to schedule: ' + err.message, 'error');
+                saveScheduleBtn.disabled = false;
+                saveScheduleBtn.innerHTML = 'Save & Schedule';
+            });
+    });
+
+    // --- Schedule List Management ---
+    const scheduledListModal = document.getElementById('scheduled-list-modal');
+    const openScheduledListBtn = document.getElementById('scheduled-list-btn');
+    const closeScheduledListBtn = document.getElementById('close-scheduled-list');
+
+    if (openScheduledListBtn) openScheduledListBtn.addEventListener('click', () => {
+        if (scheduledListModal) {
+            scheduledListModal.style.display = 'block';
+            fetchScheduledJobs(); // Custom polling function to write next
+        }
+    });
+
+    if (closeScheduledListBtn) closeScheduledListBtn.addEventListener('click', () => {
+        if (scheduledListModal) scheduledListModal.style.display = 'none';
+    });
+
+    const tabScheduled = document.getElementById('tab-scheduled');
+    const tabRunning = document.getElementById('tab-running');
+    const tabHistory = document.getElementById('tab-history');
+    const contentScheduled = document.getElementById('content-scheduled');
+    const contentRunning = document.getElementById('content-running');
+    const contentHistory = document.getElementById('content-history');
+
+    if (tabScheduled && tabRunning && tabHistory) {
+        const switchTab = (activeTab, activeContent) => {
+            [tabScheduled, tabRunning, tabHistory].forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottomColor = 'transparent';
+                t.style.color = '#666';
+                t.style.fontWeight = '500';
+            });
+            [contentScheduled, contentRunning, contentHistory].forEach(c => {
+                if (c) c.style.display = 'none';
+            });
+
+            activeTab.classList.add('active');
+            activeTab.style.borderBottomColor = '#009ade';
+            activeTab.style.color = '#009ade';
+            activeTab.style.fontWeight = '600';
+            if (activeContent) activeContent.style.display = 'block';
+            fetchScheduledJobs();
+        };
+
+        tabScheduled.addEventListener('click', () => switchTab(tabScheduled, contentScheduled));
+        tabRunning.addEventListener('click', () => switchTab(tabRunning, contentRunning));
+        tabHistory.addEventListener('click', () => switchTab(tabHistory, contentHistory));
+    }
+
+    // Modal Polling Logic
+    function fetchScheduledJobs() {
+        fetch('/api/scheduled_jobs')
+            .then(r => r.json())
+            .then(data => {
+                renderJobs(data.jobs || []);
+            })
+            .catch(err => console.error("Failed to fetch jobs", err));
+    }
+
+    function renderJobs(jobs) {
+        const schedContainer = document.getElementById('scheduled-jobs-container');
+        const runContainer = document.getElementById('running-jobs-container');
+        const histContainer = document.getElementById('history-jobs-container');
+
+        const pendingJobs = jobs.filter(j => j.status === 'pending');
+        const runningJobs = jobs.filter(j => j.status === 'running');
+        const historyJobs = jobs.filter(j => ['completed', 'failed', 'cancelled'].includes(j.status));
+
+        // Render Pending
+        if (pendingJobs.length === 0) {
+            if (schedContainer) schedContainer.innerHTML = '<p style="color:#666; font-style:italic;">No upcoming scheduled scripts.</p>';
+        } else {
+            if (schedContainer) schedContainer.innerHTML = pendingJobs.map(j => `
+                <div id="job-card-${j.job_id}" style="border:1px solid #ddd; padding:15px; border-radius:6px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div id="job-info-${j.job_id}">
+                        <strong style="color:#333; font-size:1.1rem;">${j.script_name}</strong>
+                        <div style="color:#666; font-size:0.9rem; margin-top:5px;" id="job-time-${j.job_id}">📅 ${new Date(j.run_time).toLocaleString()}</div>
+                    </div>
+                    <div style="display:flex; gap:10px;" id="job-actions-${j.job_id}">
+                        <button onclick="window.runJobNow('${j.job_id}')" class="btn-primary" style="padding:6px 12px; font-size:0.9rem;">▶ Run Now</button>
+                        <button onclick="window.editJob('${j.job_id}', '${j.run_time}')" class="btn-secondary" style="padding:6px 12px; font-size:0.9rem;">Edit</button>
+                        <button onclick="window.deleteJob('${j.job_id}')" class="btn-secondary" style="color:#dc3545; border-color:#dc3545; padding:6px 12px; font-size:0.9rem;">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Running
+        if (runningJobs.length === 0) {
+            if (runContainer) runContainer.innerHTML = '<p style="color:#666; font-style:italic;">No scripts are currently running.</p>';
+        } else {
+            if (runContainer) runContainer.innerHTML = runningJobs.map(j => `
+                <div style="border:1px solid #17a2b8; background:#e0f7fa; padding:15px; border-radius:6px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span class="spinner" style="border-top-color:#17a2b8;"></span>
+                            <strong style="color:#00838f; font-size:1.1rem;">${j.script_name}</strong>
+                        </div>
+                        <button onclick="window.stopScheduledJob('${j.job_id}', this)" class="btn-primary" 
+                                style="background-color:#dc3545; border-color:#dc3545; color:white; padding:6px 12px; font-size:0.9rem;">
+                            Stop script execution
+                        </button>
+                    </div>
+                    <p style="color:#006064; font-size:0.95rem; margin:0;">
+                        Scheduled running is in progress. The server is processing this in the background.
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        // Render History
+        if (histContainer) {
+            if (historyJobs.length === 0) {
+                histContainer.innerHTML = '<p style="color:#666; font-style:italic;">No history available.</p>';
+            } else {
+                histContainer.innerHTML = historyJobs.map(j => {
+                    let statusColor = '#28a745';
+                    let statusText = 'Success';
+
+                    if (j.status === 'failed') {
+                        statusColor = '#dc3545';
+                        statusText = 'Failed';
+                    } else if (j.status === 'cancelled') {
+                        statusColor = '#ffc107'; // Yellow/Orange
+                        statusText = 'Cancelled';
+                    }
+
+                    const timeStr = j.completed_at ? new Date(j.completed_at).toLocaleString() : 'Recently';
+
+                    return `
+                        <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong style="color:#333;">${j.script_name}</strong>
+                                <div style="color:#666; font-size:0.85rem; margin-top:4px;">
+                                    Finished: ${timeStr}
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="background:${statusColor}; color:white; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">${statusText}</span>
+                                <button onclick="window.deleteJob('${j.job_id}')" title="Remove from history" 
+                                        style="background:none; border:none; color:#999; cursor:pointer; padding:5px;"><span class="material-icons" style="font-size:1.1rem;">delete</span></button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    }
+
+    window.runJobNow = (jobId) => {
+        fetch('/api/scheduled_jobs/' + jobId + '/run_now', { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                window.showToast("Job kicked off. Moving to running tab...", "success");
+                tabRunning.click();
+            });
+    };
+
+    window.deleteJob = (jobId) => {
+        fetch('/api/scheduled_jobs/' + jobId, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(d => {
+                window.showToast("Schedule removed", "success");
+                fetchScheduledJobs();
+            });
+    };
+
+    window.editJob = (jobId, currentTime) => {
+        const timeEl = document.getElementById('job-time-' + jobId);
+        const actionsEl = document.getElementById('job-actions-' + jobId);
+        if (!timeEl || !actionsEl) return;
+
+        // Store original content for cancel
+        const originalTimeHTML = timeEl.innerHTML;
+        const originalActionsHTML = actionsEl.innerHTML;
+
+        // Inject datetime-local input
+        timeEl.innerHTML = `
+            <input type="datetime-local" id="edit-time-${jobId}" value="${currentTime}" 
+                   style="padding:5px; border:1px solid #009ade; border-radius:4px; font-size:0.9rem; width:100%; box-sizing:border-box; margin-top:5px;">
+            <div style="font-size:0.75rem; color:#888; margin-top:2px;">(IST Timezone)</div>
+        `;
+
+        // Inject Save and Cancel buttons
+        actionsEl.innerHTML = `
+            <button onclick="window.saveJobEdit('${jobId}', '${currentTime}')" class="btn-primary" 
+                    style="padding:6px 12px; font-size:0.9rem; background-color:#28a745; border-color:#28a745;">Save</button>
+            <button onclick="window.cancelEdit('${jobId}', \`${originalTimeHTML.replace(/"/g, '&quot;')}\`, \`${originalActionsHTML.replace(/"/g, '&quot;')}\`)" class="btn-secondary" 
+                    style="padding:6px 12px; font-size:0.9rem;">Cancel</button>
+        `;
+    };
+
+    window.cancelEdit = (jobId, originalTimeHTML, originalActionsHTML) => {
+        const timeEl = document.getElementById('job-time-' + jobId);
+        const actionsEl = document.getElementById('job-actions-' + jobId);
+        if (timeEl) timeEl.innerHTML = originalTimeHTML;
+        if (actionsEl) actionsEl.innerHTML = originalActionsHTML;
+    };
+
+    window.saveJobEdit = (jobId, oldTime) => {
+        const input = document.getElementById('edit-time-' + jobId);
+        const newTime = input?.value;
+
+        if (!newTime) {
+            window.showToast('Please select a valid date and time.', 'error');
+            return;
+        }
+
+        if (newTime === oldTime) {
+            // No change, just refresh to reset UI
+            fetchScheduledJobs();
+            return;
+        }
+
+        fetch('/api/scheduled_jobs/' + jobId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ run_time: newTime })
+        })
+            .then(r => r.json())
+            .then(d => {
+                window.showToast(d.message || "Job rescheduled successfully", "success");
+                fetchScheduledJobs();
+            })
+            .catch(err => {
+                window.showToast("Failed to reschedule: " + err.message, "error");
+            });
+    };
+
+    window.stopScheduledJob = (jobId, btn) => {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="border-top-color:#fff; width:12px; height:12px; border-width:2px; vertical-align:middle;"></span> Stopping...';
+
+        fetch('/api/stop/Scheduled_' + jobId, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                window.showToast("Warning: Background script forced to abort execution.", "error");
+                setTimeout(fetchScheduledJobs, 1000); // Reload the tab to see it disappear
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerText = "Stop script execution";
+                window.showToast("Failed to stop job.", "error");
+            });
+    };
 
     // ----------------------------------------------------------------
     // Expose to other modules

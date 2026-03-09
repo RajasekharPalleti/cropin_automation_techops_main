@@ -11,8 +11,9 @@ import json
 import shutil
 import asyncio
 import importlib.util
+from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, Body
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -145,11 +146,34 @@ async def clear_session(client_id: str):
 
 @router.post("/api/stop/{client_id}")
 async def stop_execution(client_id: str):
-    """Request cancellation of a running script for a given client."""
+    """Request cancellation of a running script for a given client, or a Scheduled background job."""
+    if client_id.startswith("Scheduled_"):
+        real_id = client_id.replace("Scheduled_", "")
+        from app.scheduler import load_jobs, save_jobs
+        jobs = load_jobs()
+        # Find the job that starts with this truncated ID (since we passed job_id[:8] to the frontend)
+        target_job_key = next((k for k in jobs.keys() if k.startswith(real_id)), None)
+        
+        if target_job_key and jobs[target_job_key]["status"] == "running":
+            jobs[target_job_key]["status"] = "cancelled"
+            jobs[target_job_key]["error"] = "Cancelled forcefully by admin via Background Process UI."
+            jobs[target_job_key]["completed_at"] = datetime.now().isoformat()
+            save_jobs(jobs)
+            
+            # Fire the global cancellation flag so the running background script halts immediately
+            if manager.is_active(target_job_key):
+                manager.request_cancel(target_job_key)
+                
+            return {"status": "stopping", "message": "Scheduled Job marked as cancelled."}
+            
+        return {"status": "ignored", "message": "Scheduled Job not running or not found."}
+
+    # Standard Interactive Job Cancellation
     if manager.is_active(client_id):
         manager.request_cancel(client_id)
         await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
         return {"status": "stopping", "message": "Stop requested. Process will terminate shortly."}
+        
     return {"status": "ignored", "message": "No active process found."}
 
 
@@ -160,12 +184,19 @@ async def stop_execution(client_id: str):
 @router.get("/api/server/status")
 async def get_server_status():
     """Check how many background script jobs are currently running."""
-    return {"active_jobs": len(manager.active_tasks)}
+    active_count = len(manager.active_tasks)
+    
+    # Add scheduled background jobs to the count
+    from app.scheduler import load_jobs
+    jobs = load_jobs()
+    active_count += sum(1 for job in jobs.values() if job.get("status") == "running")
+        
+    return {"active_jobs": active_count}
 
 
 @router.get("/api/server/active_jobs")
 async def get_active_jobs():
-    """Get details of all currently running background script jobs."""
+    """Get details of all currently running background script jobs (SSE and Scheduled)."""
     jobs = []
     
     for client_id in list(manager.active_tasks):
@@ -188,23 +219,54 @@ async def get_active_jobs():
             "script_name": script_name,
             "tenant": tenant,
             "user": user,
-            "machine_id": machine_id
+            "machine_id": machine_id,
+            "type": "Interactive"
         })
+        
+    # Append running scheduled jobs
+    from app.scheduler import load_jobs
+    scheduled_jobs = load_jobs()
+    for job_id, job in scheduled_jobs.items():
+        if job.get("status") == "running":
+            cfg = job.get("config", {})
+            jobs.append({
+                "client_id": f"Scheduled_{job_id[:8]}",
+                "script_name": job.get("script_name", "Unknown Scheduled Script"),
+                "tenant": cfg.get("tenant_code", "unknown"),
+                "user": cfg.get("username", "unknown"),
+                "machine_id": "Server Background",
+                "type": "Scheduled"
+            })
         
     return {"jobs": jobs}
 
 
 @router.post("/api/server/stop_all")
 async def stop_all_jobs():
-    """Request cancellation of all running scripts and immediately notify each client."""
+    """Request cancellation of all running scripts (Interactive and Scheduled) and notify clients."""
     stopped_count = 0
     active_clients = list(manager.active_tasks)
 
+    # 1. Stop all active background processes (Interactive & Scheduled) tracked by the SSE Manager
     for client_id in active_clients:
         if not manager.is_cancelled(client_id):
             manager.request_cancel(client_id)
             await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
             stopped_count += 1
+            
+    # 2. Specifically update the persistent state of Scheduled Jobs in the JSON ledger
+    from app.scheduler import load_jobs, save_jobs
+    jobs = load_jobs()
+    jobs_modified = False
+    
+    for job_id, job_data in jobs.items():
+        if job_data.get("status") == "running":
+            jobs[job_id]["status"] = "failed"
+            jobs[job_id]["error"] = "Cancelled forcefully by admin via 'Stop All Processes'."
+            jobs_modified = True
+            
+    if jobs_modified:
+        save_jobs(jobs)
 
     return {
         "status": "success",
@@ -457,6 +519,133 @@ async def execute_script(
         import traceback
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {str(e)}"})
+
+
+# ---------------------------------------------------------------------------
+# Scheduled Script Execution
+# ---------------------------------------------------------------------------
+
+@router.post("/api/schedule")
+async def schedule_script(
+    script_name: str = Form(...),
+    input_filename: str = Form(None),
+    config: str = Form(...),
+    run_time: str = Form(...)  # Expected ISO format YYYY-MM-DDTHH:MM
+):
+    """Save the script details and permanently archive the input file for a scheduled run."""
+    import uuid
+    
+    try:
+        try:
+            config_dict = json.loads(config)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid config JSON")
+
+        script_path = os.path.join(SCRIPTS_DIR, script_name)
+        if not os.path.exists(script_path):
+            raise HTTPException(status_code=404, detail="Script not found")
+
+        # Move uploaded file to permanent scheduling folder
+        permanent_input_path = None
+        if input_filename:
+            temp_input_path = os.path.join(UPLOAD_DIR, f"input_{input_filename}")
+            if not os.path.exists(temp_input_path):
+                raise HTTPException(status_code=404, detail="Input file not found")
+                
+            # Move to scheduled_uploads so lifespan cleanup doesn't delete it
+            os.makedirs("scheduled_uploads", exist_ok=True)
+            permanent_input_path = os.path.join("scheduled_uploads", f"scheduled_{uuid.uuid4().hex[:8]}_{input_filename}")
+            shutil.copy2(temp_input_path, permanent_input_path)
+
+        # Build job structure
+        job_id = str(uuid.uuid4())
+        job_data = {
+            "job_id": job_id,
+            "script_name": script_name,
+            "run_time": run_time,
+            "status": "pending",
+            "created_at": datetime.now().isoformat(),
+            "config": config_dict,
+            "input_file": permanent_input_path
+        }
+
+        # Save to JSON
+        from app.scheduler import load_jobs, save_jobs
+        jobs = load_jobs()
+        jobs[job_id] = job_data
+        save_jobs(jobs)
+
+        return {"status": "scheduled", "message": f"Script scheduled for {run_time}", "job_id": job_id}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": f"Internal Server Error: {str(e)}"})
+
+@router.get("/api/scheduled_jobs")
+async def get_scheduled_jobs():
+    """Return all scheduled and running jobs."""
+    from app.scheduler import load_jobs
+    jobs = load_jobs()
+    pending = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] == "pending"]
+    running = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] == "running"]
+    history = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] in ["completed", "failed", "cancelled"]]
+    
+    # Sort history by completed_at desc
+    history.sort(key=lambda x: x.get("completed_at", ""), reverse=True)
+
+    return {"jobs": pending + running + history, "pending": pending, "running": running, "history": history}
+
+@router.delete("/api/scheduled_jobs/{job_id}")
+async def delete_scheduled_job(job_id: str):
+    from app.scheduler import load_jobs, save_jobs
+    jobs = load_jobs()
+    if job_id in jobs:
+        # Check if file needs cleanup
+        input_path = jobs[job_id].get("input_file")
+        if input_path and os.path.exists(input_path):
+            try:
+                os.remove(input_path)
+            except:
+                pass
+        del jobs[job_id]
+        save_jobs(jobs)
+        return {"status": "deleted"}
+    raise HTTPException(status_code=404, detail="Job not found")
+
+@router.patch("/api/scheduled_jobs/{job_id}")
+async def update_scheduled_job(job_id: str, run_time: str = Body(..., embed=True)):
+    from app.scheduler import load_jobs, save_jobs
+    jobs = load_jobs()
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if jobs[job_id]["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Only pending jobs can be rescheduled")
+        
+    jobs[job_id]["run_time"] = run_time
+    save_jobs(jobs)
+    return {"status": "updated", "message": f"Job rescheduled to {run_time}"}
+
+@router.post("/api/scheduled_jobs/{job_id}/run_now")
+async def run_scheduled_job_now(job_id: str):
+    """Moves a scheduled job to running state manually."""
+    from app.scheduler import load_jobs, process_scheduled_script
+    import asyncio
+    
+    jobs = load_jobs()
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    job_data = jobs[job_id]
+    if job_data["status"] == "running":
+        raise HTTPException(status_code=400, detail="Job is already running")
+        
+    # Fire and forget directly
+    asyncio.create_task(process_scheduled_script(job_id, job_data))
+    return {"status": "started", "message": "Manual run triggered"}
 
 
 # ---------------------------------------------------------------------------
