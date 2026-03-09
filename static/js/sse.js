@@ -31,6 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function getStopBtn() { return document.getElementById('stop-script-btn'); }
 
     // ----------------------------------------------------------------
+    // Native Desktop Notifications wrapper
+    // ----------------------------------------------------------------
+    function notifyUser(title, options = {}) {
+        if (!("Notification" in window)) return;
+
+        if (Notification.permission === "granted") {
+            new Notification(title, { icon: '/static/images/logo.png', ...options });
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, { icon: '/static/images/logo.png', ...options });
+                }
+            });
+        }
+    }
+
+    // ----------------------------------------------------------------
     // Batched log renderer — processes up to 100 messages per frame
     // ----------------------------------------------------------------
     function flushLogs() {
@@ -58,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 sessionStorage.setItem('is_script_running', 'false');
                 if (window.releaseWakeLock) window.releaseWakeLock();
+                notifyUser('Script Completed', { body: `Script automation completed and ${filename} is successfully downloaded in downloads folder.` });
 
                 setTimeout(() => {
                     window.location.href = '/api/download/' + encodeURIComponent(filename);
@@ -87,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 fragment.appendChild(line);
 
                 if (window.releaseWakeLock) window.releaseWakeLock();
+                const scriptName = document.getElementById('selected-text') ? document.getElementById('selected-text').textContent : 'Script';
+                notifyUser('Script Failed', { body: `Script automation failed for ${scriptName}. Error: ${errorMsg}` });
 
                 setTimeout(() => {
                     if (statusArea) statusArea.innerHTML = '<div style="color: red;">Execution Failed</div>';
