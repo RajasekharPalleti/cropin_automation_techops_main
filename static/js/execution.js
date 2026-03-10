@@ -173,11 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
             openScheduleModalBtn.style.opacity = '1';
             openScheduleModalBtn.style.filter = 'none';
             openScheduleModalBtn.style.cursor = 'pointer';
+            openScheduleModalBtn.style.backgroundColor = '#6a1b9a';
+            openScheduleModalBtn.style.color = '#fff';
+            openScheduleModalBtn.style.border = '1px solid #6a1b9a';
         } else if (openScheduleModalBtn) {
             openScheduleModalBtn.disabled = true;
             openScheduleModalBtn.style.opacity = '0.5';
             openScheduleModalBtn.style.filter = 'grayscale(1)';
             openScheduleModalBtn.style.cursor = 'not-allowed';
+            openScheduleModalBtn.style.backgroundColor = '#fff';
+            openScheduleModalBtn.style.color = '#6a1b9a';
+            openScheduleModalBtn.style.border = '1px solid #6a1b9a';
         }
     }
 
@@ -498,6 +504,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const hideScheduleModal = () => { if (scheduleModal) scheduleModal.style.display = 'none'; };
     if (closeScheduleModal) closeScheduleModal.addEventListener('click', hideScheduleModal);
     if (cancelScheduleBtn) cancelScheduleBtn.addEventListener('click', hideScheduleModal);
+
+    // Show hover message (tooltip) matching project UI
+    if (openScheduleModalBtn) {
+        const parent = openScheduleModalBtn.parentElement;
+        let tooltip = document.getElementById('schedule-tooltip');
+
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'schedule-tooltip';
+            tooltip.className = 'custom-tooltip';
+            document.body.appendChild(tooltip);
+        }
+
+        const updateTooltip = () => {
+            if (openScheduleModalBtn.disabled) {
+                tooltip.textContent = 'Schedule Run is currently inactive. Please select a script, enter credentials, and upload a template to enable it.';
+            } else {
+                tooltip.textContent = 'Schedule this script for a future time. It will run automatically even if you close the browser.';
+            }
+
+            // Show it hidden first to get dimensions
+            tooltip.style.visibility = 'hidden';
+            tooltip.classList.add('show');
+
+            // Wait a tiny bit (next tick) to ensure width/height are populated
+            requestAnimationFrame(() => {
+                const rect = openScheduleModalBtn.getBoundingClientRect();
+                const tooltipRect = tooltip.getBoundingClientRect();
+
+                // Center horizontally relative to button
+                let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                // Position above button with space for the arrow
+                let top = rect.top - tooltipRect.height - 12;
+
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = top + 'px';
+                tooltip.style.visibility = 'visible';
+            });
+        };
+
+        const hideTooltip = () => {
+            tooltip.classList.remove('show');
+            tooltip.style.visibility = 'hidden';
+        };
+
+        if (parent) {
+            parent.addEventListener('mouseenter', updateTooltip);
+            parent.addEventListener('mouseleave', hideTooltip);
+        }
+        openScheduleModalBtn.addEventListener('mouseenter', updateTooltip);
+        openScheduleModalBtn.addEventListener('mouseleave', hideTooltip);
+    }
 
     if (saveScheduleBtn) saveScheduleBtn.addEventListener('click', () => {
         if (!scheduleDatetime.value) {

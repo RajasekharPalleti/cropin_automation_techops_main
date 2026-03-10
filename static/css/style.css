@@ -742,7 +742,8 @@ body {
     .backup-btn {
         margin-left: 0;
         margin-top: 5px;
-        flex: 1; /* Allow buttons to grow on mobile */
+        flex: 1;
+        /* Allow buttons to grow on mobile */
         text-align: center;
     }
 
@@ -1103,4 +1104,41 @@ body {
 
 .toast.info .toast-icon {
     color: #0288d1;
+}
+
+/* --- CUSTOM TOOLTIP --- */
+.custom-tooltip {
+    position: fixed;
+    background-color: #6a1b9a;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    max-width: 280px;
+    line-height: 1.4;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    opacity: 0;
+    transform: translateY(5px);
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 400;
+}
+
+.custom-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.custom-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    margin-left: -8px;
+    border-width: 8px 8px 0 8px;
+    border-style: solid;
+    border-color: #6a1b9a transparent transparent transparent;
 }
