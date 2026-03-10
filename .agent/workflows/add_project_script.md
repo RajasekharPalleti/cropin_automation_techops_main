@@ -17,7 +17,7 @@ Follow these steps strictly whenever adding a new script:
     - **Add Docstring**: Ensure the script has a structured docstring at the top of the file:
       ```python
       """
-      [Short Description about the script to cover the what exactly script will do]
+      [Detailed Description about the script to cover the what exactly script will do in not more than three lines]
 
       Inputs:
       [Input Details]

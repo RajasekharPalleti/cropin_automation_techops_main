@@ -734,6 +734,18 @@ body {
         vertical-align: middle;
     }
 
+    .header-left {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .backup-btn {
+        margin-left: 0;
+        margin-top: 5px;
+        flex: 1; /* Allow buttons to grow on mobile */
+        text-align: center;
+    }
+
     .header img {
         height: 25px !important;
         /* Smaller logo */

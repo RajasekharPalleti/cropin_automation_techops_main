@@ -207,8 +207,9 @@
     line-height: 1.5;
 }
 
-.admin-console-wrapper.minimized .admin-console-body {
-    display: none;
+.admin-console-wrapper.minimized .admin-console-body,
+.admin-console-wrapper.minimized #admin-jump-latest {
+    display: none !important;
 }
 
 /* Stop All uses a light body */

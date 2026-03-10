@@ -178,7 +178,7 @@ class BackupManager:
                     'webContentLink': item.get('webContentLink') # This allows direct download
                 }
                 
-                if name.startswith('input_'):
+                if name.startswith('input_') or (name.startswith('scheduled_') and not name.endswith('_Output.xlsx')):
                     uploaded_files.append(file_obj)
                 else:
                     # Treat everything else as downloaded/output files

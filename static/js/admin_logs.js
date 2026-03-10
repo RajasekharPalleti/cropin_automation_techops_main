@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let _isMinimized = false;
         let _isMaximized = false;
 
+        // Helper: detect mobile view (matches CSS media query)
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+
         // Click-to-front on any interaction (mouse + touch)
         wrapper.addEventListener('mousedown', () => bringToFront(wrapper));
         wrapper.addEventListener('touchstart', () => bringToFront(wrapper), { passive: true });
@@ -92,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTransformX = offsetX;
             currentTransformY = offsetY;
             document.body.style.userSelect = '';
-            wrapper.style.transition = 'width 0.3s, height 0.3s, bottom 0.3s, right 0.3s';
+            wrapper.style.transition = 'width 0.3s, height 0.3s, bottom 0.3s, right 0.3s, transform 0.3s';
 
             // Snap back if dragged off-screen
             const rect = wrapper.getBoundingClientRect();
@@ -102,8 +107,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentTransformY = 0;
                 wrapper.style.left = 'auto';
                 wrapper.style.top = 'auto';
-                wrapper.style.right = bottomOffset;
-                wrapper.style.bottom = '20px';
+
+                if (isMobile()) {
+                    wrapper.style.right = '12px';
+                    wrapper.style.bottom = '16px';
+                } else {
+                    wrapper.style.right = bottomOffset;
+                    wrapper.style.bottom = '20px';
+                }
             }
         });
 
@@ -139,44 +150,93 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: false });
 
         header.addEventListener('touchend', (e) => {
+            if (!touchStartX && !touchStartY) return;
             const t = e.changedTouches[0];
             touchTransformX += t.clientX - touchStartX;
             touchTransformY += t.clientY - touchStartY;
-            wrapper.style.transition = 'width 0.3s, height 0.3s, bottom 0.3s, right 0.3s';
+            wrapper.style.transition = 'width 0.3s, height 0.3s, bottom 0.3s, right 0.3s, transform 0.3s';
+
             // Snap back if off-screen
             const rect = wrapper.getBoundingClientRect();
             if (rect.top < 0 || rect.left < 0 || rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
                 wrapper.style.transform = 'translate(0,0)';
                 touchTransformX = 0; touchTransformY = 0;
                 wrapper.style.left = 'auto'; wrapper.style.top = 'auto';
-                wrapper.style.right = bottomOffset; wrapper.style.bottom = '20px';
+
+                if (isMobile()) {
+                    wrapper.style.right = '12px';
+                    wrapper.style.bottom = '16px';
+                } else {
+                    wrapper.style.right = bottomOffset;
+                    wrapper.style.bottom = '20px';
+                }
             }
+            // Reset start values
+            touchStartX = 0; touchStartY = 0;
         }, { passive: true });
 
         // --- Minimize / Restore ---
         function toggleMinimize() {
             if (_isMaximized) toggleMaximize();
             _isMinimized = !_isMinimized;
+
+            updatePositioning();
+
             if (_isMinimized) {
                 wrapper.classList.add('minimized');
-                wrapper.style.width = minimizedWidth;
                 if (minimizeBtn) minimizeBtn.innerHTML = '<span class="material-icons">crop_square</span>';
-                // Snap to bottom corner
-                wrapper.style.transform = '';
-                wrapper.style.left = 'auto';
-                wrapper.style.top = 'auto';
-                wrapper.style.right = bottomOffset;
-                wrapper.style.bottom = '0';
-                currentTransformX = 0; currentTransformY = 0;
-                offsetX = 0; offsetY = 0;
                 if (onMinimize) onMinimize();
             } else {
                 wrapper.classList.remove('minimized');
                 if (minimizeBtn) minimizeBtn.innerHTML = '<span class="material-icons">horizontal_rule</span>';
-                wrapper.style.bottom = '20px';
                 if (onRestore) onRestore();
             }
         }
+
+        function updatePositioning() {
+            // Reset base inline styles to avoid stale values from other breakpoints
+            wrapper.style.left = '';
+            wrapper.style.top = '';
+            wrapper.style.transform = '';
+            currentTransformX = 0; currentTransformY = 0;
+            touchTransformX = 0; touchTransformY = 0;
+            offsetX = 0; offsetY = 0;
+
+            if (_isMinimized) {
+                if (isMobile()) {
+                    wrapper.style.width = '';
+                    wrapper.style.right = '';
+                    wrapper.style.bottom = '';
+                } else {
+                    wrapper.style.width = minimizedWidth;
+                    wrapper.style.right = bottomOffset;
+                    wrapper.style.bottom = '0';
+                }
+            } else if (_isMaximized) {
+                wrapper.style.width = '';
+                wrapper.style.right = '';
+                wrapper.style.bottom = '';
+            } else {
+                // Normal Restore state
+                if (isMobile()) {
+                    wrapper.style.width = '';
+                    wrapper.style.right = '';
+                    wrapper.style.bottom = '';
+                } else {
+                    wrapper.style.width = '';
+                    wrapper.style.right = bottomOffset;
+                    wrapper.style.bottom = '20px';
+                }
+            }
+        }
+
+        // Handle window resize dynamically
+        window.addEventListener('resize', () => {
+            // Re-evaluate positioning if state is abnormal (minimized, maximized, or manually dragged)
+            if (_isMinimized || _isMaximized || (wrapper.style.left && wrapper.style.left !== '')) {
+                updatePositioning();
+            }
+        });
 
         // --- Maximize ---
         function toggleMaximize() {
@@ -189,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 wrapper.classList.remove('fullscreen');
                 if (maximizeBtn) maximizeBtn.innerHTML = '<span class="material-icons">fullscreen</span>';
             }
+            updatePositioning();
         }
 
         // --- Close ---
@@ -199,12 +260,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 _isMinimized = false;
                 _isMaximized = false;
                 wrapper.classList.remove('minimized', 'fullscreen');
+
+                // Reset ALL inline styles to base
                 wrapper.style.transform = '';
-                wrapper.style.left = 'auto';
-                wrapper.style.top = 'auto';
-                wrapper.style.right = bottomOffset;
-                wrapper.style.bottom = '20px';
+                wrapper.style.left = '';
+                wrapper.style.top = '';
+                wrapper.style.width = '';
+
+                if (isMobile()) {
+                    wrapper.style.right = '';
+                    wrapper.style.bottom = '';
+                } else {
+                    wrapper.style.right = bottomOffset;
+                    wrapper.style.bottom = '20px';
+                }
+
                 currentTransformX = 0; currentTransformY = 0;
+                touchTransformX = 0; touchTransformY = 0;
                 offsetX = 0; offsetY = 0;
                 if (onClose) onClose();
             });
@@ -427,7 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const isNearTop = logsBody.scrollTop <= 10;
         const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 60;
 
-        jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom) ? 'flex' : 'none';
+        // Hide jump button if minimized or in search mode or near bottom
+        jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom && !logsWindow.isMinimized()) ? 'flex' : 'none';
 
         if (isSearchMode) {
             // Bottom scroll → load next search page
