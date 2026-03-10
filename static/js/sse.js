@@ -37,11 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!("Notification" in window)) return;
 
         if (Notification.permission === "granted") {
-            new Notification(title, { icon: '/static/images/logo.png', ...options });
+            const iconUrl = `${window.location.origin}/static/images/logo.png`;
+            new Notification(title, { icon: iconUrl, ...options });
         } else if (Notification.permission !== "denied") {
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") {
-                    new Notification(title, { icon: '/static/images/logo.png', ...options });
+                    const iconUrl = `${window.location.origin}/static/images/logo.png`;
+                    new Notification(title, { icon: iconUrl, ...options });
                 }
             });
         }
@@ -75,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 sessionStorage.setItem('is_script_running', 'false');
                 if (window.releaseWakeLock) window.releaseWakeLock();
-                notifyUser('Script Completed', { body: `Script automation completed and ${filename} is successfully downloaded in downloads folder.` });
+                // Notification now handled in onmessage for background tab reliability
 
                 setTimeout(() => {
                     window.location.href = '/api/download/' + encodeURIComponent(filename);
@@ -105,8 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fragment.appendChild(line);
 
                 if (window.releaseWakeLock) window.releaseWakeLock();
-                const scriptName = document.getElementById('selected-text') ? document.getElementById('selected-text').textContent : 'Script';
-                notifyUser('Script Failed', { body: `Script automation failed for ${scriptName}. Error: ${errorMsg}` });
+                // Notification now handled in onmessage for background tab reliability
 
                 setTimeout(() => {
                     if (statusArea) statusArea.innerHTML = '<div style="color: red;">Execution Failed</div>';
@@ -215,7 +216,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         evtSource.onmessage = (event) => {
-            logBuffer.push(event.data);
+            const data = event.data;
+
+            // Immediate notification for background tab reliability
+            if (data.startsWith('JOB_COMPLETED::')) {
+                const filename = data.split('::')[1];
+                notifyUser('Script Completed', {
+                    body: `Script automation completed and ${filename} is successfully downloaded in downloads folder.`
+                });
+            } else if (data.startsWith('JOB_FAILED::')) {
+                const errorMsg = data.split('::')[1];
+                const scriptName = document.getElementById('selected-text') ? document.getElementById('selected-text').textContent : 'Script';
+                notifyUser('Script Failed', {
+                    body: `Script automation failed for ${scriptName}. Error: ${errorMsg}`
+                });
+            }
+
+            logBuffer.push(data);
             if (!isRenderPending) {
                 isRenderPending = true;
                 requestAnimationFrame(flushLogs);

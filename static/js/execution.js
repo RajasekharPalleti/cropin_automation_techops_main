@@ -278,6 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.requestWakeLock) window.requestWakeLock();
 
+        // Proactively request notification permission
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+
         // Close any existing SSE connection before starting fresh
         if (window.closeSSE) window.closeSSE();
 
