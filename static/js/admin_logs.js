@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalServerLines = 0;
     let hasMoreOldLogs = true;   // set false when backend confirms no more older lines
     let eventSource = null;
-    const BATCH_SIZE = 1000;
+    const BATCH_SIZE = 2000;
 
     const logsWindow = setupFloatingWindow({
         wrapper: consoleWrapper,
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 60;
 
         // Hide jump button if minimized or in search mode or near bottom
-        jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom && !logsWindow.isMinimized()) ? 'flex' : 'none';
+        jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom && !logsWindow.isMinimized) ? 'flex' : 'none';
 
         if (isSearchMode) {
             // Bottom scroll → load next search page
@@ -555,6 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
                 logsCache.push(data.line);
                 totalServerLines++;
+                olderLogsOffset++; // Correct for offset drift: history is fetched relative to the end of the file
                 updateCounter();
 
                 if (!isSearchMode) {
@@ -625,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!term || isLoadingSearch) return;
         isLoadingSearch = true;
 
-        fetch(`/api/server_logs/search?q=${encodeURIComponent(term)}&offset=${offset}&limit=1000`)
+        fetch(`/api/server_logs/search?q=${encodeURIComponent(term)}&offset=${offset}&limit=${BATCH_SIZE}`)
             .then(r => r.json())
             .then(data => {
                 searchResults = searchResults.concat(data.results || []);

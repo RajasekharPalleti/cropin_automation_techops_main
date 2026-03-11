@@ -653,12 +653,12 @@ async def run_scheduled_job_now(job_id: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/server_logs")
-async def get_server_logs(offset_line: int = 0, limit: int = 1000):
+async def get_server_logs(offset_line: int = 0, limit: int = 2000):
     """
     Returns a paginated slice of log lines from the combined server.log.1 + server.log files.
     Lines are ordered chronologically (oldest first). Pagination works from the END backwards:
       - offset_line=0          → last `limit` lines (newest)
-      - offset_line=1000       → lines before the last 1000
+      - offset_line=2000       → lines before the last 2000
     Returns: { logs, total_lines, returned_count, has_more }
     """
     def count_lines(path):
@@ -730,7 +730,7 @@ async def get_server_logs(offset_line: int = 0, limit: int = 1000):
 
 
 @router.get("/api/server_logs/search")
-async def search_server_logs(q: str = "", offset: int = 0, limit: int = 1000):
+async def search_server_logs(q: str = "", offset: int = 0, limit: int = 2000):
     """
     Full-file search across server.log.1 + server.log (not just the in-memory cache).
     - q:      search term (case-insensitive)
