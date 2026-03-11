@@ -374,6 +374,8 @@ async def list_scripts():
                 "show_area_audit": config.get("show_area_audit", False),
                 "show_variety_removal": config.get("show_variety_removal", False),
                 "show_ca_close_delete": config.get("show_ca_close_delete", False),
+                "show_google_api_config": config.get("show_google_api_config", False),
+                "show_threading": config.get("show_threading", False),
                 "show_time_delay": config.get("show_time_delay", True)
             })
 

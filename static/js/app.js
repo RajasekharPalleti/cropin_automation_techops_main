@@ -178,12 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('pr-weather-config', selectedScript.show_pr_weather);
             toggle('attribute-config', selectedScript.show_attribute_config);
             toggle('address-config', selectedScript.show_address_config);
-            toggle('area-audit-config', selectedScript.show_area_audit_config);
-            toggle('variety-removal-config', selectedScript.show_variety_removal_config);
-            toggle('threading-config', selectedScript.show_threading_config);
-            toggle('time-delay-config', selectedScript.show_time_delay_config);
-            toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
+            toggle('area-audit-config', selectedScript.show_area_audit);
+            toggle('variety-removal-config', selectedScript.show_variety_removal);
             toggle('threading-config', selectedScript.show_threading);
+            toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
+            toggle('google-api-config', selectedScript.show_google_api_config);
+            document.getElementById('time-delay-config').style.display = 'block';
 
             // Count dropdowns
             const setupCountDropdown = (selectId, groupPrefix, max = 4) => {
