@@ -82,8 +82,7 @@ SCRIPT_CONFIGS = {
         "base_api_url": "https://cloud.cropin.in/services/user/api/users/images",
         "label": "User API Url",
         "requires_input": True,
-        "show_extended_config": True,
-        "extended_config_type": "add_users",
+        "show_google_api_config": True,
     },
     "Area_Audit_Removal.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
@@ -265,6 +264,12 @@ SCRIPT_CONFIGS = {
         "second_base_api_url": "https://cloud.cropin.in/services/farm/api/tasks/croppablearea",
         "label2": "CA TASK API URL",
         "requires_input": True,
+    },
+    "Create_Places.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/place",
+        "label": "Place API URL",
+        "requires_input": True,
+        "show_google_api_config": True,
     },
 }
 

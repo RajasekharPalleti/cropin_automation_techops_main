@@ -171,34 +171,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 secGroup.style.display = 'none';
             }
 
-            // Extended config visibility toggles
-            const extendedConfigDiv = document.getElementById('extended-config');
-            if (selectedScript.show_extended_config) {
-                extendedConfigDiv.style.display = 'block';
-                if (selectedScript.extended_config_type === 'add_users') {
-                    document.getElementById('dataset').closest('.input-group').style.display = 'none';
-                    document.getElementById('load-type').closest('.input-group').style.display = 'none';
-                    document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
-                    document.querySelector('label[for="x-api-key"]').textContent = 'Google API Key';
-                } else if (selectedScript.extended_config_type === 'get_discrolls') {
-                    document.getElementById('dataset').closest('.input-group').style.display = 'block';
-                    document.getElementById('load-type').closest('.input-group').style.display = 'block';
-                    document.getElementById('x-api-key').closest('.input-group').style.display = 'block';
-                    document.querySelector('label[for="x-api-key"]').textContent = 'X-API-KEY';
-                }
-            } else {
-                extendedConfigDiv.style.display = 'none';
-            }
-
             const toggle = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? 'block' : 'none'; };
+            
+            toggle('google-api-config', selectedScript.show_google_api_config);
 
             toggle('pr-weather-config', selectedScript.show_pr_weather);
             toggle('attribute-config', selectedScript.show_attribute_config);
             toggle('address-config', selectedScript.show_address_config);
-            toggle('area-audit-config', selectedScript.show_area_audit);
-            toggle('variety-removal-config', selectedScript.show_variety_removal);
+            toggle('area-audit-config', selectedScript.show_area_audit_config);
+            toggle('variety-removal-config', selectedScript.show_variety_removal_config);
+            toggle('threading-config', selectedScript.show_threading_config);
+            toggle('time-delay-config', selectedScript.show_time_delay_config);
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
-            toggle('time-delay-config', selectedScript.show_time_delay);
             toggle('threading-config', selectedScript.show_threading);
 
             // Count dropdowns

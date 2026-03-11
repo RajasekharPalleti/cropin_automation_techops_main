@@ -14,6 +14,7 @@ Follow these steps strictly whenever adding a new script:
     - Add log_callback as other scripts.
     - Add Author details as Rajasekhar Palleti
     - Add log that shows which rows is executing
+    - **Code Style & Output**: Ensure the script style is identical to other project scripts. It must iterate over the input pandas dataframe, populate 'Status' and 'Response' columns, and strictly save the final dataframe to `output_excel_file`. This guarantees it natively supports the system's frontend download buttons and backend daily backups.
     - **Add Docstring**: Ensure the script has a structured docstring at the top of the file:
       ```python
       """

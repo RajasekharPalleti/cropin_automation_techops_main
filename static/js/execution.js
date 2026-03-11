@@ -327,17 +327,21 @@ document.addEventListener('DOMContentLoaded', () => {
             config.worker_count = parseInt(document.getElementById('worker-count')?.value) || 1;
         }
 
-        // 2. Extra Appended Config (PR Weather, Add Users)
-        const extendedConfig = document.getElementById('extended-config');
-        if (extendedConfig && extendedConfig.style.display !== 'none') {
+        // 2. Extra Appended Config (Secondary URL & Google API)
+        const secondaryGroup = document.getElementById('group-secondary-url');
+        if (secondaryGroup && secondaryGroup.style.display !== 'none') {
             const secondBaseApiUrl = document.getElementById('second-base-api-url')?.value;
-            const xApiKey = document.getElementById('x-api-key')?.value;
             if (secondBaseApiUrl) config.second_base_api_url = secondBaseApiUrl;
+        }
+
+        const googleApiConfig = document.getElementById('google-api-config');
+        if (googleApiConfig && googleApiConfig.style.display !== 'none') {
+            const xApiKey = document.getElementById('x-api-key')?.value;
             if (xApiKey) config.x_api_key = xApiKey;
         }
 
         // 3. CA Control Config
-        const caControl = document.getElementById('ca-control');
+        const caControl = document.getElementById('ca-close-delete-config');
         if (caControl && caControl.style.display !== 'none') {
             config.ca_action = document.getElementById('ca-action-select')?.value || 'none';
 
