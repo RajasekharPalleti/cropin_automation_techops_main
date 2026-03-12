@@ -36,16 +36,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function notifyUser(title, options = {}) {
         if (!("Notification" in window)) return;
 
+        const defaultOptions = {
+            icon: `${window.location.origin}/static/images/logo.png`,
+            requireInteraction: true // Keeps notification visible until user interacts
+        };
+        const finalOptions = { ...defaultOptions, ...options };
+
         if (Notification.permission === "granted") {
-            const iconUrl = `${window.location.origin}/static/images/logo.png`;
-            new Notification(title, { icon: iconUrl, ...options });
+            try {
+                new Notification(title, finalOptions);
+            } catch (e) {
+                console.warn('Notification failed:', e);
+            }
         } else if (Notification.permission !== "denied") {
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") {
-                    const iconUrl = `${window.location.origin}/static/images/logo.png`;
-                    new Notification(title, { icon: iconUrl, ...options });
+                    try {
+                        new Notification(title, finalOptions);
+                    } catch (e) {
+                        console.warn('Notification failed:', e);
+                    }
                 }
-            });
+            }).catch(e => console.warn('Notification permission request failed:', e));
         }
     }
 

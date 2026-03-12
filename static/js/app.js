@@ -20,6 +20,11 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+    // Request Notification permission right after page loads if not already accepted/denied
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(e => console.warn('Auto-request Notification permission blocked/failed:', e));
+    }
+
     // 1) Initialize UI State (Deferred slightly to ensure ui.js is parsed)
     setTimeout(() => {
         if (window.loadFormState) window.loadFormState();
