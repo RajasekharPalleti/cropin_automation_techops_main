@@ -170,20 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tenant && username && password && scriptSelected && currentUploadedFilename && openScheduleModalBtn) {
             openScheduleModalBtn.disabled = false;
-            openScheduleModalBtn.style.opacity = '1';
-            openScheduleModalBtn.style.filter = 'none';
-            openScheduleModalBtn.style.cursor = 'pointer';
-            openScheduleModalBtn.style.backgroundColor = '#6a1b9a';
-            openScheduleModalBtn.style.color = '#fff';
-            openScheduleModalBtn.style.border = '1px solid #6a1b9a';
         } else if (openScheduleModalBtn) {
             openScheduleModalBtn.disabled = true;
-            openScheduleModalBtn.style.opacity = '0.5';
-            openScheduleModalBtn.style.filter = 'grayscale(1)';
-            openScheduleModalBtn.style.cursor = 'not-allowed';
-            openScheduleModalBtn.style.backgroundColor = '#fff';
-            openScheduleModalBtn.style.color = '#6a1b9a';
-            openScheduleModalBtn.style.border = '1px solid #6a1b9a';
         }
     }
 

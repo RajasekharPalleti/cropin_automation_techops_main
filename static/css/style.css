@@ -349,6 +349,39 @@ body {
     transform: translateY(-1px);
 }
 
+/* Schedule Run Button */
+.btn-schedule {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid #6a1b9a;
+    color: #6a1b9a;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    height: 34px;
+}
+
+.btn-schedule:hover:not(:disabled) {
+    background: #6a1b9a;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(106, 27, 154, 0.2);
+}
+
+.btn-schedule:disabled {
+    opacity: 0.5;
+    filter: grayscale(1);
+    cursor: not-allowed;
+    background: #ffffff;
+    color: #6a1b9a;
+    border: 1px solid #6a1b9a;
+}
+
 .info-box {
     background: #f1f8e9;
     border: 1px solid #c5e1a5;
