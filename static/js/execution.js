@@ -593,7 +593,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (openScheduledListBtn) openScheduledListBtn.addEventListener('click', () => {
         if (scheduledListModal) {
             scheduledListModal.style.display = 'block';
-            fetchScheduledJobs(); // Custom polling function to write next
+            // Explicitly click the first tab to ensure UI resets and fetches data
+            if (tabScheduled) tabScheduled.click();
+            else fetchScheduledJobs();
         }
     });
 
@@ -635,12 +637,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Modal Polling Logic
     function fetchScheduledJobs() {
+        const schedContainer = document.getElementById('scheduled-jobs-container');
+        const runContainer = document.getElementById('running-jobs-container');
+        const histContainer = document.getElementById('history-jobs-container');
+
+        const loadingHTML = '<div style="display:flex; align-items:center; gap:10px; color:#666; font-style:italic;"><span class="spinner" style="border-top-color:#009ade; width:16px; height:16px;"></span> Loading scripts...</div>';
+
+        if (schedContainer) schedContainer.innerHTML = loadingHTML;
+        if (runContainer) runContainer.innerHTML = loadingHTML;
+        if (histContainer) histContainer.innerHTML = loadingHTML;
+
         fetch('/api/scheduled_jobs')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) throw new Error("Server error: " + r.status);
+                return r.json();
+            })
             .then(data => {
                 renderJobs(data.jobs || []);
             })
-            .catch(err => console.error("Failed to fetch jobs", err));
+            .catch(err => {
+                console.error("Failed to fetch jobs", err);
+                const errorHTML = `<p style="color:#dc3545; font-weight:500;">❌ Failed to load: ${err.message}</p>`;
+                if (schedContainer) schedContainer.innerHTML = errorHTML;
+                if (runContainer) runContainer.innerHTML = errorHTML;
+                if (histContainer) histContainer.innerHTML = errorHTML;
+            });
     }
 
     function renderJobs(jobs) {
