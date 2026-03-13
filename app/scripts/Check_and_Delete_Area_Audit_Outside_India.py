@@ -93,8 +93,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
         if log_callback:
             log_callback(msg)
-        else:
-            print(msg)
+        print(msg)
             
     # 1. Parse Config
     base_api_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/croppable-areas")

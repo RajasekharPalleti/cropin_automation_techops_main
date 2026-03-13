@@ -20,8 +20,7 @@ def run(input_excel, output_excel, config, log_callback=None):
     def log(msg):
         if log_callback:
             log_callback(msg)
-        else:
-            print(msg)
+        print(msg)
 
     token = config.get("token")
     api_url = config.get("base_api_url")

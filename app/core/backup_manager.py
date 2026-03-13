@@ -1,5 +1,6 @@
 import os
 import datetime
+import time
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
@@ -114,7 +115,7 @@ class BackupManager:
             print(f"BackupManager: Authentication failed: {e}")
 
     def upload_file(self, file_path, custom_name=None):
-        """Uploads a file to the configured Google Drive folder."""
+        """Uploads a file to the configured Google Drive folder with resumable chunks and retries."""
         if not self.service:
             print("BackupManager: Service not initialized. Skipping upload.")
             return None
@@ -123,24 +124,47 @@ class BackupManager:
             print(f"BackupManager: File not found {file_path}")
             return None
 
-        try:
-            file_metadata = {
-                'name': custom_name if custom_name else os.path.basename(file_path),
-                'parents': [self.BACKUP_FOLDER_ID]
-            }
-            media = MediaFileUpload(file_path, resumable=True)
-            
-            file = self.service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id, name, webViewLink'
-            ).execute()
-            
-            print(f"BackupManager: File ID: {file.get('id')} uploaded.")
-            return file
-        except Exception as e:
-            print(f"BackupManager: Upload failed: {e}")
-            return None
+        file_metadata = {
+            'name': custom_name if custom_name else os.path.basename(file_path),
+            'parents': [self.BACKUP_FOLDER_ID]
+        }
+        
+        max_retries = 5
+        current_retry = 0
+        
+        while current_retry < max_retries:
+            try:
+                media = MediaFileUpload(file_path, resumable=True)
+                request = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, webViewLink'
+                )
+                
+                response = None
+                while response is None:
+                    status, response = request.next_chunk()
+                    if status:
+                        # Log progress only for larger files? Or just once in a while.
+                        # For now, let's just keep it simple.
+                        pass
+                
+                print(f"BackupManager: File ID: {response.get('id')} uploaded.")
+                return response
+                
+            except Exception as e:
+                current_retry += 1
+                error_msg = str(e)
+                print(f"BackupManager: Upload attempt {current_retry} failed: {error_msg}")
+                
+                # Check for connection reset specifically or just retry on any transient error
+                if current_retry < max_retries:
+                    wait_time = current_retry * 5
+                    print(f"BackupManager: Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    print("BackupManager: Maximum retries reached. Upload failed.")
+                    return None
 
     def list_files(self, page_size=100, page_token=None):
         """Lists files in the backup folder with pagination."""

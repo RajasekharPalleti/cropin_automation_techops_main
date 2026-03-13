@@ -108,11 +108,13 @@ async def process_scheduled_script(job_id: str, job_data: dict):
                 else:
                     logger.info("scheduled run is complete please check the backup folder to see the output file.")
 
-                # Backup results
+                # 1. Backup input file first (source of truth)
+                if input_path and os.path.exists(input_path):
+                    backup_manager.upload_file(input_path)
+
+                # 2. Backup output file
                 if os.path.exists(output_path):
                     backup_manager.upload_file(output_path)
-                    if input_path and os.path.exists(input_path):
-                        backup_manager.upload_file(input_path)
 
             finally:
                 manager.mark_inactive(job_id)

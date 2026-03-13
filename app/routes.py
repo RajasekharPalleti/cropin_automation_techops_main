@@ -92,19 +92,18 @@ async def process_background_script(
             await asyncio.to_thread(run_wrapper)
             await manager.send_log("Script execution finished.", client_id)
 
+            # 1. Backup input file first (source of truth)
+            if input_path and os.path.exists(input_path):
+                await manager.send_log("Backing up input file to Drive...", client_id)
+                backup_manager.upload_file(input_path)
+
+            # 2. Backup output file
             if os.path.exists(output_path):
                 await manager.send_log(f"JOB_COMPLETED::{output_filename}", client_id)
-
-                # Backup output file to Google Drive
                 await manager.send_log("Backing up output file to Drive...", client_id)
                 backup_manager.upload_file(output_path)
 
-                # Backup input file if it exists
-                if input_path and os.path.exists(input_path):
-                    await manager.send_log("Backing up input file to Drive...", client_id)
-                    backup_manager.upload_file(input_path)
-
-                await manager.send_log("Backup completed.", client_id)
+            await manager.send_log("Backup completed.", client_id)
         else:
             await manager.send_log("JOB_FAILED::Script does not have a 'run' function", client_id)
 

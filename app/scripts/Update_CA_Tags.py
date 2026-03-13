@@ -38,8 +38,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
     def log(msg):
         if log_callback:
             log_callback(msg)
-        else:
-            print(msg)
+        print(msg)
 
     headers = {"Authorization": f"Bearer {token}",
     "Content-Type": "application/json"
@@ -129,8 +128,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
         if log_callback:
             log_callback(msg)
-        else:
-            print(msg)
+        print(msg)
 
     api_url = config.get("base_api_url")
     token = config.get("token")

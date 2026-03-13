@@ -19,8 +19,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
         if log_callback:
             log_callback(msg)
-        else:
-            print(msg)
+        print(msg)
 
     api_url_delete = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/tasks/bulk")
     api_url_verify = config.get("second_base_api_url", "https://cloud.cropin.in/services/farm/api/tasks/croppablearea")
@@ -47,13 +46,13 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     if "Status" not in headers_row:
         sheet.cell(1, next_col, "Status")
         next_col += 1
-    if "Failure Reason" not in headers_row:
-        sheet.cell(1, next_col, "Failure Reason")
+    if "Remarks" not in headers_row:
+        sheet.cell(1, next_col, "Remarks")
         
     headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
     try:
         status_col = headers_row.index("Status") + 1
-        reason_col = headers_row.index("Failure Reason") + 1
+        reason_col = headers_row.index("Remarks") + 1
     except ValueError:
         status_col = sheet.max_column + 1
         reason_col = sheet.max_column + 2

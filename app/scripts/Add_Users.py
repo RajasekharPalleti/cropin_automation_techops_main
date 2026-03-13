@@ -1,14 +1,8 @@
-"""
-Adds new users to the system and optionally uploads images.
-
-Inputs:
-Excel file with User details (Name, Email, Role, etc.).
-"""
 import pandas as pd
-
 import requests
 import json
 import time
+import re
 
 def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
@@ -27,26 +21,34 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         user_api_url = "https://cloud.cropin.in/services/user/api/users/images"
         log(f"Using default User API URL: {user_api_url}")
     
-    delay_time = float(config.get("delay_time", 1.0))  # seconds, configurable via UI
+    delay_time = float(config.get("delay_time", 1.0))
 
-    # We use x_api_key field for Google Maps API Key
     google_api_key = config.get("x_api_key")
     if not google_api_key:
         log("❌ Missing Google Maps API Key. Please enter it in the configuration.")
         return
 
-    # Function to fetch location details
-    def get_location_details(address, api_key):
-        """Fetch structured location details for a given address using Google Maps API"""
+    def get_location_details(location_input, api_key):
+        """Fetch structured location details using Google Maps API. Supports Name or Lat, Long."""
+        if not location_input:
+            return None
+            
         base_url = "https://maps.googleapis.com/maps/api/geocode/json"
-        params = {"address": address, "key": api_key}
+        
+        # Check if input is a coordinate pair: "12.9716, 77.5946"
+        is_coord = re.match(r"^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$", str(location_input).strip())
+        
+        if is_coord:
+            params = {"latlng": location_input, "key": api_key}
+        else:
+            params = {"address": location_input, "key": api_key}
 
         try:
             response = requests.get(base_url, params=params)
             data = response.json()
 
             if data["status"] != "OK":
-                log(f"❌ Failed to get details for address: {address} - {data.get('status')}")
+                log(f"❌ Failed to get details for: {location_input} - {data.get('status')}")
                 return None
 
             result = data["results"][0]
@@ -90,12 +92,29 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         }
                     ]
                 },
-                "name": address
+                "name": location_input if not is_coord else result.get("formatted_address", location_input)
             }
             return structured_data
         except Exception as e:
             log(f"Error fetching location: {e}")
             return None
+
+    def parse_comma_separated_ints(val):
+        if pd.isna(val) or str(val).strip() == "":
+            return []
+        parts = str(val).split(",")
+        result = []
+        for p in parts:
+            p = p.strip()
+            if p:
+                try:
+                    result.append(int(float(p)))
+                except ValueError:
+                    pass
+        return result
+
+    def get_value(cell):
+        return None if pd.isna(cell) or str(cell).strip() == "" else str(cell).strip()
 
     # Processing Excel
     log(f"📂 Loading input Excel file: {input_excel_file}")
@@ -105,10 +124,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    def get_value(cell):
-        return None if pd.isna(cell) or str(cell).strip() == "" else str(cell).strip()
-
-    columns_to_check = ["Status", "Response", "User_response"]
+    columns_to_check = ["Status", "Response"]
     for col in columns_to_check:
         if col not in df.columns:
             df[col] = ""
@@ -118,108 +134,144 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     for index, row in df.iterrows():
         try:
-            # Column mapping based on user's code (assuming standard order 0-11)
-            # 0: User Name, 1: Manager IDs, 2: Contact, 3: roleId, 4: Email, 5: CountryCode, 6: Location Name
-            # 7: TimeZone, 8: Language, 9: Currency, 10: AreaUnits, 11: Locale
+            # Excel Structure Logic (based on updated implementation plan)
+            company_id = get_value(row.iloc[0])
+            user_name = get_value(row.iloc[1])
+            manager_ids_str = get_value(row.iloc[2])
+            contact_number = get_value(row.iloc[3])
+            user_role_id = get_value(row.iloc[4])
+            email = get_value(row.iloc[5])
+            country_code = get_value(row.iloc[6])
+            country_iso_code = get_value(row.iloc[7])
+            location_name_raw = get_value(row.iloc[8])
             
-            user_name = get_value(row.iloc[0])
-            manager_ids_str = get_value(row.iloc[1])
-            managerIds = [mid.strip() for mid in manager_ids_str.split(",") if mid.strip()] if manager_ids_str else []
+            timezone = get_value(row.iloc[9])
+            language = get_value(row.iloc[10])
+            currency = get_value(row.iloc[11])
+            area_units = get_value(row.iloc[12])
+            locale = get_value(row.iloc[13])
             
-            contactNumber = get_value(row.iloc[2]) or ""
-            userRoleId = get_value(row.iloc[3])
-            email = get_value(row.iloc[4])
-            countryCode = get_value(row.iloc[5])
-            countryISOcode = get_value(row.iloc[6])
-            location_name = get_value(row.iloc[7])
-            
-            timeZone = get_value(row.iloc[8])
-            language = get_value(row.iloc[9])
-            currency = get_value(row.iloc[10])
-            areaUnits = get_value(row.iloc[11])
-            locale = get_value(row.iloc[12])
+            # Optional Preferences
+            plan_type_raw = get_value(row.iloc[14])
+            crop_pref_raw = get_value(row.iloc[15])
+            project_pref_raw = get_value(row.iloc[16])
+            forms_raw = get_value(row.iloc[17])
+            loc_pref_raw = get_value(row.iloc[18])
+            farmer_tags_raw = get_value(row.iloc[19])
+            asset_tags_raw = get_value(row.iloc[20])
+            plot_tags_raw = get_value(row.iloc[21])
+            precip_unit = get_value(row.iloc[22])
+            temp_unit = get_value(row.iloc[23])
+            weight_unit = get_value(row.iloc[24])
+            geo_id_raw = get_value(row.iloc[25])
 
             # Validation
-            if not user_name:
-                log(f"⚠️ Row {index + 1} skipped: Invalid user name.")
-                df.at[index, 'Status'] = "Skipped"
-                continue
-            
-            if not managerIds:
-                log(f"⚠️ Row {index + 1} skipped: Empty manager list.")
-                df.at[index, 'Status'] = "Skipped"
+            if not company_id or not user_name or not email or not contact_number:
+                log(f"⚠️ Row {index+2} skipped: Missing mandatory fields (Company ID, Name, Email, or Contact).")
+                df.at[index, 'Status'] = "Skipped: Missing Mandatory Data"
                 continue
 
-            # Check logic: user hardcoded companyId = 1251. 
-            # We should probably expose this or keep it hardcoded as per snippet.
-            companyId = 1251 
-
-            log(f"📍 Fetching location for: {location_name}")
-            location_details = get_location_details(location_name, google_api_key)
-            if not location_details:
-                log(f"❌ Location not found: {location_name}")
-                df.at[index, 'Status'] = "Location Failed"
+            # Fetch Primary Location
+            primary_location = get_location_details(location_name_raw, google_api_key)
+            if not primary_location:
+                log(f"❌ Primary Location failed for row {index+2}: {location_name_raw}")
+                df.at[index, 'Status'] = "Location Error"
                 continue
+
+            # Preference Lists
+            plan_type_prefs = [{"id": i} for i in parse_comma_separated_ints(plan_type_raw)]
+            crop_prefs = parse_comma_separated_ints(crop_pref_raw)
+            # Project logic
+            project_ids = parse_comma_separated_ints(project_pref_raw)
+            project_prefs = [{"id": i} for i in project_ids]
             
-            # Payload
+            form_ids = parse_comma_separated_ints(forms_raw)
+            farmer_tag_ids = parse_comma_separated_ints(farmer_tags_raw)
+            asset_tag_ids = parse_comma_separated_ints(asset_tags_raw)
+            plot_tag_ids = parse_comma_separated_ints(plot_tags_raw)
+            
+            # Secondary Locations for Preferences
+            loc_preferences = []
+            if loc_pref_raw:
+                # Use '|' as delimiter to allow commas inside location names/coordinates
+                loc_list = [l.strip() for l in str(loc_pref_raw).split("|")] 
+                for l_str in loc_list:
+                    l_det = get_location_details(l_str, google_api_key)
+                    if l_det:
+                        loc_preferences.append(l_det)
+
+            # Construct Payload
             user_payload = {
-                "companyId": companyId,
+                "companyId": int(float(company_id)),
                 "data": {
-                    "countryIsoCode": countryISOcode
-                    },
+                    "countryIsoCode": country_iso_code
+                },
                 "images": {},
-                "contactNumber": contactNumber,
+                "contactNumber": str(contact_number),
                 "name": user_name,
-                "userRoleId": userRoleId,
-                "countryCode": f"+{countryCode}", # now the value is like +91
                 "email": email,
-                "locations": location_details,
-                "managers": [managerIds[0]] if managerIds else [], # User snippet wrapped [managerIds], but managerIds is a list. Wait.
-                # User snippet: "managers": [managerIds]. If managerIds is a list of strings, this makes it a list of list of strings? 
-                # Or user meant managerIds is a single string?
-                # User snippet: managerIds = [mid.strip() for mid in managerIds.split(",")] 
-                # Payload: "managers": [managerIds] -> [[id1, id2]]. This seems potentially wrong for standard APIs which expect ["id1", "id2"].
-                # However, strictly following user snippet: "managers": [managerIds]
-                # If managerIds is ['123'], payload is [['123']]. 
-                # Wait, looking at user snippet: 
-                # extract manager ids logic produces a LIST. 
-                # Payload uses [managerIds]. 
-                # I will follow user snippet EXACTLY.
+                "locations": primary_location,
                 "assignedTo": None,
                 "preferences": {
-                    "data": {},
-                    "timeZone": timeZone,
-                    "language": language,
-                    "currency": currency,
-                    "areaUnits": areaUnits,
-                    "locale": locale
+                    "timeZone": timezone or "IST",
+                    "language": language or "en",
+                    "currency": currency or "INR",
+                    "areaUnits": area_units or "ACRE",
+                    "locale": locale or "en-IN"
                 }
             }
-            # Correction on managers: usually it's list of strings. But if user code works... 
-            # Let's check `managerIds` variable in user snippet. It's a list.
-            # `managers: [managerIds]` puts the list inside a list. 
-            # I will trust the user snippet logic even if looks odd, or maybe flattened?
-            # Actually, `managerIds` in user snippet is a LIST of strings. 
-            # putting it in `[]` creates `[['id']]`. 
-            # I'll stick to user logic.
+            
+            # Conditionally add optional fields
+            if user_role_id:
+                user_payload["userRoleId"] = int(float(user_role_id))
+            
+            if country_code:
+                user_payload["countryCode"] = f"+{country_code}" if not str(country_code).startswith("+") else country_code
+            
+            # Conditionally add optional managers
+            managers = parse_comma_separated_ints(manager_ids_str)
+            if managers:
+                user_payload["managers"] = managers
+
+            # Construct preferences.data dynamically
+            pref_data = {}
+            if plan_type_prefs: pref_data["planTypePreferences"] = plan_type_prefs
+            if crop_prefs: pref_data["cropPreferences"] = crop_prefs
+            if project_prefs: pref_data["projectPreferences"] = project_prefs
+            if form_ids: pref_data["form"] = form_ids
+            if farmer_tag_ids: pref_data["farmerTag"] = farmer_tag_ids
+            if asset_tag_ids: pref_data["assetTag"] = asset_tag_ids
+            if plot_tag_ids: pref_data["caTag"] = plot_tag_ids
+            if geo_id_raw: pref_data["geoId"] = int(float(geo_id_raw))
+            if precip_unit: pref_data["precipitationUnit"] = precip_unit
+            if temp_unit: pref_data["tempratureUnit"] = temp_unit
+            if weight_unit: pref_data["cropUnit"] = weight_unit
+            
+            if pref_data:
+                user_payload["preferences"]["data"] = pref_data
+            else:
+                user_payload["preferences"]["data"] = {}
+
+            if loc_preferences:
+                user_payload["preferences"]["locations"] = loc_preferences
 
             headers = {'Authorization': f'Bearer {token}'}
             multipart_data = {"dto": (None, json.dumps(user_payload), "application/json")}
             
-            log(f"🚀 Creating User: {user_name}")
+            log(f"🚀 Creating User: {user_name} (Row {index+2})")
             resp = requests.post(user_api_url, headers=headers, files=multipart_data)
             
-            if resp.status_code == 201:
+            if resp.status_code in [200, 201]:
                 log(f"✅ Created: {user_name}")
                 df.at[index, 'Status'] = 'Success'
-                df.at[index, 'User_response'] = resp.text[:200]
+                df.at[index, 'Response'] = resp.text[:500]
             else:
-                log(f"⚠️ Failed: {resp.status_code} - {resp.text}")
+                log(f"⚠️ Failed row {index+2}: {resp.status_code} - {resp.text}")
                 df.at[index, 'Status'] = f"Failed: {resp.status_code}"
                 df.at[index, 'Response'] = resp.text
 
         except Exception as e:
-            log(f"❌ Error row {index}: {e}")
+            log(f"❌ Error row {index+2}: {e}")
             df.at[index, 'Status'] = "Error"
             df.at[index, 'Response'] = str(e)
             

@@ -31,9 +31,7 @@ def run(input_excel, output_excel, config, log_callback=None):
     def log(message):
         if log_callback:
             log_callback(message)
-        else:
-            print(message)
-
+        print(message)
     try:
         token = config.get("token")
         base_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/varieties")
