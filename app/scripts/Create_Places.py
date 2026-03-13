@@ -27,7 +27,8 @@ def get_address_data(session: requests.Session, lat: float, lng: float, google_a
     data = resp.json()
 
     if data.get("status") != "OK" or not data.get("results"):
-        raise RuntimeError(f"Google API returned {data.get('status')} - could not fetch address for {lat},{lng}")
+        error_msg = data.get("error_message", "No detailed error message provided by Google.")
+        raise RuntimeError(f"Google API returned {data.get('status')} - {error_msg}")
 
     result = data["results"][0]
     formatted_address = result.get("formatted_address", "")

@@ -48,7 +48,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             data = response.json()
 
             if data["status"] != "OK":
-                log(f"❌ Failed to get details for: {location_input} - {data.get('status')}")
+                error_msg = data.get("error_message", "No detailed error message provided by Google.")
+                log(f"❌ Failed to get details for: {location_input} - {data.get('status')}: {error_msg}")
                 return None
 
             result = data["results"][0]
