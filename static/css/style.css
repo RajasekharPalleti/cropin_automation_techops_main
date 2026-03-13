@@ -865,9 +865,11 @@ body {
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s;
-    margin-left: auto;
-    /* Push to right */
     white-space: nowrap;
+}
+
+#scheduled-list-btn {
+    margin-left: auto;
 }
 
 .backup-btn:hover {
