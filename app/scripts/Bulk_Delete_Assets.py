@@ -15,8 +15,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log_callback(msg)
         print(msg)
 
-    delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
-    BATCH_SIZE = int(config.get("batch_size", 100)) # configurable via UI
 
     # Configuration
     token = config.get("token")
@@ -30,7 +28,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
-    BATCH_SIZE = int(config.get("bulk_batch_size", 100))
+    BATCH_SIZE = int(config.get("bulk_batch_size", config.get("batch_size", 100)))
+    delay_time = float(config.get("delay_time", 2))
     
     log(f"📘 Loading Excel file: {input_excel_file}")
 
@@ -47,6 +46,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                  log("❌ Excel must contain 'asset_id' column")
                  return
 
+        # Ensure asset_id is string type immediately to avoid formatting errors
+        df["asset_id"] = df["asset_id"].astype(str).str.replace(r'\.0$', '', regex=True)
+
         # Ensure tracking columns
         for col in ["Status", "Processed_IDs", "API_Response"]:
             if col not in df.columns:
@@ -55,13 +57,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         # Clean IDs
         df_clean = df.dropna(subset=["asset_id"])
         
-        # Convert to int then str to remove decimals if any, then back to str
-        try:
-             # Handle cases where asset_id might be non-numeric
-            df.loc[df_clean.index, "asset_id"] = df.loc[df_clean.index, "asset_id"].astype(str).str.replace(r'\.0$', '', regex=True)
-        except Exception as e:
-            log(f"⚠️ Warning during ID formatting: {e}")
-
         # Identify rows that have asset_id
         valid_indices = df[df["asset_id"].notna() & (df["asset_id"].astype(str).str.strip() != "")].index.tolist()
         

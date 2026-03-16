@@ -15,8 +15,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log_callback(msg)
         print(msg)
 
-    delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
-    BATCH_SIZE = int(config.get("batch_size", 100)) # configurable via UI
 
     # Configuration
     token = config.get("token")
@@ -30,8 +28,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
-    BATCH_SIZE = int(config.get("bulk_batch_size", 100))
-    # Use output_excel_file from arguments
+    BATCH_SIZE = int(config.get("bulk_batch_size", config.get("batch_size", 100)))
+    delay_time = float(config.get("delay_time", 2))
     
     log(f"📘 Loading Excel file: {input_excel_file}")
 
@@ -48,6 +46,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                  log("❌ Excel must contain 'farmer_id' column")
                  return
 
+        # Ensure farmer_id is string type immediately to avoid formatting errors
+        df["farmer_id"] = df["farmer_id"].astype(str).str.replace(r'\.0$', '', regex=True)
+
         # Ensure tracking columns
         for col in ["Status", "Processed_IDs", "API_Response"]:
             if col not in df.columns:
@@ -55,16 +56,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
         # Clean IDs
         df_clean = df.dropna(subset=["farmer_id"])
-        
-        # Convert to int then str to remove decimals if any, then back to str
-        try:
-             # Handle cases where farmer_id might be non-numeric
-            df.loc[df_clean.index, "farmer_id"] = df.loc[df_clean.index, "farmer_id"].astype(str).str.replace(r'\.0$', '', regex=True)
-        except Exception as e:
-            log(f"⚠️ Warning during ID formatting: {e}")
-
-        # Re-fetch cleaned list for processing, but keep original index for updating
-        # We need to process based on index to update effectively
         
         # Identify rows that have farmer_id
         valid_indices = df[df["farmer_id"].notna() & (df["farmer_id"].astype(str).str.strip() != "")].index.tolist()
