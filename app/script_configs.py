@@ -275,8 +275,8 @@ SCRIPT_CONFIGS = {
         "show_google_api_config": True,
     },
     "Get_Lat_Long_AreaCount.py": {
-        "base_api_url": "",
-        "label": "Optional Config",
+        "base_api_url": "N/A",
+        "label": "N/A",
         "requires_input": True,
     },
 }

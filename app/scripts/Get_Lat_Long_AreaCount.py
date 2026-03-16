@@ -1,5 +1,6 @@
 """
 Script to calculate area (acres and hectares) and center point (lat, long) from coordinates.
+Delay time is not needed for this script.
 
 Inputs:
 Excel file with 'Coordinates' column containing JSON array of [long, lat] or raw lat/long combinations.
