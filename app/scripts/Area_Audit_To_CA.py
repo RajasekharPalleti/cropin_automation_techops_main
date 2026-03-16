@@ -1,14 +1,16 @@
 # Author: Rajasekhar Palleti
 # Purpose: Update Area Audit for Croppable Areas
 # Supports geoInfo in BOTH formats:
+
 """
 Audits area data and updates Croppable Areas (CA).
 
 Inputs:
 Excel file with CA_id, CA_Name, area_Audit_DTO, Latitude, Longitude, and audited_count.
+Supports geoInfo in BOTH formats:
+1) Full GeoJSON FeatureCollection as type = featureCollection
+2) Raw coordinates list [[lng, lat], ...]
 """
-# 1) Full GeoJSON FeatureCollection
-# 2) Raw coordinates list [[lng, lat], ...]
 
 import json
 import requests
@@ -98,10 +100,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    # Ensure output columns exist
+    # Ensure output columns exist and are of string type to avoid TypeError
     for col in ["Status", "CA_Response"]:
         if col not in df.columns:
             df[col] = ""
+        # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+        df[col] = df[col].fillna("").astype(str)
 
     # Replace NaNs with empty string for safety in text fields, but be careful with numbers
     # df = df.fillna("") # Optional, may mess up numeric checks if not careful, sticking to per-row checks
