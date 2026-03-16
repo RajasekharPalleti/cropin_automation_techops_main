@@ -187,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('variety-removal-config', selectedScript.show_variety_removal);
             toggle('threading-config', selectedScript.show_threading);
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
+            toggle('common-batch-config', selectedScript.show_batch_config);
             toggle('google-api-config', selectedScript.show_google_api_config);
             document.getElementById('time-delay-config').style.display = 'block';
 

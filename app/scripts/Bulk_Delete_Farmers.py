@@ -1,8 +1,9 @@
 """
-Bulk delete farmers using Excel input (100 IDs per batch).
+Bulk delete farmers using Excel input (Default 100 IDs per batch will execute).
 
 Inputs:
-Excel file with 'farmer_id' column.
+- Excel file with 'farmer_id' column.
+- One ID per row in the 'farmer_id' column.
 """
 import pandas as pd
 import requests
@@ -15,6 +16,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         print(msg)
 
     delay_time = float(config.get("delay_time", 2))  # seconds, configurable via UI
+    BATCH_SIZE = int(config.get("batch_size", 100)) # configurable via UI
 
     # Configuration
     token = config.get("token")
@@ -28,7 +30,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
-    BATCH_SIZE = 100
+    BATCH_SIZE = int(config.get("bulk_batch_size", 100))
     # Use output_excel_file from arguments
     
     log(f"📘 Loading Excel file: {input_excel_file}")

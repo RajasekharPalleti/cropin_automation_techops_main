@@ -332,16 +332,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const caControl = document.getElementById('ca-close-delete-config');
         if (caControl && caControl.style.display !== 'none') {
             config.ca_action = document.getElementById('ca-action-select')?.value || 'none';
-
-            let caBatchSizeRaw = parseInt(document.getElementById('ca-batch-size')?.value);
-            if (isNaN(caBatchSizeRaw) || caBatchSizeRaw < 1) caBatchSizeRaw = 50;
-            if (caBatchSizeRaw > 100) {
-                window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
-                document.getElementById('ca-batch-size').value = 100;
-                caBatchSizeRaw = 100;
-            }
-            config.ca_batch_size = caBatchSizeRaw;
             config.ca_x_api_key = document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS';
+        }
+
+        // 3.5 Common Batch Size Config
+        const commonBatchConfig = document.getElementById('common-batch-config');
+        if (commonBatchConfig && commonBatchConfig.style.display !== 'none') {
+            let batchSizeRaw = parseInt(document.getElementById('common-batch-size')?.value);
+            if (isNaN(batchSizeRaw) || batchSizeRaw < 1) batchSizeRaw = 100;
+            if (batchSizeRaw > 100) {
+                window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
+                document.getElementById('common-batch-size').value = 100;
+                batchSizeRaw = 100;
+            }
+            config.batch_size = batchSizeRaw;
         }
 
         // 4. Attribute Config (Generic Attributes)

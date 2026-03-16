@@ -255,6 +255,14 @@
                                 </select>
                             </div>
                         </div>
+                        <!-- Common Batch Size Config -->
+                        <div id="common-batch-config" style="display: none;">
+                            <div class="input-group">
+                                <label for="common-batch-size">Batch Size (Max 100)</label>
+                                <input type="number" id="common-batch-size" placeholder="Default 100" value="100" min="1"
+                                    max="100">
+                            </div>
+                        </div>
 
                         <!-- Specific Config for CA_Close_and_Delete -->
                         <div id="ca-close-delete-config" style="display: none;">
@@ -265,11 +273,6 @@
                                     <option value="only delete CA">Only Delete CA</option>
                                     <option value="close and delete CA" selected>Close and Delete CA</option>
                                 </select>
-                            </div>
-                            <div class="input-group">
-                                <label for="ca-batch-size">Batch Size (Max 100)</label>
-                                <input type="number" id="ca-batch-size" placeholder="Default 50" value="50" min="1"
-                                    max="100">
                             </div>
                             <div class="input-group">
                                 <label for="ca-x-api-key">X-API-Key</label>

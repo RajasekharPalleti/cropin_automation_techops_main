@@ -179,11 +179,13 @@ SCRIPT_CONFIGS = {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers/bulk",
         "label": "Base Api Url",
         "requires_input": True,
+        "show_batch_config": True,
     },
     "Bulk_Delete_Assets.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/assets/bulk",
         "label": "Base Api Url",
         "requires_input": True,
+        "show_batch_config": True,
     },
     "Update_DOS_Variety_to_CA.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
@@ -252,6 +254,7 @@ SCRIPT_CONFIGS = {
         "label": "Base Api Url",
         "requires_input": True,
         "show_ca_close_delete": True,
+        "show_batch_config": True,
     },
     "Check_and_Delete_Area_Audit_Outside_India.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
