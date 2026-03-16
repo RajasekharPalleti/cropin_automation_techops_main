@@ -126,7 +126,15 @@ async def sse_endpoint(client_id: str, request: Request):
     """Server-Sent Events stream — clients subscribe here to receive live logs."""
     last_event_id = request.headers.get("Last-Event-ID")
     await manager.connect(client_id, last_event_id)
-    return StreamingResponse(manager.stream_logs(client_id), media_type="text/event-stream")
+    return StreamingResponse(
+        manager.stream_logs(client_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @router.get("/api/status/{client_id}")
@@ -834,7 +842,15 @@ async def stream_server_logs(request: Request):
         finally:
             f.close()
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 
