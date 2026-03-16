@@ -445,6 +445,22 @@ async def get_backups(page_size: int = 100, page_token: str = None):
     return backup_manager.list_files(page_size=page_size, page_token=page_token)
 
 
+@router.delete("/api/backups")
+async def delete_all_backups():
+    """Delete all files in the backup folder."""
+    count = backup_manager.delete_all_files()
+    return {"status": "success", "deleted_count": count}
+
+
+@router.delete("/api/backups/{file_id}")
+async def delete_single_backup(file_id: str):
+    """Delete a specific file from the backup folder."""
+    success = backup_manager.delete_file(file_id)
+    if success:
+        return {"status": "success"}
+    raise HTTPException(status_code=500, detail="Failed to delete file from Google Drive")
+
+
 # ---------------------------------------------------------------------------
 # Script execution
 # ---------------------------------------------------------------------------

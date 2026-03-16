@@ -1054,6 +1054,51 @@ body {
     font-style: italic;
 }
 
+/* Admin Delete Mode Styles */
+#delete-all-backups-btn {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#delete-all-backups-btn:hover {
+    background-color: #bb2d3b;
+}
+
+.delete-record-btn {
+    background-color: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.delete-record-btn:hover {
+    background-color: #fecaca;
+    border-color: #fca5a5;
+}
+
+.delete-record-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
 /* --- TOAST NOTIFICATIONS --- */
 .toast-container {
     position: fixed;

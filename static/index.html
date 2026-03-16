@@ -400,8 +400,13 @@
     <div id="backup-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Google Drive Backups</h2>
-                <span class="close" id="close-modal">&times;</span>
+                <h2 id="backup-header" style="cursor: pointer; user-select: none;">Google Drive Backups</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button id="delete-all-backups-btn" style="display: none;">
+                        <span class="material-icons" style="font-size: 14px; vertical-align: middle;">delete_forever</span> Delete All Records
+                    </button>
+                    <span class="close" id="close-modal">&times;</span>
+                </div>
             </div>
 
             <div class="tabs">

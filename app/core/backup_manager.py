@@ -255,3 +255,58 @@ class BackupManager:
             
         except Exception as e:
             print(f"BackupManager: Cleanup failed: {e}")
+
+    def delete_file(self, file_id):
+        """Deletes a specific file from Google Drive."""
+        if not self.service:
+            print("BackupManager: Service not initialized. Skipping delete.")
+            return False
+        try:
+            print(f"BackupManager: Deleting file ID: {file_id}...")
+            self.service.files().delete(fileId=file_id).execute()
+            return True
+        except Exception as e:
+            print(f"BackupManager: Delete file failed: {e}")
+            return False
+
+    def delete_all_files(self):
+        """Lists and deletes all files in the backup folder using pagination."""
+        if not self.service:
+            print("BackupManager: Service not initialized. Skipping bulk delete.")
+            return 0
+        
+        try:
+            print("BackupManager: Starting bulk delete of all backup files...")
+            deleted_count = 0
+            page_token = None
+            
+            while True:
+                results = self.service.files().list(
+                    q=f"'{self.BACKUP_FOLDER_ID}' in parents and trashed=false",
+                    pageSize=1000,
+                    pageToken=page_token,
+                    fields="nextPageToken, files(id, name)"
+                ).execute()
+                
+                files = results.get('files', [])
+                if not files:
+                    break
+                
+                for file in files:
+                    file_id = file.get('id')
+                    try:
+                        self.service.files().delete(fileId=file_id).execute()
+                        deleted_count += 1
+                    except Exception as e:
+                        print(f"BackupManager: Failed to delete file {file.get('name')} ({file_id}): {e}")
+                
+                page_token = results.get('nextPageToken')
+                if not page_token:
+                    break
+            
+            print(f"BackupManager: Bulk delete complete. {deleted_count} files deleted.")
+            return deleted_count
+            
+        except Exception as e:
+            print(f"BackupManager: Bulk delete failed: {e}")
+            return 0

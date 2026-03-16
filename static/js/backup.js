@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let nextPageToken = null;
     let isLoadingBackups = false;
 
+    // --- Hidden mode for admin deleting records ---
+    let headerClickCount = 0;
+    let isDeleteModeReveal = false;
+
     // ----------------------------------------------------------------
     // Tab switcher (called via onclick in HTML)
     // ----------------------------------------------------------------
@@ -59,6 +63,62 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeModal) {
         closeModal.addEventListener('click', () => {
             if (backupModal) backupModal.style.display = 'none';
+            // Reset delete mode when closing if desired, or keep it. Let's reset for security.
+            resetDeleteMode();
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // Hidden mode reveal (10 clicks on header)
+    // ----------------------------------------------------------------
+    const backupHeader = document.getElementById('backup-header');
+    const deleteAllBtn = document.getElementById('delete-all-backups-btn');
+
+    if (backupHeader) {
+        backupHeader.addEventListener('click', () => {
+            headerClickCount++;
+            if (headerClickCount >= 10 && !isDeleteModeReveal) {
+                isDeleteModeReveal = true;
+                if (deleteAllBtn) deleteAllBtn.style.display = 'block';
+                // Reveal individual delete buttons
+                document.querySelectorAll('.delete-record-btn').forEach(btn => btn.style.display = 'inline-flex');
+                window.showToast('Admin Delete Mode Activated.', 'info');
+            }
+        });
+    }
+
+    function resetDeleteMode() {
+        headerClickCount = 0;
+        isDeleteModeReveal = false;
+        if (deleteAllBtn) deleteAllBtn.style.display = 'none';
+        document.querySelectorAll('.delete-record-btn').forEach(btn => btn.style.display = 'none');
+    }
+
+    // ----------------------------------------------------------------
+    // Bulk Delete Action
+    // ----------------------------------------------------------------
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', () => {
+            if (confirm("Are you sure you want to delete ALL backup records from Google Drive? This action cannot be undone.")) {
+                deleteAllBtn.disabled = true;
+                deleteAllBtn.textContent = 'Deleting...';
+
+                fetch('/api/backups', { method: 'DELETE' })
+                    .then(r => r.json())
+                    .then(data => {
+                        window.showToast(`Deleted ${data.deleted_count} record(s).`, 'success');
+                        fetchBackups(true); // Refresh list
+                        resetDeleteMode();
+                    })
+                    .catch(err => {
+                        console.error('Bulk delete failed:', err);
+                        window.showToast('Failed to delete all backups.', 'error');
+                    })
+                    .finally(() => {
+                        deleteAllBtn.disabled = false;
+                        deleteAllBtn.innerHTML = '<span class="material-icons" style="font-size: 14px; vertical-align: middle;">delete_forever</span> Delete All Records';
+                    });
+            }
         });
     }
 
@@ -132,19 +192,54 @@ document.addEventListener('DOMContentLoaded', () => {
         files.forEach(file => {
             const li = document.createElement('li');
             li.className = 'file-item';
+            li.setAttribute('data-id', file.id);
 
             const date = new Date(file.createdTime).toLocaleString();
             const link = file.webContentLink || file.webViewLink || '#';
+
+            const displayDelete = isDeleteModeReveal ? 'inline-flex' : 'none';
 
             li.innerHTML = `
                 <div class="file-info">
                     <span class="file-name">${file.name}</span>
                     <span class="file-meta">${date} • ${(file.size / 1024).toFixed(1)} KB</span>
                 </div>
-                <a href="${link}" target="_blank" class="download-btn">
-                    <span class="material-icons" style="font-size: 16px;">download</span> Download
-                </a>
+                <div class="file-actions">
+                    <button class="delete-record-btn" style="display: ${displayDelete};">
+                        <span class="material-icons" style="font-size: 16px;">delete</span> Delete
+                    </button>
+                    <a href="${link}" target="_blank" class="download-btn">
+                        <span class="material-icons" style="font-size: 16px;">download</span> Download
+                    </a>
+                </div>
             `;
+
+            // Single Delete Event
+            const deleteBtn = li.querySelector('.delete-record-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
+                        deleteBtn.disabled = true;
+                        
+                        fetch(`/api/backups/${file.id}`, { method: 'DELETE' })
+                            .then(r => {
+                                if (!r.ok) throw new Error('Delete failed');
+                                return r.json();
+                            })
+                            .then(() => {
+                                window.showToast('Record deleted.', 'success');
+                                li.remove(); // Remove from UI directly
+                            })
+                            .catch(err => {
+                                console.error('Delete failed:', err);
+                                window.showToast('Failed to delete record.', 'error');
+                                deleteBtn.disabled = false;
+                            });
+                    }
+                });
+            }
+
             listElement.appendChild(li);
         });
     }
