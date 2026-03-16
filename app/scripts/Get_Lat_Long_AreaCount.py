@@ -84,7 +84,10 @@ def run(input_excel, output_excel, config, log_callback=None):
     # Add required columns if not present
     for col in ['area in acres', 'area in hectares', 'latitude', 'longitude', 'Status', 'Response']:
         if col not in df.columns:
-            df[col] = ''
+            df[col] = None
+        else:
+            # If they exist, ensure they can accept floats/strings
+            df[col] = df[col].astype(object)
             
     log("⏳ Starting coordinate area calculations...")
 

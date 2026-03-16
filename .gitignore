@@ -12,3 +12,4 @@ outputs/
 # Scheduled Tasks Persistence
 scheduled_jobs.json
 scheduled_uploads/
+tests/
