@@ -57,11 +57,14 @@ def run(input_excel_path, output_excel_path, config, log_callback=None):
         log(f"❌ Error reading input file: {e}")
         return
 
-    # Ensure status columns exist
+    # Ensure status columns exist and are explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
+    
     if "Response" not in df.columns:
         df["Response"] = ""
+    df["Response"] = df["Response"].fillna("").astype(str)
 
     total_rows = len(df)
     log(f"Processing {total_rows} rows...")

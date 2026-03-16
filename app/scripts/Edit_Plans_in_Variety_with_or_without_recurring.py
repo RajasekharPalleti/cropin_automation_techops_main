@@ -61,9 +61,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     log("[INFO] Cleaning data: Replacing NaN values with empty strings")
     exdata = exdata.fillna("")
 
-    log("[INFO] Adding status tracking columns")
-    exdata['status'] = ""
-    exdata['Response'] = ''
+    log("[INFO] Adding status tracking columns and enforcing string type")
+    if 'status' not in exdata.columns:
+        exdata['status'] = ""
+    exdata['status'] = exdata['status'].fillna("").astype(str)
+    
+    if 'Response' not in exdata.columns:
+        exdata['Response'] = ""
+    exdata['Response'] = exdata['Response'].fillna("").astype(str)
 
     log(f"\n[INFO] Starting to process {len(exdata)} rows from the Excel file")
 

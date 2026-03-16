@@ -64,11 +64,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
              id_col = df.columns[0]
              log(f"⚠️ 'farmer_id' column not found. Using first column: {id_col}")
 
-    # Ensure Status columns exist
+    # Ensure Status columns exist and are explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
+    
     if "Response" not in df.columns:
         df["Response"] = ""
+    df["Response"] = df["Response"].fillna("").astype(str)
 
     # Split for threading
     mid_index = len(df) // 2

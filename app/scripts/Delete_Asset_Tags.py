@@ -7,7 +7,7 @@ Excel file with 'Asset ID' and 'Tags' (comma-separated IDs or Names).
 
 import json
 import requests
-import openpyxl
+import pandas as pd
 import time
 import re
 import os
@@ -19,8 +19,7 @@ def normalize_tag_name(name: str) -> str:
     """
     Normalize tag names for consistent comparison.
     """
-    return re.sub(r"\s+", " ", name.strip().lower())
-
+    return re.sub(r"\s+", " ", str(name).strip().lower())
 
 # ------------------------------------------------------------
 # Fetch ASSET tags (Name → ID mapping)
@@ -46,7 +45,6 @@ def fetch_asset_tag_map(token, url):
     print(f"✅ Loaded {len(tag_map)} ASSET tags")
     return tag_map
 
-
 # ------------------------------------------------------------
 # Resolve Excel input → Tag IDs
 # ------------------------------------------------------------
@@ -71,7 +69,6 @@ def resolve_tag_ids(raw_tokens, tag_name_map):
 
     return resolved_ids, unresolved
 
-
 # ------------------------------------------------------------
 # Remove tag IDs from asset response
 # ------------------------------------------------------------
@@ -92,7 +89,6 @@ def remove_tag_ids(asset_data, tag_ids_to_remove):
 
     asset_data["data"]["tags"] = updated_tags
     return asset_data, removed
-
 
 # ------------------------------------------------------------
 # Main Run Function
@@ -127,55 +123,46 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     log(f"Reading input file: {input_excel_file}")
     try:
-        wb = openpyxl.load_workbook(input_excel_file)
-        sheet = wb.active # Use active sheet
+        df = pd.read_excel(input_excel_file)
     except Exception as e:
         log(f"Failed to read Excel: {e}")
         return
 
-    # 3. Headers
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    next_col = sheet.max_column + 1
-
-    if "Status" not in headers_row:
-        sheet.cell(1, next_col, "Status")
-        next_col += 1
-
-    if "Failure Reason" not in headers_row:
-        sheet.cell(1, next_col, "Failure Reason")
-    
-    # Recalculate column indices
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    try:
-        status_col = headers_row.index("Status") + 1
-        reason_col = headers_row.index("Failure Reason") + 1
-    except ValueError:
-         status_col = sheet.max_column + 1
-         reason_col = sheet.max_column + 2
+    # 3. Add columns for output and ensure string type for safety
+    for col in ["Status", "Failure Reason"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
 
     req_headers = {"Authorization": f"Bearer {token}"}
 
     # 4. Process Rows
-    max_row = sheet.max_row
-    log(f"Processing {max_row - 1} rows...")
+    total_rows = len(df)
+    log(f"Processing {total_rows} rows...")
 
-    for row in range(2, max_row + 1):
-        asset_id = sheet.cell(row, 1).value
-        # Asset Name is column 2
-        raw_tags = sheet.cell(row, 3).value
+    for index, row in df.iterrows():
+        # Using iloc to match original script's column assumption: index 0 (Asset ID), index 2 (Tags)
+        # Column 2 is Asset Name based on original script comments, but tags are fetched from column 3 (index 2)
+        # Wait, let me check the original script's row mapping again.
+        # original line 163: asset_id = sheet.cell(row, 1).value
+        # original line 165: raw_tags = sheet.cell(row, 3).value
+        
+        asset_id = row.iloc[0] if len(row) > 0 else None
+        raw_tags = row.iloc[2] if len(row) > 2 else None
 
-        if not asset_id or not raw_tags:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing Asset ID or Tags")
+        if pd.isna(asset_id) or pd.isna(raw_tags):
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "Missing Asset ID or Tags"
             continue
 
+        asset_id = str(asset_id).strip()
         cleaned_tags = re.sub(r'[\[\]\'\"]', '', str(raw_tags))
         raw_tokens = [t.strip() for t in cleaned_tags.split(",") if t.strip()]
         tag_ids, _ = resolve_tag_ids(raw_tokens, tag_name_map)
 
         if not tag_ids:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "No valid tags found")
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "No valid tags found"
             continue
 
         try:
@@ -197,8 +184,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             common_tags = existing_tags_set.intersection(set(tag_ids))
 
             if not common_tags:
-                sheet.cell(row, status_col, "Skipped")
-                sheet.cell(row, reason_col, "No tags found to remove")
+                df.at[index, "Status"] = "Skipped"
+                df.at[index, "Failure Reason"] = "No tags found to remove"
                 continue
 
             updated_asset, removed_ids = remove_tag_ids(asset_data, tag_ids)
@@ -213,24 +200,23 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             put_resp = requests.put(api_url, headers=req_headers, files=multipart_data)
             put_resp.raise_for_status()
 
-            sheet.cell(row, status_col, "Success")
-            sheet.cell(
-                row,
-                reason_col,
-                f"Removed Tag IDs: {', '.join(map(str, removed_ids))}"
-            )
-            log(f"Row {row}: Asset {asset_id} updated. Removed: {removed_ids}")
+            df.at[index, "Status"] = "Success"
+            df.at[index, "Failure Reason"] = f"Removed Tag IDs: {', '.join(map(str, removed_ids))}"
+            log(f"Row {index + 2}: Asset {asset_id} updated. Removed: {removed_ids}")
 
         except requests.exceptions.RequestException as e:
             err_msg = str(e)
             if e.response is not None:
                 err_msg += f" - {e.response.text}"
-            sheet.cell(row, status_col, "Failed")
-            sheet.cell(row, reason_col, err_msg)
-            log(f"Row {row}: Failed - {err_msg[:100]}")
+            df.at[index, "Status"] = "Failed"
+            df.at[index, "Failure Reason"] = err_msg
+            log(f"Row {index + 2}: Failed - {err_msg[:100]}")
 
         time.sleep(delay_time)
 
     # Save to OUTPUT file
-    wb.save(output_excel_file)
-    log(f"📁 Output saved to: {output_excel_file}")
+    try:
+        df.to_excel(output_excel_file, index=False)
+        log(f"📁 Output saved to: {output_excel_file}")
+    except Exception as e:
+        log(f"❌ Error saving output: {e}")

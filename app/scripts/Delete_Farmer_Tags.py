@@ -7,7 +7,7 @@ Excel file with 'Farmer ID' and 'Tags' (comma-separated IDs or Names).
 
 import json
 import requests
-import openpyxl
+import pandas as pd
 import time
 import re
 import os
@@ -16,7 +16,7 @@ import os
 # Normalize tag names (handles spaces & case)
 # ------------------------------------------------------------
 def normalize_tag_name(name: str) -> str:
-    return re.sub(r"\s+", " ", name.strip().lower())
+    return re.sub(r"\s+", " ", str(name).strip().lower())
 
 # ------------------------------------------------------------
 # Fetch FARMER tags (Name → ID mapping)
@@ -46,10 +46,10 @@ def resolve_tag_ids(raw_tokens, tag_name_map):
     unresolved = []
 
     for token in raw_tokens:
-        token = str(token).strip() # Ensure string
+        token = str(token).strip()
 
         if token.isdigit():
-            resolved_ids.append(int(token))
+            resolved_ids.append(int(float(token)))
         else:
             normalized = normalize_tag_name(token)
             if normalized in tag_name_map:
@@ -88,33 +88,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         print(msg)
 
     # 1. Parse Config
-    api_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/farmers") # In main.py, we register it as 'base_api_url'
-    # Actually, in main.py logic for other scripts:
-    # api_url = config.get("base_api_url") is common but relies on UI sending it.
-    # checking main.py again...
-    # `default_configs` uses "url". 
-    # BUT `Update_Farmer_Tags.py` uses `config.get("base_api_url")`.
-    # `main.py` seems to NOT rename keys, just passes `config_dict`.
-    # Wait, `main.py`: `config_dict = json.loads(config)`...
-    # The UI `app.js` likely sends the configured URL as `base_api_url` or similar?
-    # Let's double check `Update_Farmer_Tags.py` again. It uses `config.get("base_api_url")`.
-    # Let's check `main.py` again to see what key it uses for the URL.
-    # `scripts.append({ "name": filename, "url": config["url"], ... })`
-    # The frontend likely sends back the edited URL key.
-    # The UI `app.js` likely sends the configured URL as `base_api_url` or similar?
-    
-    # Let's confirm how the API calls are made:
-    # `base_api_url/farmers/{farmer_id}`  (GET, DELETE etc)
-    # So `api_url` needs to be the base.
-    
-    # If the user's `Update_Farmer_Tags.py` works, it implies the key is `base_api_url`.
-    # Let's look at `Update_Farmer_Tags.py` again. Line 150: `api_url = config.get("base_api_url")`.
-    # Then line 118: `requests.put(f"{api_url}", ...)` ? Hmm wait, if `api_url` is ".../farmers", PUT to ".../farmers" is bulk? 
-    # Yes, Cropin bulk update is PUT to `/farmers`.
-    
-    # Ideally I should verify this, but "base_api_url" seems common for "Post Api Url" label.
-    # The label for `Update_Farmer_Tags.py` was "Base Api Url".
-    
+    api_url = config.get("base_api_url", "https://cloud.cropin.in/services/farm/api/farmers")
     second_base_api_url = config.get("second_base_api_url", "https://cloud.cropin.in/services/master/api/filter?type=FARMER&size=10000")
     token = config.get("token")
 
@@ -127,7 +101,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     delay_time = float(config.get("delay_time", 0.5))  # seconds, configurable via UI
 
-
     # 3. Fetch Tag Mapping (Name -> ID)
     log("🔄 Fetching tag mapping from master API...")
     try:
@@ -139,68 +112,51 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     log(f"Reading input file: {input_excel_file}")
     try:
-        wb = openpyxl.load_workbook(input_excel_file)
-        sheet = wb.active # Use active sheet
+        df = pd.read_excel(input_excel_file)
     except Exception as e:
         log(f"Failed to read Excel: {e}")
         return
 
-    # 3. Headers
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    next_col = sheet.max_column + 1
-
-    if "Status" not in headers_row:
-        sheet.cell(1, next_col, "Status")
-        next_col += 1
-    if "Failure Reason" not in headers_row:
-        sheet.cell(1, next_col, "Failure Reason")
-    
-    # Recalculate column indices
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    try:
-        status_col = headers_row.index("Status") + 1
-        reason_col = headers_row.index("Failure Reason") + 1
-    except ValueError:
-         # Fallback if something weird happens
-         status_col = sheet.max_column + 1
-         reason_col = sheet.max_column + 2
+    # 3. Add columns for output and ensure string type for safety
+    for col in ["Status", "Failure Reason"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
 
     req_headers = {"Authorization": f"Bearer {token}"}
 
     # 4. Process Rows
-    max_row = sheet.max_row
-    log(f"Processing {max_row - 1} rows...")
+    total_rows = len(df)
+    log(f"Processing {total_rows} rows...")
 
-    for row in range(2, max_row + 1):
-        farmer_id = sheet.cell(row, 1).value
-        # Farmer Name is column 2
-        raw_tags = sheet.cell(row, 3).value
+    for index, row in df.iterrows():
+        # Using iloc to match original script's column assumption: index 0 (Farmer ID), index 2 (Tags)
+        farmer_id = row.iloc[0] if len(row) > 0 else None
+        raw_tags = row.iloc[2] if len(row) > 2 else None
 
-        if not farmer_id or not raw_tags:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing Farmer ID or Tags")
+        if pd.isna(farmer_id) or pd.isna(raw_tags):
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "Missing Farmer ID or Tags"
             continue
 
+        farmer_id = str(farmer_id).strip()
         cleaned_tags = re.sub(r'[\[\]\'\"]', '', str(raw_tags))
         raw_tokens = [t.strip() for t in cleaned_tags.split(",") if t.strip()]
         tag_ids, _ = resolve_tag_ids(raw_tokens, tag_name_map)
 
         if not tag_ids:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "No valid tags found")
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "No valid tags found"
             continue
 
         try:
-            # Check if farmer actually has these tags first?
-            # User script: GET /farmers/{id}
+            # GET /farmers/{id}
             get_resp = requests.get(f"{api_url}/{farmer_id}", headers=req_headers)
             get_resp.raise_for_status()
             farmer_data = get_resp.json()
 
             existing_tags = farmer_data.get("data", {}).get("tags", [])
             
-            # Convert existing tags to strings/ints depending on API, usually they are ints in ID list
-            # safely convert to set of ints for comparison
             existing_tags_set = set()
             for t in existing_tags:
                 try:
@@ -211,8 +167,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             common_tags = existing_tags_set.intersection(set(tag_ids))
 
             if not common_tags:
-                sheet.cell(row, status_col, "Skipped")
-                sheet.cell(row, reason_col, "No tags found to remove")
+                df.at[index, "Status"] = "Skipped"
+                df.at[index, "Failure Reason"] = "No tags found to remove"
                 continue
 
             updated_farmer, removed_ids = remove_tag_ids(farmer_data, tag_ids)
@@ -225,21 +181,24 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             put_resp = requests.put(api_url, headers=req_headers, files=multipart_data)
             put_resp.raise_for_status()
 
-            sheet.cell(row, status_col, "Success")
-            sheet.cell(row, reason_col, f"Removed Tag IDs: {', '.join(map(str, removed_ids))}")
-            log(f"Row {row}: Farmer {farmer_id} updated. Removed: {removed_ids}")
+            df.at[index, "Status"] = "Success"
+            df.at[index, "Failure Reason"] = f"Removed Tag IDs: {', '.join(map(str, removed_ids))}"
+            log(f"Row {index + 2}: Farmer {farmer_id} updated. Removed: {removed_ids}")
 
         except requests.exceptions.RequestException as e:
             err_msg = str(e)
             if e.response is not None:
                 err_msg += f" - {e.response.text}"
-            sheet.cell(row, status_col, "Failed")
-            sheet.cell(row, reason_col, err_msg)
-            log(f"Row {row}: Failed - {err_msg[:100]}")
+            df.at[index, "Status"] = "Failed"
+            df.at[index, "Failure Reason"] = err_msg
+            log(f"Row {index + 2}: Failed - {err_msg[:100]}")
 
         # Basic rate limiting
         time.sleep(delay_time)
 
     # 5. Save Output
-    wb.save(output_excel_file)
-    log(f"✅ Output saved to: {output_excel_file}")
+    try:
+        df.to_excel(output_excel_file, index=False)
+        log(f"✅ Output saved to: {output_excel_file}")
+    except Exception as e:
+        log(f"❌ Error saving output: {e}")

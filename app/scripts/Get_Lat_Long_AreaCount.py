@@ -82,13 +82,17 @@ def run(input_excel, output_excel, config, log_callback=None):
         log(f"❌ Failed to read input file: {e}")
         return
 
-    # Add required columns if not present
-    for col in ['area in acres', 'area in hectares', 'latitude', 'longitude', 'Status', 'Response']:
+    # Add required columns if not present and ensure string types for status
+    for col in ['area in acres', 'area in hectares', 'latitude', 'longitude']:
         if col not in df.columns:
             df[col] = None
         else:
-            # If they exist, ensure they can accept floats/strings
             df[col] = df[col].astype(object)
+            
+    for col in ['Status', 'Response']:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
             
     log("⏳ Starting coordinate area calculations...")
 

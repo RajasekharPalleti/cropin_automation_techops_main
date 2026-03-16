@@ -134,10 +134,13 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     df[latitude_column] = pd.to_numeric(df[latitude_column], errors="coerce")
     df[longitude_column] = pd.to_numeric(df[longitude_column], errors="coerce")
 
-    # Add result columns
+    # Add result columns and ensure string type to avoid TypeError
     df["is_outside_india"] = "INVALID"
     df["area_audit_status"] = ""
+    df["area_audit_status"] = df["area_audit_status"].fillna("").astype(str)
+    
     df["area_audit_api_response"] = ""
+    df["area_audit_api_response"] = df["area_audit_api_response"].fillna("").astype(str)
     
     log("Loading India Polygon Geometry...")
     try:

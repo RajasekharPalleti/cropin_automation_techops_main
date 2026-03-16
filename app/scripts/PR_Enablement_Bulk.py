@@ -70,7 +70,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     for col in required_columns:
         if col not in df.columns:
             df[col] = ""
-        df[col] = df[col].astype(str)
+        df[col] = df[col].fillna("").astype(str)
 
     BATCH_SIZE = 25
 

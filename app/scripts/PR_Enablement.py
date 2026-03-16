@@ -51,12 +51,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Error reading Excel file: {e}")
         return
 
-    # Ensure necessary columns exist
+    # Ensure necessary columns exist and are explicitly cast to string to avoid TypeError
     columns_to_check = ["status", "Failed in Response", "srPlotid", "Plot_risk_response", "Weather_response"]
     for col in columns_to_check:
         if col not in df.columns:
             df[col] = ""
-        df[col] = df[col].astype(str)
+        df[col] = df[col].fillna("").astype(str)
 
     # Function to extract srPlotId
     def extract_sr_plot_id(response_json):

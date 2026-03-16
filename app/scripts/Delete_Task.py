@@ -12,7 +12,7 @@ Excel file with 'Task_Id' (a single task ID) and 'CA_Id' (the related Croppable 
 """
 
 import requests
-import openpyxl
+import pandas as pd
 import time
 
 def run(input_excel_file, output_excel_file, config, log_callback=None):
@@ -34,79 +34,60 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     log(f"Reading input file: {input_excel_file}")
     try:
-        wb = openpyxl.load_workbook(input_excel_file)
-        sheet = wb.active
+        df = pd.read_excel(input_excel_file)
     except Exception as e:
         log(f"Failed to read Excel: {e}")
         return
 
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    next_col = sheet.max_column + 1
-    
-    if "Status" not in headers_row:
-        sheet.cell(1, next_col, "Status")
-        next_col += 1
-    if "Remarks" not in headers_row:
-        sheet.cell(1, next_col, "Remarks")
-        
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    try:
-        status_col = headers_row.index("Status") + 1
-        reason_col = headers_row.index("Remarks") + 1
-    except ValueError:
-        status_col = sheet.max_column + 1
-        reason_col = sheet.max_column + 2
+    # Ensure tracking columns
+    for col in ["Status", "Remarks"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
 
     # Identify Task_Id and CA_Id columns
-    try:
-        task_id_col = headers_row.index("Task_Id") + 1
-    except ValueError:
-        try:
-            task_id_col = headers_row.index("Task_Ids") + 1
-        except ValueError:
-            task_id_col = 1
-            log("Warning: Could not find 'Task_Id' header. Falling back to Column 1.")
-            
-    try:
-        ca_id_col = headers_row.index("CA_Id") + 1
-    except ValueError:
-        ca_id_col = 2
-        log("Warning: Could not find 'CA_Id' header. Falling back to Column 2.")
+    task_id_col = None
+    for possible in ["Task_Id", "Task_Ids", "task_id"]:
+        if possible in df.columns:
+            task_id_col = possible
+            break
+    if not task_id_col:
+        task_id_col = df.columns[0]
+        log(f"Warning: Could not find 'Task_Id' header. Falling back to Column: {task_id_col}")
 
-    max_row = sheet.max_row
-    log(f"Scanning {max_row - 1} rows to group by CA_Id...")
+    ca_id_col = None
+    for possible in ["CA_Id", "ca_id", "CA_ID"]:
+        if possible in df.columns:
+            ca_id_col = possible
+            break
+    if not ca_id_col:
+        ca_id_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+        log(f"Warning: Could not find 'CA_Id' header. Falling back to Column: {ca_id_col}")
 
+    total_rows = len(df)
+    log(f"Scanning {total_rows} rows to group by CA_Id...")
+
+    # Group by CA_Id using pandas
     ca_groups = {}
     skipped_count = 0
 
-    for row in range(2, max_row + 1):
-        task_id_raw = sheet.cell(row, task_id_col).value
-        ca_id_raw = sheet.cell(row, ca_id_col).value
+    for index, row in df.iterrows():
+        task_id_raw = row[task_id_col]
+        ca_id_raw = row[ca_id_col]
 
-        # End of data check
-        if task_id_raw is None and ca_id_raw is None:
-            break
-
-        if not task_id_raw or not ca_id_raw:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing Task_Id or CA_Id")
+        if pd.isna(task_id_raw) or pd.isna(ca_id_raw):
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Remarks"] = "Missing Task_Id or CA_Id"
             skipped_count += 1
             continue
 
         # Handle numeric values and convert to string properly
-        if isinstance(task_id_raw, float):
-            task_id_str = str(int(task_id_raw)).strip()
-        else:
-            task_id_str = str(task_id_raw).strip()
-            
-        if isinstance(ca_id_raw, float):
-            ca_id_str = str(int(ca_id_raw)).strip()
-        else:
-            ca_id_str = str(ca_id_raw).strip()
+        task_id_str = str(int(float(task_id_raw))).strip()
+        ca_id_str = str(int(float(ca_id_raw))).strip()
             
         if ca_id_str not in ca_groups:
             ca_groups[ca_id_str] = []
-        ca_groups[ca_id_str].append((row, task_id_str))
+        ca_groups[ca_id_str].append((index, task_id_str))
 
     log(f"Found {len(ca_groups)} unique CA IDs. (Skipped {skipped_count} invalid rows)")
 
@@ -118,6 +99,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
         for i in range(0, total_tasks, batch_size):
             batch = items[i:i + batch_size]
+            batch_indices = [item[0] for item in batch]
             batch_task_ids = [item[1] for item in batch]
             clean_task_ids_str = ",".join(batch_task_ids)
             batch_num = (i // batch_size) + 1
@@ -154,21 +136,19 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 if isinstance(task_dtos, list):
                     tasks_list = task_dtos
                 else:
-                    # Fallback just in case the API changes its response format slightly 
-                    # without breaking the script completely.
-                    tasks_list = [task_dtos] if not isinstance(task_dtos, dict) else task_dtos.get("content", task_dtos.get("data", task_dtos.get("taskDTOList", [task_dtos])))
+                    tasks_list = task_dtos.get("content", task_dtos.get("data", task_dtos.get("taskDTOList", [task_dtos])))
                     
                 active_task_ids_in_ca = set(str(t.get("id", "")) for t in tasks_list if isinstance(t, dict) and "id" in t)
                 
                 not_deleted_count = 0
-                for row_num, tid in batch:
+                for idx, tid in batch:
                     if tid in active_task_ids_in_ca:
-                        sheet.cell(row_num, status_col, "Not Deleted")
-                        sheet.cell(row_num, reason_col, f"Task ID {tid} was not deleted from CA {ca_id_str}")
+                        df.at[idx, "Status"] = "Not Deleted"
+                        df.at[idx, "Remarks"] = f"Task ID {tid} was not deleted from CA {ca_id_str}"
                         not_deleted_count += 1
                     else:
-                        sheet.cell(row_num, status_col, "Deleted")
-                        sheet.cell(row_num, reason_col, "Task successfully deleted")
+                        df.at[idx, "Status"] = "Deleted"
+                        df.at[idx, "Remarks"] = "Task successfully deleted"
                 
                 if not_deleted_count > 0:
                     log(f"[CA: {ca_id_str}] Batch {batch_num}: Complete. {not_deleted_count} tasks were not deleted.")
@@ -182,14 +162,17 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         err_msg += f" - {e.response.text}"
                     except:
                         pass
-                for row_num, tid in batch:
-                    sheet.cell(row_num, status_col, "Failed")
-                    sheet.cell(row_num, reason_col, err_msg)
+                for idx, tid in batch:
+                    df.at[idx, "Status"] = "Failed"
+                    df.at[idx, "Remarks"] = err_msg
                 log(f"[CA: {ca_id_str}] Batch {batch_num}: Failed - {err_msg[:100]}")
 
             # Throttle delay
             time.sleep(delay_time)
 
     # Save Output
-    wb.save(output_excel_file)
-    log(f"✅ Output saved to: {output_excel_file}")
+    try:
+        df.to_excel(output_excel_file, index=False)
+        log(f"✅ Output saved to: {output_excel_file}")
+    except Exception as e:
+        log(f"❌ Error saving output: {e}")

@@ -53,6 +53,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         for col in ["Status", "Processed_IDs", "API_Response"]:
             if col not in df.columns:
                 df[col] = ""
+            # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+            df[col] = df[col].fillna("").astype(str)
 
         # Clean IDs
         df_clean = df.dropna(subset=["asset_id"])

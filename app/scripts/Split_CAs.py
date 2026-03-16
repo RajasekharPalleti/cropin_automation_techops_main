@@ -57,11 +57,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    # Add result columns
+    # Add result columns and ensure string type to avoid TypeError
     if "status" not in df.columns:
         df["status"] = ""
+    df["status"] = df["status"].fillna("").astype(str)
+    
     if "Response" not in df.columns:
         df["Response"] = ""
+    df["Response"] = df["Response"].fillna("").astype(str)
 
     # =========================
     # PROCESS ROWS

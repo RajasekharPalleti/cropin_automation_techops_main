@@ -11,7 +11,7 @@ Excel file with 'Place name', 'Place type', 'Latitude', and 'Longitude' columns.
 import time
 import requests
 import json
-import openpyxl
+import pandas as pd
 
 def get_address_data(session: requests.Session, lat: float, lng: float, google_api_key: str) -> dict:
     if not google_api_key:
@@ -120,64 +120,49 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     log(f"Reading input file: {input_excel_file}")
     try:
-        wb = openpyxl.load_workbook(input_excel_file)
-        sheet = wb.active
+        df = pd.read_excel(input_excel_file)
     except Exception as e:
         log(f"Failed to read Excel: {e}")
         return
 
-    headers_row = [str(sheet.cell(1, c).value).strip() if sheet.cell(1, c).value else "" for c in range(1, sheet.max_column + 1)]
-    next_col = sheet.max_column + 1
-    
-    # Append output columns if missing
-    for col_name in ["Status", "Failure Reason", "Place ID"]:
-        if col_name not in headers_row:
-            sheet.cell(1, next_col, col_name)
-            headers_row.append(col_name)
-            next_col += 1
+    # Add columns for output and ensure string type for safety
+    for col in ["Status", "Failure Reason", "Place ID"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
 
-    try:
-        name_col = headers_row.index("Place name") + 1
-        type_col = headers_row.index("Place type") + 1
-        lat_col = headers_row.index("Latitude") + 1
-        lng_col = headers_row.index("Longitude") + 1
-    except ValueError as e:
-        log(f"Error: Missing required column in Excel. Expected exactly: 'Place name', 'Place type', 'Latitude', 'Longitude'.")
+    # Identifiers for required columns
+    required_cols = ["Place name", "Place type", "Latitude", "Longitude"]
+    missing_cols = [c for c in required_cols if c not in df.columns]
+    
+    if missing_cols:
+        log(f"Error: Missing required columns in Excel: {', '.join(missing_cols)}")
         return
 
-    status_col = headers_row.index("Status") + 1
-    reason_col = headers_row.index("Failure Reason") + 1
-    pid_col = headers_row.index("Place ID") + 1
-
     session = requests.Session()
-    max_row = sheet.max_row
-    
-    log(f"Starting place creation for {max_row - 1} rows...")
+    total_rows = len(df)
+    log(f"Starting place creation for {total_rows} rows...")
 
-    for row in range(2, max_row + 1):
-        place_name = sheet.cell(row, name_col).value
-        place_type = sheet.cell(row, type_col).value
-        lat = sheet.cell(row, lat_col).value
-        lng = sheet.cell(row, lng_col).value
+    for index, row in df.iterrows():
+        place_name = row["Place name"]
+        place_type = row["Place type"]
+        lat = row["Latitude"]
+        lng = row["Longitude"]
 
-        # End of data check
-        if not place_name and not place_type and lat is None and lng is None:
-            continue
-
-        if not place_name or not place_type or lat is None or lng is None:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing required fields")
+        if pd.isna(place_name) or pd.isna(place_type) or pd.isna(lat) or pd.isna(lng):
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "Missing required fields"
             continue
             
         try:
             lat_f = float(lat)
             lng_f = float(lng)
         except ValueError:
-            sheet.cell(row, status_col, "Failed")
-            sheet.cell(row, reason_col, "Latitude or Longitude is not a valid number")
+            df.at[index, "Status"] = "Failed"
+            df.at[index, "Failure Reason"] = "Latitude or Longitude is not a valid number"
             continue
 
-        log(f"📍 Executing Row {row - 1} of {max_row - 1}: Creating place '{place_name}' at {lat_f},{lng_f}")
+        log(f"📍 Executing Row {index + 1} of {total_rows}: Creating place '{place_name}' at {lat_f},{lng_f}")
 
         try:
             # 1. Fetch Address
@@ -198,27 +183,30 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 try:
                     data = resp.json()
                     pid = data.get("id") or data.get("data", {}).get("id")
-                    sheet.cell(row, status_col, "Success")
+                    df.at[index, "Status"] = "Success"
                     if pid:
-                        sheet.cell(row, pid_col, str(pid))
+                        df.at[index, "Place ID"] = str(pid)
                         log(f"   ✅ Successfully created place → ID: {pid}")
                     else:
                         log("   ✅ Success but failed to extract ID from JSON")
                 except Exception:
-                    sheet.cell(row, status_col, "Success (JSON Parse Failed)")
+                    df.at[index, "Status"] = "Success (JSON Parse Failed)"
                     log("   ⚠️ Created but JSON parse failed")
             else:
                 err_text = resp.text[:200]
-                sheet.cell(row, status_col, "Failed")
-                sheet.cell(row, reason_col, f"HTTP {resp.status_code}: {err_text}")
+                df.at[index, "Status"] = "Failed"
+                df.at[index, "Failure Reason"] = f"HTTP {resp.status_code}: {err_text}"
                 log(f"   ❌ Failed ({resp.status_code}) → {err_text}")
 
         except Exception as e:
-            sheet.cell(row, status_col, "Failed")
-            sheet.cell(row, reason_col, str(e))
+            df.at[index, "Status"] = "Failed"
+            df.at[index, "Failure Reason"] = str(e)
             log(f"   ❌ Error: {str(e)}")
 
         time.sleep(delay_time)
 
-    wb.save(output_excel_file)
-    log(f"✅ Output saved to: {output_excel_file}")
+    try:
+        df.to_excel(output_excel_file, index=False)
+        log(f"✅ Output saved to: {output_excel_file}")
+    except Exception as e:
+        log(f"❌ Error saving output: {e}")

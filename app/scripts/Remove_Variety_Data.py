@@ -38,8 +38,14 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
         log(f"Fields to clear: {fields_to_remove}")
 
         df = pd.read_excel(input_excel)
-        df['Status'] = ''
-        df['Response'] = ''
+        # Ensure Status/Response columns are explicitly cast to string to avoid TypeError
+        if 'Status' not in df.columns:
+            df['Status'] = ''
+        df['Status'] = df['Status'].fillna("").astype(str)
+        
+        if 'Response' not in df.columns:
+            df['Response'] = ''
+        df['Response'] = df['Response'].fillna("").astype(str)
 
         headers = {"Authorization": f"Bearer {token}"}
         

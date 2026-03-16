@@ -52,6 +52,10 @@ def run(input_excel, output_excel, config, log_callback=None):
     if "CA_Response" not in df.columns:
         df["CA_Response"] = ""
 
+    # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+    df["Status"] = df["Status"].fillna("").astype(str)
+    df["CA_Response"] = df["CA_Response"].fillna("").astype(str)
+
     total_rows = len(df)
     log(f"Processing {total_rows} rows with {worker_count} workers. Delay: {thread_delay}s")
 

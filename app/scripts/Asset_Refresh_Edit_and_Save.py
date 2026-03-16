@@ -51,6 +51,10 @@ def run(input_excel, output_excel, config, log_callback=None):
     if "Message" not in df.columns:
         df["Message"] = ""
 
+    # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+    df["Status"] = df["Status"].fillna("").astype(str)
+    df["Message"] = df["Message"].fillna("").astype(str)
+
     # Ensure asset_id exists
     id_col = None
     possible_cols = ['asset_id', 'assetId', 'id', 'Id', 'ID']

@@ -65,11 +65,11 @@ def run(input_excel, output_excel, config, log_callback=None):
         log(f"❌ Error converting user_id to integer/string: {e}")
         return
 
-    # Add result columns
+    # Add result columns and ensure string type to avoid TypeError/nan strings
     for col in ["Status", "Processed_User_Ids", "API_Response"]:
         if col not in df.columns:
             df[col] = ""
-        df[col] = df[col].astype(str)
+        df[col] = df[col].fillna("").astype(str)
 
     total = len(df)
     log(f"Total rows to process: {total}")

@@ -55,11 +55,11 @@ def run(input_excel, output_excel, config, log_callback=None):
         log(f"❌ Missing required columns: {missing_cols}")
         return
 
-    # Add output columns if not present
+    # Add output columns if not present and ensure string type to avoid TypeError
     for col in ["Status", "Response"]:
         if col not in df.columns:
             df[col] = ""
-        df[col] = df[col].astype(str)
+        df[col] = df[col].fillna("").astype(str)
 
     total_rows = len(df)
     log(f"Total rows to process: {total_rows}")

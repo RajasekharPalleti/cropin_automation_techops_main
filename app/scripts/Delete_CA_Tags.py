@@ -2,13 +2,12 @@
 Remove CA tags from croppable areas using Excel input.
 
 Inputs:
-Inputs:
 Excel file with 'CA_id', 'CA_name', and 'Tags IDs' (comma-separated IDs or Names).
 """
 
 import json
 import requests
-import openpyxl
+import pandas as pd
 import time
 import re
 
@@ -16,7 +15,7 @@ import re
 # Normalize tag names (handles spaces & case)
 # ------------------------------------------------------------
 def normalize_tag_name(name: str) -> str:
-    return re.sub(r"\s+", " ", name.strip().lower())
+    return re.sub(r"\s+", " ", str(name).strip().lower())
 
 # ------------------------------------------------------------
 # Fetch CA tags (Name → ID mapping)
@@ -46,10 +45,10 @@ def resolve_tag_ids(raw_tokens, tag_name_map):
     unresolved = []
 
     for token in raw_tokens:
-        token = str(token).strip() # Ensure string
+        token = str(token).strip()
 
         if token.isdigit():
-            resolved_ids.append(int(token))
+            resolved_ids.append(int(float(token)))
         else:
             normalized = normalize_tag_name(token)
             if normalized in tag_name_map:
@@ -94,49 +93,31 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     log(f"Reading input file: {input_excel_file}")
     try:
-        wb = openpyxl.load_workbook(input_excel_file)
-        sheet = wb.active # Use active sheet
+        df = pd.read_excel(input_excel_file)
     except Exception as e:
         log(f"Failed to read Excel: {e}")
         return
 
-    # 3. Headers
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    next_col = sheet.max_column + 1
-
-    if "Status" not in headers_row:
-        sheet.cell(1, next_col, "Status")
-        next_col += 1
-    if "Failure Reason" not in headers_row:
-        sheet.cell(1, next_col, "Failure Reason")
-    
-    # Recalculate column indices
-    headers_row = [sheet.cell(1, c).value for c in range(1, sheet.max_column + 1)]
-    try:
-        status_col = headers_row.index("Status") + 1
-        reason_col = headers_row.index("Failure Reason") + 1
-    except ValueError:
-         status_col = sheet.max_column + 1
-         reason_col = sheet.max_column + 2
+    # 3. Add columns for output and ensure string type for safety
+    for col in ["Status", "Failure Reason"]:
+        if col not in df.columns:
+            df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
 
     req_headers = {"Authorization": f"Bearer {token}"}
 
     # 4. Process Rows
-    max_row = sheet.max_row
-    log(f"Processing {max_row - 1} rows...")
+    total_rows = len(df)
+    log(f"Processing {total_rows} rows...")
 
-    for row in range(2, max_row + 1):
-        ca_id = sheet.cell(row, 1).value
-        # CA_name is column 2 but we don't strictly need it for the API call
-        raw_tags = sheet.cell(row, 3).value
+    for index, row in df.iterrows():
+        # Using iloc to match original script's column assumption: index 0 (CA_id), index 2 (Tags IDs)
+        ca_id = row.iloc[0] if len(row) > 0 else None
+        raw_tags = row.iloc[2] if len(row) > 2 else None
 
-        # End of data check
-        if ca_id is None and raw_tags is None:
-            break
-
-        if not ca_id or not raw_tags:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "Missing CA_id or Tags IDs")
+        if pd.isna(ca_id) or pd.isna(raw_tags):
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "Missing CA_id or Tags IDs"
             continue
 
         ca_id = str(ca_id).strip()
@@ -148,8 +129,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log(f"Warning mapping tags for CA {ca_id}: Could not resolve '{', '.join(unresolved)}'")
 
         if not tag_ids:
-            sheet.cell(row, status_col, "Skipped")
-            sheet.cell(row, reason_col, "No valid tags found matching system records")
+            df.at[index, "Status"] = "Skipped"
+            df.at[index, "Failure Reason"] = "No valid tags found matching system records"
             continue
 
         try:
@@ -164,13 +145,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 
             existing_tags = ca_data["data"].get("tags", [])
             
-            # The API usually expects list of dicts: [{"id": 123}, {"id": 124}]
-            # Or standard int list [123, 124]? Let's check CA API standard. Most APIs use list of ints or dicts.
-            # Using dict format based on AddTagsWithNewAPI which does:
-            # tags_list = [{"id": tid} for tid in common_tags]
-            # Wait, `Delete_Farmer_Tags` just replaced with a list of ints.
-            # Let's clean the existing tags.
-            
             existing_tag_ids = set()
             for t in existing_tags:
                 try:
@@ -182,8 +156,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             intersection = existing_tag_ids.intersection(to_remove_set)
 
             if not intersection:
-                sheet.cell(row, status_col, "Skipped")
-                sheet.cell(row, reason_col, "No specified tags exist on this CA to remove")
+                df.at[index, "Status"] = "Skipped"
+                df.at[index, "Failure Reason"] = "No specified tags exist on this CA to remove"
                 continue
 
             # Remove the specified tags from the active set
@@ -196,21 +170,24 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             put_resp = requests.put(api_url, headers=req_headers, json=ca_data)
             put_resp.raise_for_status()
 
-            sheet.cell(row, status_col, "Success")
-            sheet.cell(row, reason_col, f"Removed Tag IDs: {', '.join(map(str, intersection))}")
-            log(f"Row {row}: CA {ca_id} updated. Removed: {intersection}")
+            df.at[index, "Status"] = "Success"
+            df.at[index, "Failure Reason"] = f"Removed Tag IDs: {', '.join(map(str, intersection))}"
+            log(f"Row {index + 2}: CA {ca_id} updated. Removed: {intersection}")
 
         except requests.exceptions.RequestException as e:
             err_msg = str(e)
             if e.response is not None:
                 err_msg += f" - {e.response.text}"
-            sheet.cell(row, status_col, "Failed")
-            sheet.cell(row, reason_col, err_msg)
-            log(f"Row {row}: Failed - {err_msg[:100]}")
+            df.at[index, "Status"] = "Failed"
+            df.at[index, "Failure Reason"] = err_msg
+            log(f"Row {index + 2}: Failed - {err_msg[:100]}")
 
         # Throttle delay
         time.sleep(delay_time)
 
     # 5. Save Output
-    wb.save(output_excel_file)
-    log(f"✅ Output saved to: {output_excel_file}")
+    try:
+        df.to_excel(output_excel_file, index=False)
+        log(f"✅ Output saved to: {output_excel_file}")
+    except Exception as e:
+        log(f"❌ Error saving output: {e}")

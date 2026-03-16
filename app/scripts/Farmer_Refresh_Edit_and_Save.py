@@ -46,11 +46,14 @@ def run(input_excel, output_excel, config, log_callback=None):
         log(f"❌ Error reading Excel: {e}")
         return
 
-    # Check columns
+    # Check columns and explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
+    
     if "Message" not in df.columns:
         df["Message"] = ""
+    df["Message"] = df["Message"].fillna("").astype(str)
 
     # Ensure farmer_id exists
     # Allow 'farmer_id', 'farmerId', 'id', or column 0

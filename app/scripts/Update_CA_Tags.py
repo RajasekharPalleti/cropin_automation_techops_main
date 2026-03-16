@@ -150,10 +150,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Failed to read Excel: {e}")
         return
 
+    # Ensure Status/Response columns are explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
+    
     if "Response" not in df.columns:
         df["Response"] = ""
+    df["Response"] = df["Response"].fillna("").astype(str)
 
     n = len(df)
     log(f"Total rows to process: {n}")

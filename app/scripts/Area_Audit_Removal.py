@@ -44,7 +44,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     for col in ["Status", "Response"]:
         if col not in df.columns:
             df[col] = ""
-        df[col] = df[col].astype(str)
+        # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+        df[col] = df[col].fillna("").astype(str)
 
     headers = {
         "Authorization": f"Bearer {token}",

@@ -51,11 +51,14 @@ def run(input_excel, output_excel, config, log_callback=None):
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    # Ensure output columns exist
+    # Ensure output columns exist and are explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
+    
     if "CA_Response" not in df.columns:
         df["CA_Response"] = ""
+    df["CA_Response"] = df["CA_Response"].fillna("").astype(str)
 
     # Validate required columns
     required_cols = ["CA_id", "CA_name", "variety_id"]

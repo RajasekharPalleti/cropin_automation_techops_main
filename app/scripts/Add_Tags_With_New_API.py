@@ -25,6 +25,9 @@ def post_data_to_api(base_api_url, access_token_bearer, input_excel_file, output
     # Add a status column to track the response of each iteration
     df['Status'] = ''
     df['Response'] = ''  # Add a column to store the full response
+    # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+    df['Status'] = df['Status'].fillna("").astype(str)
+    df['Response'] = df['Response'].fillna("").astype(str)
 
     # Set up headers for the API request
     headers = {

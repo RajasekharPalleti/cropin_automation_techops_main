@@ -204,6 +204,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Actually, simpler is to just return results_df or merge carefully.
     # The user logic was: df = df.merge(results_df, how="left", on="ca_id")
     df = df.merge(results_df, how="left", on="ca_id")
+    
+    # Ensure status/response columns are explicitly cast to string to avoid TypeError
+    for col in ["status", "response"]:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str)
 
     try:
         df.to_excel(output_excel_file, index=False)

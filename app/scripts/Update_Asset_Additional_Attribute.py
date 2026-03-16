@@ -55,9 +55,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Error reading Excel file: {e}")
         return
 
-    # Ensure status column
+    # Ensure status column is explicitly cast to string to avoid TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
+    df["Status"] = df["Status"].fillna("").astype(str)
 
     # Check for asset_id
     if "asset_id" not in df.columns:

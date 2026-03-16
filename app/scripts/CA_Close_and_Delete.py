@@ -63,15 +63,17 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     project_asset_col = lower_cols["project_asset_id"]
     ca_col = lower_cols["croppable_area_id"]
 
-    # Ensure only relevant status columns based on action mode
+    # Ensure only relevant status columns based on action mode and cast to string
     if "close" in ca_action:
         for col in ["closed_api_http_status", "closed_api_status"]:
             if col not in df.columns:
                 df[col] = ""
+            df[col] = df[col].fillna("").astype(str)
     if "delete" in ca_action:
         for col in ["delete_api_http_status", "delete_api_status"]:
             if col not in df.columns:
                 df[col] = ""
+            df[col] = df[col].fillna("").astype(str)
 
     # Clean and Format Data
     df[project_col] = df[project_col].astype(str).str.strip().replace(r'\.0$', '', regex=True)

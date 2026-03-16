@@ -131,6 +131,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df[col] = ""
         df[col] = df[col].astype(str)
 
+    # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+    df["Status"] = df["Status"].fillna("").astype(str)
+    df["Response"] = df["Response"].fillna("").astype(str)
+
     log(f"🔄 Processing {len(df)} rows...")
 
     for index, row in df.iterrows():

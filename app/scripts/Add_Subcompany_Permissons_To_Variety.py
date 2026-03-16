@@ -47,6 +47,9 @@ def run(input_excel, output_excel, config, log_callback=None):
         df = pd.read_excel(input_excel)
         df['Status'] = ''
         df['Response'] = ''
+        # Explicitly cast to string after filling NaNs to prevent TypeError in newer pandas versions
+        df['Status'] = df['Status'].fillna("").astype(str)
+        df['Response'] = df['Response'].fillna("").astype(str)
 
         headers = {"Authorization": f"Bearer {token}"}
 
