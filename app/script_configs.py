@@ -271,6 +271,11 @@ SCRIPT_CONFIGS = {
         "requires_input": True,
         "show_google_api_config": True,
     },
+    "Get_Lat_Long_AreaCount.py": {
+        "base_api_url": "",
+        "label": "Optional Config",
+        "requires_input": True,
+    },
 }
 
 # Fallback config used when a script is not listed in SCRIPT_CONFIGS above.
