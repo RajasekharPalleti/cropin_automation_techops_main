@@ -383,6 +383,8 @@ async def list_scripts():
                 "show_ca_close_delete": config.get("show_ca_close_delete", False),
                 "show_google_api_config": config.get("show_google_api_config", False),
                 "show_threading": config.get("show_threading", False),
+                "show_coordinate_order": config.get("show_coordinate_order", False),
+                "show_batch_config": config.get("show_batch_config", False),
                 "show_time_delay": config.get("show_time_delay", True)
             })
 
