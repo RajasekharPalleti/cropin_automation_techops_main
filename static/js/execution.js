@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const areaAuditConfig = document.getElementById('area-audit-config');
         if (areaAuditConfig && areaAuditConfig.style.display !== 'none') {
             config.unit = document.getElementById('area-unit-select')?.value || 'Hectare';
-            config.force_crop_audited = document.getElementById('force-crop-audited')?.value || 'none';
+            config.force_crop_audited = document.getElementById('force-crop-audited')?.value || 'true';
         }
 
         // 7. Variety Removal Config

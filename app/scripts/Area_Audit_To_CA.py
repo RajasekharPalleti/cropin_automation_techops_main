@@ -10,6 +10,8 @@ Excel file with CA_id, CA_Name, area_Audit_DTO, Latitude, Longitude, and audited
 Supports geoInfo in BOTH formats:
 1) Full GeoJSON FeatureCollection as type = featureCollection
 2) Raw coordinates list [[lng, lat], ...]
+3) Default cropAudited = true
+4) Pass Area Unit in UI as company preffered unit.
 """
 
 import json
@@ -199,7 +201,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             CA_data["longitude"] = None
             
             # CA_data["cropAudited"] = True  # Logic moved to config
-            force_crop_audited = config.get("force_crop_audited", "none")
+            force_crop_audited = config.get("force_crop_audited", "true")
             
             if force_crop_audited == "true":
                 CA_data["cropAudited"] = True
