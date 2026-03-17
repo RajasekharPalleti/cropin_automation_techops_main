@@ -790,17 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
         stopAllCloseAllBtn.style.cursor = hasJobs ? 'pointer' : 'not-allowed';
     }
 
-    // ---- Helper: show "closing in progress" overlay, then reload after delayMs ----
     function showClosingAndReload(message, delayMs) {
         hideConfirmBanner();
-        stopAllJobsList.innerHTML = `
-            <div style="text-align:center;padding:40px 20px;">
-                <div style="font-size:2em;margin-bottom:12px;">⏳</div>
-                <div style="font-weight:600;color:#dc3545;font-size:1em;margin-bottom:8px;">${message}</div>
-                <div style="color:#888;font-size:0.85em;">Refreshing in ${Math.round(delayMs / 1000)} second(s)…</div>
-            </div>`;
-        syncCloseAllBtn(false);
-        setTimeout(() => loadActiveJobs(), delayMs);
+        // Trigger quiet refresh immediately to show "Stopping..." badges
+        loadActiveJobs(true);
     }
 
     const stopAllMaximizeBtn = document.getElementById('stopall-maximize');
@@ -816,10 +809,14 @@ document.addEventListener('DOMContentLoaded', () => {
         onClose: () => hideConfirmBanner(),
     });
 
+    let activeJobsPoller = null;
+
     // ---- Load jobs ----
-    function loadActiveJobs() {
+    function loadActiveJobs(quiet = false) {
         hideConfirmBanner();
-        stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes…</div>';
+        if (!quiet) {
+            stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes…</div>';
+        }
         syncCloseAllBtn(false);
 
         fetch('/api/server/active_jobs')
@@ -853,13 +850,21 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     <div style="font-size:0.72em;color:#aaa;margin-top:2px;">ID: ${job.client_id}</div>
                                 </div>
-                                <button class="cancel-job-btn"
-                                        data-client-id="${job.client_id}"
-                                        style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;
-                                               background:#fff;border:1px solid #dc3545;color:#dc3545;
-                                               cursor:pointer;white-space:nowrap;">
-                                    Cancel
-                                </button>
+                                ${job.is_stopping 
+                                    ? `<div style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;
+                                                   background:#fff3cd;border:1px solid #ffeeba;color:#856404;
+                                                   display:flex;align-items:center;gap:6px;">
+                                           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:0.8rem;height:0.8rem;"></span>
+                                           Stopping...
+                                       </div>`
+                                    : `<button class="cancel-job-btn"
+                                                data-client-id="${job.client_id}"
+                                                style="flex-shrink:0;padding:5px 12px;font-size:0.8em;border-radius:4px;
+                                                       background:#fff;border:1px solid #dc3545;color:#dc3545;
+                                                       cursor:pointer;white-space:nowrap;">
+                                           Cancel
+                                       </button>`
+                                }
                             </div>
 
                             <!-- Per-row "Are you sure?" confirmation (hidden by default) -->
@@ -940,10 +945,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!stopAllWindow.isVisible()) {
             stopAllWindow.show();
             loadActiveJobs();
+            // Start real-time poller
+            if (activeJobsPoller) clearInterval(activeJobsPoller);
+            activeJobsPoller = setInterval(() => loadActiveJobs(true), 3000);
         } else {
             if (!stopAllWindow.flashIfVisible()) {
                 stopAllWindow.show();
                 loadActiveJobs();
+                if (activeJobsPoller) clearInterval(activeJobsPoller);
+                activeJobsPoller = setInterval(() => loadActiveJobs(true), 3000);
             }
         }
     }
@@ -953,6 +963,11 @@ document.addEventListener('DOMContentLoaded', () => {
     stopAllDismissBtn.addEventListener('click', () => {
         hideConfirmBanner();
         stopAllWindow.hide();
+        // Stop real-time poller
+        if (activeJobsPoller) {
+            clearInterval(activeJobsPoller);
+            activeJobsPoller = null;
+        }
     });
 
     // ---- Close All: show confirmation banner ----

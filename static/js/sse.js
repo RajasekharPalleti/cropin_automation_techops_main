@@ -135,7 +135,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const line = document.createElement('div');
                 line.className = 'console-line';
                 line.style.color = 'orange';
-                line.textContent = '> JOB STOPPED SUCCESSFULLY. READY FOR NEW RUN.';
+                line.style.fontWeight = 'bold';
+                line.style.border = '1px solid orange';
+                line.style.padding = '5px';
+                line.style.marginTop = '10px';
+                line.style.borderRadius = '4px';
+                line.style.background = 'rgba(255, 165, 0, 0.1)';
+                line.textContent = '>>> JOB STOPPED SUCCESSFULLY. READY FOR NEW RUN. <<<';
                 fragment.appendChild(line);
 
                 setTimeout(() => {
@@ -159,8 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const line = document.createElement('div');
                 line.className = 'console-line';
                 line.style.color = '#ff8c00';
-                line.style.fontWeight = '600';
-                line.textContent = '> ⚠ ADMIN ACTION: ' + reason + ' Script execution terminated.';
+                line.style.fontWeight = 'bold';
+                line.style.border = '1px solid #ff8c00';
+                line.style.padding = '5px';
+                line.style.marginTop = '10px';
+                line.style.borderRadius = '4px';
+                line.style.background = 'rgba(255, 140, 0, 0.1)';
+                line.textContent = '>>> ⚠ ADMIN ACTION: ' + reason + ' <<< Script execution terminated.';
                 fragment.appendChild(line);
 
                 if (window.releaseWakeLock) window.releaseWakeLock();
