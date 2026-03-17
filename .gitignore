@@ -13,3 +13,4 @@ outputs/
 scheduled_jobs.json
 scheduled_uploads/
 tests/
+tmp/

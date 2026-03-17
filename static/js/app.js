@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
             toggle('common-batch-config', selectedScript.show_batch_config);
             toggle('google-api-config', selectedScript.show_google_api_config);
+            toggle('coordinate-order-config', selectedScript.show_coordinate_order);
             document.getElementById('time-delay-config').style.display = 'block';
 
             // Count dropdowns

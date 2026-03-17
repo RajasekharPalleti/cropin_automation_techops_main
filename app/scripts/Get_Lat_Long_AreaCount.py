@@ -13,7 +13,7 @@ import time
 
 def calculate_area_and_center(coords):
     if not coords or len(coords) < 3:
-        return 0, 0, 0, 0
+        return 0, 0, 0, 0, 0
     
     # Calculate geometric center from points
     sum_lon = sum(c[0] for c in coords)
@@ -25,7 +25,7 @@ def calculate_area_and_center(coords):
         from pyproj import Geod
     except ImportError:
         # Fallback to simple math if dependencies failed to install
-        return 0, 0, center_lat, center_lon
+        return 0, 0, 0, center_lat, center_lon
         
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
@@ -38,19 +38,23 @@ def calculate_area_and_center(coords):
         area_sqm = abs(poly_area)
     except Exception:
         # If coordinates are invalid or loop crosses itself improperly
-        return 0, 0, center_lat, center_lon
+        return 0, 0, 0, center_lat, center_lon
     
     # Standard conversons
     area_hectares = area_sqm / 10000.0
     area_acres = area_sqm / 4046.8564224
     
-    return area_acres, area_hectares, center_lat, center_lon
+    return area_sqm, area_acres, area_hectares, center_lat, center_lon
 
-def parse_coordinates(coord_str):
+def parse_coordinates(coord_str, coordinate_order="Long, Lat"):
     try:
         # First try JSON [ [lon, lat], [lon, lat]... ]
         coords = json.loads(str(coord_str).replace("'", '"'))
         if isinstance(coords, list) and len(coords) > 0 and isinstance(coords[0], list):
+            # For JSON, we respect the standard [Long, Lat] usually, 
+            # but if user specifically says "Lat, Long", we swap it.
+            if coordinate_order == "Lat, Long":
+                return [[c[1], c[0]] for c in coords]
             return coords
     except Exception:
         pass
@@ -58,11 +62,18 @@ def parse_coordinates(coord_str):
     # Try parsing lat/long combinations using regex
     numbers = re.findall(r'-?\d+\.\d+|-?\d+', str(coord_str))
     if len(numbers) >= 6 and len(numbers) % 2 == 0:
-        # Assuming format is lat, long, lat, long
         coords = []
         for i in range(0, len(numbers), 2):
-            lat = float(numbers[i])
-            lon = float(numbers[i+1])
+            val1 = float(numbers[i])
+            val2 = float(numbers[i+1])
+            if coordinate_order == "Lat, Long":
+                # User says first is Lat, second is Long
+                lat = val1
+                lon = val2
+            else:
+                # User says first is Long, second is Lat
+                lon = val1
+                lat = val2
             coords.append([lon, lat])
         return coords
         
@@ -75,6 +86,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         print(msg)
         
     delay_time = float(config.get("delay_time", 0))
+    coordinate_order = config.get("coordinate_order", "Long, Lat")
 
     try:
         df = pd.read_excel(input_excel)
@@ -83,7 +95,8 @@ def run(input_excel, output_excel, config, log_callback=None):
         return
 
     # Add required columns if not present and ensure string types for status
-    for col in ['area in acres', 'area in hectares', 'latitude', 'longitude']:
+    required_cols = ['geo info', 'latitude', 'longitude', 'area in acres', 'area in hectares', 'area in square meters']
+    for col in required_cols:
         if col not in df.columns:
             df[col] = None
         else:
@@ -94,7 +107,7 @@ def run(input_excel, output_excel, config, log_callback=None):
             df[col] = ""
         df[col] = df[col].fillna("").astype(str)
             
-    log("⏳ Starting coordinate area calculations...")
+    log(f"⏳ Starting coordinate area calculations (Order: {coordinate_order})...")
 
     # Look for coordinates column
     coord_col_names = [col for col in df.columns if 'coord' in col.lower() or 'lat' in col.lower() or 'long' in col.lower()]
@@ -111,7 +124,7 @@ def run(input_excel, output_excel, config, log_callback=None):
                 
             log(f"⏳ Processing row {i+2}...")
             
-            coords = parse_coordinates(coord_str)
+            coords = parse_coordinates(coord_str, coordinate_order)
             if not coords:
                 df.at[i, 'Status'] = "Failed"
                 df.at[i, 'Response'] = "Invalid coordinate format"
@@ -124,12 +137,14 @@ def run(input_excel, output_excel, config, log_callback=None):
                 log(f"❌ Polygon needs at least 3 points on row {i+2}")
                 continue
 
-            acres, hectares, center_lat, center_lon = calculate_area_and_center(coords)
+            sqm, acres, hectares, center_lat, center_lon = calculate_area_and_center(coords)
             
-            df.at[i, 'area in acres'] = round(acres, 4)
-            df.at[i, 'area in hectares'] = round(hectares, 4)
-            df.at[i, 'latitude'] = round(center_lat, 6)
-            df.at[i, 'longitude'] = round(center_lon, 6)
+            df.at[i, 'area in square meters'] = sqm
+            df.at[i, 'area in acres'] = acres
+            df.at[i, 'area in hectares'] = hectares
+            df.at[i, 'latitude'] = center_lat
+            df.at[i, 'longitude'] = center_lon
+            df.at[i, 'geo info'] = json.dumps(coords)
             
             df.at[i, 'Status'] = "Success"
             df.at[i, 'Response'] = "Calculated Area and Center Point"

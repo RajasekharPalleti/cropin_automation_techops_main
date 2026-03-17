@@ -398,10 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
             config.fields_to_remove = remKeys;
         }
 
-        // 8. Time Delay Config
-        const timeDelayConfig = document.getElementById('time-delay-config');
-        if (timeDelayConfig && timeDelayConfig.style.display !== 'none') {
-            config.delay_time = document.getElementById('delay-time-input')?.value || 1;
+        // 9. Coordinate Order Config
+        const coordOrderConfig = document.getElementById('coordinate-order-config');
+        if (coordOrderConfig && coordOrderConfig.style.display !== 'none') {
+            config.coordinate_order = document.getElementById('coordinate-order')?.value || 'Long, Lat';
         }
 
         return config;

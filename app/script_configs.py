@@ -278,6 +278,7 @@ SCRIPT_CONFIGS = {
         "base_api_url": "N/A",
         "label": "N/A",
         "requires_input": True,
+        "show_coordinate_order": True,
     },
 }
 
