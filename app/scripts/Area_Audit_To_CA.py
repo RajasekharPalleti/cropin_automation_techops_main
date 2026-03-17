@@ -22,6 +22,23 @@ import time
 # ============================================================
 # GEOINFO NORMALIZATION
 # ============================================================
+def _normalize_coords(data):
+    """
+    Recursively normalizes coordinates in a GeoJSON-like list structure.
+    Converts strings to floats and strips whitespace.
+    """
+    if isinstance(data, list):
+        # Check if it's a coordinate pair [lng, lat]
+        if len(data) == 2 and not isinstance(data[0], (list, dict)):
+            try:
+                # Strip spaces and convert to float
+                return [float(str(data[0]).strip()), float(str(data[1]).strip())]
+            except (ValueError, TypeError):
+                return data
+        # Otherwise recurse
+        return [_normalize_coords(item) for item in data]
+    return data
+
 def normalize_geo_info(area_Audit_DTO):
     """
     Accepts either:
@@ -43,10 +60,17 @@ def normalize_geo_info(area_Audit_DTO):
 
     # Case 1: Already valid FeatureCollection
     if isinstance(geo, dict) and geo.get("type") == "FeatureCollection":
+        if "features" in geo:
+            for feature in geo.get("features", []):
+                geom = feature.get("geometry")
+                if geom and "coordinates" in geom:
+                    geom["coordinates"] = _normalize_coords(geom["coordinates"])
         return geo
 
     # Case 2: Raw coordinates list (e.g. [[77.5, 12.9], ...])
     if isinstance(geo, list):
+        normalized_geo = _normalize_coords(geo)
+        
         return {
             "type": "FeatureCollection",
             "features": [
@@ -55,7 +79,7 @@ def normalize_geo_info(area_Audit_DTO):
                     "properties": {},
                     "geometry": {
                         "type": "MultiPolygon",
-                        "coordinates": [[geo]]
+                        "coordinates": [[normalized_geo]]
                     }
                 }
             ]
