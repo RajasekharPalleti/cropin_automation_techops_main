@@ -159,7 +159,7 @@ async def clear_session(client_id: str):
 
 
 @router.post("/api/stop/{client_id}")
-async def stop_execution(client_id: str):
+async def stop_execution(client_id: str, admin: bool = False):
     """Request cancellation of a running script for a given client, or a Scheduled background job."""
     if client_id.startswith("Scheduled_"):
         real_id = client_id.replace("Scheduled_", "")
@@ -177,7 +177,9 @@ async def stop_execution(client_id: str):
             # Fire the global cancellation flag so the running background script halts immediately
             if manager.is_active(target_job_key):
                 manager.request_cancel(target_job_key)
-                
+                if admin:
+                    await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", target_job_key)
+            
             return {"status": "stopping", "message": "Scheduled Job marked as cancelled."}
             
         return {"status": "ignored", "message": "Scheduled Job not running or not found."}
@@ -185,7 +187,8 @@ async def stop_execution(client_id: str):
     # Standard Interactive Job Cancellation
     if manager.is_active(client_id):
         manager.request_cancel(client_id)
-        await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
+        if admin:
+            await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
         return {"status": "stopping", "message": "Stop requested. Process will terminate shortly."}
         
     return {"status": "ignored", "message": "No active process found."}

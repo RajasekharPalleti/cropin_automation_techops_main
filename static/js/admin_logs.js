@@ -803,10 +803,13 @@ document.addEventListener('DOMContentLoaded', () => {
         header: stopAllHeader,
         minimizeBtn: stopAllMinimizeBtn,
         maximizeBtn: stopAllMaximizeBtn,
-        closeBtn: stopAllCloseBtn,   // X = just closes window, no intercept
-        bottomOffset: '20px',
-        minimizedWidth: '280px',
-        onClose: () => hideConfirmBanner(),
+        onClose: () => {
+            hideConfirmBanner();
+            if (activeJobsPoller) {
+                clearInterval(activeJobsPoller);
+                activeJobsPoller = null;
+            }
+        },
     });
 
     let activeJobsPoller = null;
@@ -920,7 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.disabled = true;
                         btn.textContent = 'Stopping…';
 
-                        fetch(`/api/stop/${clientId}`, { method: 'POST' })
+                        fetch(`/api/stop/${clientId}?admin=true`, { method: 'POST' })
                             .then(res => res.json())
                             .then(() => {
                                 showClosingAndReload('Closing task in progress…', 5000);
@@ -987,8 +990,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         fetch('/api/server/stop_all', { method: 'POST' })
             .then(res => res.json())
-            .then(() => {
-                showClosingAndReload('Terminating all tasks in progress…', 5000);
+            .then(data => {
+                showClosingAndReload(`All processes stopped (${data.stopped_count || 0}).`, 5000);
             })
             .catch(err => {
                 console.error('Error stopping all jobs:', err);
