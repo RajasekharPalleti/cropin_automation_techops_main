@@ -6,6 +6,7 @@ singleton instances used by both main.py (lifespan) and routes.py (endpoints).
 """
 
 import asyncio
+from datetime import datetime
 from typing import Dict, List
 
 from app.core.backup_manager import BackupManager
@@ -125,7 +126,6 @@ class ConnectionManager:
 
     async def send_log(self, message: str, client_id: str):
         """Archive a log message and push it to the live SSE queue."""
-        from datetime import datetime
         
         # Prepend timestamp only if it's not a control message protocol marker
         is_control = any(message.startswith(p) for p in ["JOB_COMPLETED::", "JOB_FAILED::", "JOB_STOPPED::"])

@@ -214,7 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmRunBtn.disabled = true;
             confirmRunBtn.innerHTML = '<span class="spinner"></span> Checking...';
 
-            fetch(`/api/recover_session?machine_id=${machineId}&username=${user}&tenant_code=${tenant}`)
+            fetch('/api/recover_session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    machine_id: machineId,
+                    username: user,
+                    tenant_code: tenant
+                })
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.found) {
