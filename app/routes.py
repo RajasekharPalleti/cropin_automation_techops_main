@@ -140,7 +140,14 @@ async def sse_endpoint(client_id: str, request: Request):
 @router.get("/api/status/{client_id}")
 async def get_task_status(client_id: str):
     """Check whether a script is currently running for a given client."""
-    return {"is_running": manager.is_active(client_id)}
+    is_active = manager.is_active(client_id)
+    is_stopping = manager.is_cancelled(client_id)
+    
+    # Return running if it's active (even if stopping)
+    return {
+        "is_running": is_active,
+        "is_stopping": is_stopping
+    }
 
 
 @router.post("/api/clear_session/{client_id}")
@@ -152,7 +159,7 @@ async def clear_session(client_id: str):
 
 
 @router.post("/api/stop/{client_id}")
-async def stop_execution(client_id: str):
+async def stop_execution(client_id: str, admin: bool = False):
     """Request cancellation of a running script for a given client, or a Scheduled background job."""
     if client_id.startswith("Scheduled_"):
         real_id = client_id.replace("Scheduled_", "")
@@ -170,7 +177,9 @@ async def stop_execution(client_id: str):
             # Fire the global cancellation flag so the running background script halts immediately
             if manager.is_active(target_job_key):
                 manager.request_cancel(target_job_key)
-                
+                if admin:
+                    await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", target_job_key)
+            
             return {"status": "stopping", "message": "Scheduled Job marked as cancelled."}
             
         return {"status": "ignored", "message": "Scheduled Job not running or not found."}
@@ -178,7 +187,8 @@ async def stop_execution(client_id: str):
     # Standard Interactive Job Cancellation
     if manager.is_active(client_id):
         manager.request_cancel(client_id)
-        await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
+        if admin:
+            await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
         return {"status": "stopping", "message": "Stop requested. Process will terminate shortly."}
         
     return {"status": "ignored", "message": "No active process found."}
@@ -205,36 +215,37 @@ async def get_server_status():
 async def get_active_jobs():
     """Get details of all currently running background script jobs (SSE and Scheduled)."""
     jobs = []
+    active_now = list(manager.active_tasks)
     
-    for client_id in list(manager.active_tasks):
+    # 1. Append active interactive jobs
+    for client_id in active_now:
+        # DO NOT filter here — we want the UI to show "Stopping..." until it's gone
+        is_stopping = manager.is_cancelled(client_id)
+            
         script_name = manager.client_script_map.get(client_id, "Unknown Script")
-        machine_key = manager.client_machine_map.get(client_id)
+        machine_key = manager.client_machine_map.get(client_id, "Unknown Machine")
         
-        tenant = "unknown"
-        user = "unknown"
-        machine_id = "unknown"
+        parts = machine_key.split(':') if ':' in machine_key else ["unknown", "unknown", machine_key]
+        tenant = parts[0]
+        user = parts[1]
+        machine_id = parts[2]
         
-        if machine_key:
-            parts = machine_key.split(":")
-            if len(parts) >= 3:
-                tenant = parts[0]
-                user = parts[1]
-                machine_id = parts[2]
-                
         jobs.append({
             "client_id": client_id,
             "script_name": script_name,
             "tenant": tenant,
             "user": user,
             "machine_id": machine_id,
-            "type": "Interactive"
+            "type": "Interactive",
+            "is_stopping": is_stopping
         })
         
-    # Append running scheduled jobs
+    # 2. Append running scheduled jobs
     from app.scheduler import load_jobs
     scheduled_jobs = load_jobs()
     for job_id, job in scheduled_jobs.items():
         if job.get("status") == "running":
+            is_stopping = manager.is_cancelled(job_id)
             cfg = job.get("config", {})
             jobs.append({
                 "client_id": f"Scheduled_{job_id[:8]}",
@@ -242,7 +253,8 @@ async def get_active_jobs():
                 "tenant": cfg.get("tenant_code", "unknown"),
                 "user": cfg.get("username", "unknown"),
                 "machine_id": "Server Background",
-                "type": "Scheduled"
+                "type": "Scheduled",
+                "is_stopping": is_stopping
             })
         
     return {"jobs": jobs}
@@ -270,7 +282,9 @@ async def stop_all_jobs():
         if job_data.get("status") == "running":
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = "Cancelled forcefully by admin via 'Stop All Processes'."
+            manager.request_cancel(job_id) # Ensure they disappear from list too
             jobs_modified = True
+            stopped_count += 1
             
     if jobs_modified:
         save_jobs(jobs)

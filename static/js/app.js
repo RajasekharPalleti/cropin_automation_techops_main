@@ -454,21 +454,30 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(r => r.json())
             .then(status => {
                 if (status.is_running) {
-                    if (runBtn) runBtn.innerHTML = '<span class="spinner"></span> Processing...';
+                    if (status.is_stopping) {
+                        if (runBtn) { runBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Stopping...'; runBtn.disabled = true; }
+                        if (stopBtn) { stopBtn.style.display = 'inline-block'; stopBtn.disabled = true; stopBtn.innerHTML = 'Stopping...'; }
+                        if (statusArea) statusArea.innerHTML = '<div style="color: Orange; font-weight:600;">⚠ Stopping Process...</div>';
+                    } else {
+                        if (runBtn) runBtn.innerHTML = '<span class="spinner"></span> Processing...';
+                        if (stopBtn) { stopBtn.style.display = 'inline-block'; stopBtn.disabled = false; }
+                    }
 
                     const confirmedLine = document.createElement('div');
                     confirmedLine.className = 'console-line';
-                    confirmedLine.style.color = '#00AA00';
-                    confirmedLine.textContent = '> Session confirmed. Resuming logs...';
+                    confirmedLine.style.color = status.is_stopping ? 'orange' : '#00AA00';
+                    confirmedLine.textContent = status.is_stopping 
+                        ? '> Session confirmed. Script is currently stopping...' 
+                        : '> Session confirmed. Resuming logs...';
                     if (consoleContent) consoleContent.appendChild(confirmedLine);
 
                     if (window.connectSSE) window.connectSSE();
                 } else {
-                    // Ghost session — server restarted
+                    // Ghost session — server restarted or job finished while away
                     sessionStorage.setItem('is_script_running', 'false');
                     sessionStorage.removeItem('running_script_name');
                     if (window.releaseWakeLock) window.releaseWakeLock();
-                    if (statusArea) statusArea.innerHTML = '<div style="color: orange;">Previous session was not found on server. Ready for new run.</div>';
+                    if (statusArea) statusArea.innerHTML = '<div style="color: grey;">Session ended. Ready for new run.</div>';
                     if (consoleBox) consoleBox.style.display = 'none';
                     if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = '▶ Run Script'; }
                     if (stopBtn) stopBtn.style.display = 'none';
