@@ -193,7 +193,21 @@ document.addEventListener('DOMContentLoaded', () => {
             // --- Normal log line ---
             const logLine = document.createElement('div');
             logLine.className = 'console-line';
-            logLine.textContent = '> ' + msgData;
+
+            // Detect and style timestamp [YYYY-MM-DD HH:mm:ss]
+            const timestampMatch = msgData.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.*)/);
+            if (timestampMatch) {
+                const tsSpan = document.createElement('span');
+                tsSpan.className = 'console-timestamp';
+                tsSpan.textContent = `[${timestampMatch[1]}] `;
+                tsSpan.style.color = '#888';
+                tsSpan.style.fontSize = '0.9em';
+                tsSpan.style.marginRight = '5px';
+                logLine.appendChild(tsSpan);
+                logLine.appendChild(document.createTextNode(timestampMatch[2]));
+            } else {
+                logLine.textContent = '> ' + msgData;
+            }
             fragment.appendChild(logLine);
         });
 

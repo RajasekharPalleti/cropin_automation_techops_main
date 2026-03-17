@@ -103,11 +103,12 @@ class ConnectionManager:
         self.active_connections[client_id] = asyncio.Queue()
         print(f"Client {client_id} connected for SSE. Last-Event-ID: {last_event_id}")
 
+        timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
         if client_id in self.client_logs and self.client_logs[client_id]:
             if last_event_id:
-                await self.active_connections[client_id].put((0, "Connected to server (SSE) - Resuming session..."))
+                await self.active_connections[client_id].put((0, f"{timestamp} Connected to server (SSE) - Resuming session..."))
             else:
-                await self.active_connections[client_id].put((0, "Connected to server (SSE)."))
+                await self.active_connections[client_id].put((0, f"{timestamp} Connected to server (SSE)."))
 
             for (msg_id, message) in self.client_logs[client_id]:
                 if not last_event_id or (last_event_id.isdigit() and msg_id > int(last_event_id)):
@@ -115,7 +116,7 @@ class ConnectionManager:
         else:
             self.client_logs[client_id] = []
             self.client_counters[client_id] = 0
-            await self.active_connections[client_id].put((0, "Connected to server (SSE)."))
+            await self.active_connections[client_id].put((0, f"{timestamp} Connected to server (SSE)."))
 
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
@@ -124,6 +125,14 @@ class ConnectionManager:
 
     async def send_log(self, message: str, client_id: str):
         """Archive a log message and push it to the live SSE queue."""
+        from datetime import datetime
+        
+        # Prepend timestamp only if it's not a control message protocol marker
+        is_control = any(message.startswith(p) for p in ["JOB_COMPLETED::", "JOB_FAILED::", "JOB_STOPPED::"])
+        if not is_control and message != "STOP_UI_NOW":
+            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+            message = f"{timestamp} {message}"
+
         if client_id not in self.client_logs:
             self.client_logs[client_id] = []
             self.client_counters[client_id] = 0

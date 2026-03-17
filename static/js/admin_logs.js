@@ -561,7 +561,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!isSearchMode) {
                     if (!data.line.includes('/api/server_logs')) {
                         const safeLine = data.line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        logsBody.insertAdjacentHTML('beforeend', `<div class="admin-log-line">${safeLine}</div>`);
+                        
+                        // Style timestamp [YYYY-MM-DD HH:mm:ss]
+                        const styled = safeLine.replace(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.*)/, (match, p1, p2) => {
+                             return `<span class="admin-log-timestamp" style="color:#888;font-size:0.9em;margin-right:6px;">[${p1}]</span> ${p2}`;
+                        });
+
+                        logsBody.insertAdjacentHTML('beforeend', `<div class="admin-log-line">${styled}</div>`);
                         if (wasScrolledToBottom && !logsWindow.isMinimized && !isLoadingOlder) {
                             scrollToBottom();
                         }
@@ -663,7 +669,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             searchResults.forEach(line => {
                 const safeLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                const highlighted = safeLine.replace(regex, m =>
+                
+                // Style timestamp [YYYY-MM-DD HH:mm:ss]
+                const styled = safeLine.replace(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.*)/, (match, p1, p2) => {
+                    return `<span class="admin-log-timestamp" style="color:#888;font-size:0.9em;margin-right:6px;">[${p1}]</span> ${p2}`;
+                });
+
+                const highlighted = styled.replace(regex, m =>
                     `<span style="background:yellow;color:#000;border-radius:2px;padding:0 2px;">${m}</span>`);
                 html += `<div class="admin-log-line search-match">${highlighted}</div>`;
             });
@@ -690,7 +702,13 @@ document.addEventListener('DOMContentLoaded', () => {
         logsCache.forEach(line => {
             if (line.includes('/api/server_logs')) return;
             const safeLine = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            html += `<div class="admin-log-line">${safeLine}</div>`;
+            
+            // Style timestamp [YYYY-MM-DD HH:mm:ss]
+            const styled = safeLine.replace(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (.*)/, (match, p1, p2) => {
+                 return `<span class="admin-log-timestamp" style="color:#888;font-size:0.9em;margin-right:6px;">[${p1}]</span> ${p2}`;
+            });
+
+            html += `<div class="admin-log-line">${styled}</div>`;
         });
         if (!html) html = '<div style="color:#888;text-align:center;padding:20px;">No logs available.</div>';
 

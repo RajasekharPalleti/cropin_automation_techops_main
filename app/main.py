@@ -65,7 +65,8 @@ class LoggerWriter:
 # Ensure basic configuration sends all Python root logs to server.log
 logging.basicConfig(
     level=logging.INFO,
-    format='%(message)s', # Keep it simple so it matches what user sees in terminal
+    format='[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
         logging.handlers.RotatingFileHandler(
             "server.log", maxBytes=15 * 1024 * 1024, backupCount=1, encoding="utf-8"
