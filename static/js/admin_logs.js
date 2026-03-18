@@ -837,6 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopAllWindow = setupFloatingWindow({
         wrapper: stopAllWrapper,
         header: stopAllHeader,
+        closeBtn: stopAllCloseBtn,
         minimizeBtn: stopAllMinimizeBtn,
         maximizeBtn: stopAllMaximizeBtn,
         onClose: () => {

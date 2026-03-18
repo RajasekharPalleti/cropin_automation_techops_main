@@ -190,7 +190,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
 
                 time.sleep(delay_time)
-                log(f"    ⏳ Waiting for {delay_time} seconds before next batch...")
+                log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
 
             # --- 2) DELETE CROPPABLE AREA API ---
             if "delete" in ca_action:
@@ -271,7 +271,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
 
                     time.sleep(delay_time)
-                    log(f"    ⏳ Waiting for {delay_time} seconds before next batch...")
+                    log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
 
             # Live save to output
             try:
