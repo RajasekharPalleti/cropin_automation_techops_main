@@ -763,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- Jobs populated by JS -->
             </div>
 
-            <!-- Inline confirmation banner (hidden by default) -->
+            <!-- Inline confirmation banner for Stop All (hidden by default) -->
             <div id="stopall-confirm-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 14px;margin-bottom:10px;">
                 <p style="margin:0 0 10px;font-weight:600;color:#856404;font-size:0.92em;">
                     ⚠ Are you sure you want to terminate ALL running processes?
@@ -775,10 +775,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
 
+            <!-- Inline confirmation banner for System Restart (hidden by default) -->
+            <div id="stopall-restart-confirm-banner" style="display:none;background:#fcecea;border:1px solid #f5c6cb;border-radius:6px;padding:12px 14px;margin-bottom:10px;">
+                <p style="margin:0 0 10px;font-weight:600;color:#dc3545;font-size:0.92em;">
+                    ⚠ Are you sure you want to FORCE RESTART the entire system?
+                </p>
+                <p style="margin:0 0 12px;color:#666;font-size:0.82em;">This will kill currently running server/ngrok processes and start fresh instances (same as midnight deployment). All active scripts will be aborted.</p>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="stopall-restart-cancel" class="btn-secondary" style="padding:6px 14px;font-size:0.85em;">Cancel</button>
+                    <button id="stopall-restart-proceed" class="btn-primary" style="background:#dc3545;padding:6px 14px;font-size:0.85em;">Yes, Restart System</button>
+                </div>
+            </div>
+
             <!-- Footer buttons -->
-            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:10px;border-top:1px solid #dee2e6;flex-shrink:0;">
-                <button id="stopall-dismiss-btn" class="btn-secondary" style="padding:8px 16px;">Dismiss</button>
-                <button id="stopall-closeall-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Terminate All</button>
+            <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #dee2e6;flex-shrink:0;">
+                <button id="stopall-force-restart-btn" class="btn-primary" style="background-color:#ff9800; border-color:#ff9800; padding:8px 16px;">Force Restart System</button>
+                <div style="display:flex;gap:10px;">
+                    <button id="stopall-dismiss-btn" class="btn-secondary" style="padding:8px 16px;">Dismiss</button>
+                    <button id="stopall-closeall-btn" class="btn-primary" style="background-color:#dc3545;padding:8px 16px;">Terminate All</button>
+                </div>
             </div>
         </div>
     `;
@@ -794,11 +809,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopAllDismissBtn = document.getElementById('stopall-dismiss-btn');
     const stopAllCloseAllBtn = document.getElementById('stopall-closeall-btn');
 
-    // ---- Helper: hide the Close All confirmation banner ----
+    // ---- Helper: hide both confirmation banners ----
     function hideConfirmBanner() {
         stopAllConfirmBanner.style.display = 'none';
+        stopAllRestartConfirmBanner.style.display = 'none';
         stopConfirmProceedBtn.disabled = false;
         stopConfirmProceedBtn.textContent = 'Terminate All';
+        stopRestartProceedBtn.disabled = false;
+        stopRestartProceedBtn.textContent = 'Yes, Restart System';
     }
 
     // ---- Helper: enable/disable Close All button based on job count ----
@@ -834,7 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ---- Load jobs ----
     function loadActiveJobs(quiet = false) {
-        hideConfirmBanner();
+        // hideConfirmBanner() removed to ensure manual confirmation choice was persistent
         if (!quiet) {
             stopAllJobsList.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">Fetching running processes…</div>';
         }
@@ -964,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---- Toggle Stop All console ----
     function toggleStopAllConsole() {
         if (!stopAllWindow.isVisible()) {
+            hideConfirmBanner(); // Start fresh
             stopAllWindow.show();
             loadActiveJobs();
             // Start real-time poller
@@ -971,6 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activeJobsPoller = setInterval(() => loadActiveJobs(true), 3000);
         } else {
             if (!stopAllWindow.flashIfVisible()) {
+                hideConfirmBanner(); // Start fresh
                 stopAllWindow.show();
                 loadActiveJobs();
                 if (activeJobsPoller) clearInterval(activeJobsPoller);
@@ -994,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---- Close All: show confirmation banner ----
     stopAllCloseAllBtn.addEventListener('click', () => {
         if (stopAllCloseAllBtn.disabled) return;
+        hideConfirmBanner(); // Clear other banners (e.g. restart banner)
         stopAllConfirmBanner.style.display = 'block';
         stopAllConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
@@ -1018,6 +1039,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
+    const stopAllForceRestartBtn = document.getElementById('stopall-force-restart-btn');
+    const stopAllRestartConfirmBanner = document.getElementById('stopall-restart-confirm-banner');
+    const stopRestartCancelBtn = document.getElementById('stopall-restart-cancel');
+    const stopRestartProceedBtn = document.getElementById('stopall-restart-proceed');
+
+    // ---- Force Restart: show confirmation banner ----
+    stopAllForceRestartBtn.addEventListener('click', () => {
+        hideConfirmBanner(); // Clear other banners
+        stopAllRestartConfirmBanner.style.display = 'block';
+        stopAllRestartConfirmBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // ---- Restart Banner — dismiss ----
+    stopRestartCancelBtn.addEventListener('click', () => hideConfirmBanner());
+
+    // ---- Restart Banner — Restart confirmed ----
+    stopRestartProceedBtn.addEventListener('click', () => {
+        stopRestartProceedBtn.disabled = true;
+        stopRestartProceedBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restarting…';
+
+        fetch('/api/server/force_restart', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (window.showToast) {
+                    window.showToast(data.message || 'System restart initiated.', 'success', 'System Restart');
+                }
+                hideConfirmBanner();
+                stopAllWindow.hide();
+                // After 20 seconds, encourage the user to refresh
+                setTimeout(() => {
+                    if (window.showToast) {
+                        window.showToast('Server should be back online soon. Please REFRESH your browser tab.', 'info', 'Action Required');
+                    }
+                }, 20000);
+            })
+            .catch(err => {
+                console.error('Restart failed:', err);
+                if (window.showToast) {
+                    window.showToast('Failed to initiate restart: ' + err.message, 'error');
+                }
+                stopRestartProceedBtn.disabled = false;
+                stopRestartProceedBtn.textContent = 'Yes, Restart System';
+            });
+    });
 
 });
 

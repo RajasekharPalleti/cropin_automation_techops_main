@@ -25,6 +25,7 @@ read -p "Press any key to close..."
 exit 0
 
 :WINDOWS
+title CROPIN_SERVER
 echo Starting Cropin Automation Server...
 echo Open http://localhost:4444 or http://<your-ip>:4444 in your browser.
 pushd %~dp0\..\

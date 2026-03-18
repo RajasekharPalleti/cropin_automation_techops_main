@@ -16,6 +16,7 @@ exit 0
 
 :WINDOWS
 @echo off
+title CROPIN_NGROK
 echo Initializing Remote Tunnel...
 echo.
 echo The public URL will appear below.

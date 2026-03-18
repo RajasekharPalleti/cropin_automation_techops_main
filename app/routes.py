@@ -321,6 +321,27 @@ async def shutdown_server():
     threading.Timer(2.0, kill_server).start()
     return {"status": "shutting_down", "message": "Server will shut down via stop_server.bat in 2 seconds."}
 
+@router.post("/api/server/force_restart")
+async def force_restart_server():
+    """Trigger a standalone force_restart.py logic (stop server/ngrok, then start new instance)."""
+    import os
+    import subprocess
+    import sys
+
+    try:
+        # Use Popen to launch it independently
+        # We use sys.executable to ensure we use the same python interpreter/venv
+        # creationflags=subprocess.CREATE_NEW_CONSOLE ensures it lives after this process dies
+        subprocess.Popen(
+            [sys.executable, "force_restart.py"],
+            shell=False,
+            creationflags=subprocess.CREATE_NEW_CONSOLE
+        )
+        return {"status": "success", "message": "Force restart sequence initiated. Server will reboot in ~10 seconds."}
+    except Exception as e:
+        print(f"Error triggering force_restart.py: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to trigger restart: {str(e)}")
+
 
 # ---------------------------------------------------------------------------
 # Session recovery
