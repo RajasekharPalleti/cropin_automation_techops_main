@@ -105,6 +105,3 @@ def execute_force_restart():
 
 if __name__ == "__main__":
     execute_force_restart()
-
-if __name__ == "__main__":
-    execute_force_restart()
