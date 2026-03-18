@@ -188,9 +188,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         df.at[chunk_idx, "closed_api_http_status"] = "Error"
                         df.at[chunk_idx, "closed_api_status"] = str(e)
 
-
-                time.sleep(delay_time)
                 log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
+                time.sleep(delay_time)
 
             # --- 2) DELETE CROPPABLE AREA API ---
             if "delete" in ca_action:
@@ -269,9 +268,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                             df.at[chunk_idx, "delete_api_http_status"] = "Error"
                             df.at[chunk_idx, "delete_api_status"] = str(e)
 
-
-                    time.sleep(delay_time)
                     log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
+                    time.sleep(delay_time)
 
             # Live save to output
             try:
