@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Scroll: top → load older history (normal mode) | bottom → load more search results (search mode) ---
     logsBody.addEventListener('scroll', () => {
         const isNearTop = logsBody.scrollTop <= 10;
-        const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 60;
+        const isNearBottom = logsBody.scrollHeight - logsBody.scrollTop - logsBody.clientHeight < 100;
 
         // Hide jump button if minimized or in search mode or near bottom
         jumpLatestBtn.style.display = (!isSearchMode && !isNearBottom && !logsWindow.isMinimized) ? 'flex' : 'none';
@@ -552,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
         eventSource.onmessage = function (event) {
             try {
                 const data = JSON.parse(event.data);
-                const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
+                const wasScrolledToBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 100;
                 logsCache.push(data.line);
                 totalServerLines++;
                 olderLogsOffset++; // Correct for offset drift: history is fetched relative to the end of the file
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!html) html = '<div style="color:#888;text-align:center;padding:20px;">No logs available.</div>';
 
-        const isAtBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 20;
+        const isAtBottom = logsBody.scrollHeight - logsBody.clientHeight <= logsBody.scrollTop + 100;
         logsBody.innerHTML = html;
         if ((forceScrollToBottom || isAtBottom) && !logsWindow.isMinimized && !isLoadingOlder) {
             scrollToBottom();
