@@ -4,6 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
+echo -ne "\033]0;RESTART_SERVER\007"
 echo "Restarting Cropin Automation Server..."
 PID=$(lsof -ti:4444)
 if [ -n "$PID" ]; then
@@ -30,6 +31,7 @@ read -p "Press any key to close..."
 exit 0
 
 :WINDOWS
+title RESTART_SERVER
 echo Restarting Cropin Automation Server...
 for /f "tokens=5" %%a in ('netstat -aon ^| find ":4444" ^| find "LISTENING"') do taskkill /f /pid %%a
 timeout /t 2 >nul

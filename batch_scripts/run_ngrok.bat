@@ -4,6 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
+echo -ne "\033]0;CROPIN_NGROK\007"
 echo "Initializing Remote Tunnel..."
 echo ""
 echo "The public URL will appear below."

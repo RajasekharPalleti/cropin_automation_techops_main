@@ -136,7 +136,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Replace NaNs with empty string for safety in text fields, but be careful with numbers
     # df = df.fillna("") # Optional, may mess up numeric checks if not careful, sticking to per-row checks
 
-    log(f"\n[INFO] Starting to process {len(df)} rows")
+    total_rows = len(df)
+    processed_count = 0
+    log(f"\n[INFO] Starting to process {total_rows} rows")
 
     for index, row in df.iterrows():
         # Try to use named columns if they exist, else fallback to indices as per original script
@@ -179,7 +181,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[index, "Status"] = f"Invalid GeoInfo: {e}"
                 continue
 
-            log(f"🔄 Processing CA_ID: {CA_id} ({CA_Name})")
+            pending_rows = total_rows - processed_count
+            log(f"🔄 Processing CA_ID: {CA_id} ({CA_Name}) | Row {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows}")
 
             # ---------------- GET CA ----------------
             get_endpoint = f"{api_url}/{CA_id}"
@@ -261,6 +264,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Status"] = f"Error: {e}"
             log(f"❌ Error: {e}")
 
+        processed_count += 1
         time.sleep(delay_time)
 
     # Save output

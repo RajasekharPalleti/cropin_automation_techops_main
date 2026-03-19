@@ -4,6 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
+echo -ne "\033]0;CROPIN_SERVER\007"
 echo "Starting Cropin Automation Server..."
 echo "Open http://localhost:4444 or http://<your-ip>:4444 in your browser."
 cd "$(dirname "$0")/.."

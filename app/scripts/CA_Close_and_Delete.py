@@ -92,6 +92,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("⚠️ No valid data to process after cleaning.")
         return
 
+    total_rows = len(df)
+    processed_count = 0
+
     ca_x_api_key = config.get("ca_x_api_key", "SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS")
 
     headers = {
@@ -121,7 +124,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             ca_ids_param = ",".join(map(str, ca_chunk))
             project_asset_ids_param = ",".join(map(str, project_asset_chunk))
 
-            log(f"  🔁 Batch {offset + 1} | Items: {len(ca_chunk)}")
+            batch_item_count = len(ca_chunk)
+            pending_rows = total_rows - processed_count
+            log(f"  🔁 Batch {offset + 1} | Items: {batch_item_count} | Processed: {processed_count} | Pending: {pending_rows}")
 
             # Log each row being processed in this batch
             for row_idx, (ca_id, project_asset_id) in enumerate(zip(ca_chunk, project_asset_chunk)):
@@ -271,10 +276,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
                     time.sleep(delay_time)
 
-            # Live save to output
-            try:
-                df.to_excel(output_excel_file, index=False)
-            except:
-                pass
+            processed_count += len(idx_chunk)
 
+    # Final save to output
+    try:
+        df.to_excel(output_excel_file, index=False)
+    except:
+        pass
     log(f"\n🎯 Process completed. Output saved to: {output_excel_file}")

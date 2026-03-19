@@ -4,6 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
+echo -ne "\033]0;RESTART_NGROK\007"
 echo "Restarting ngrok..."
 pkill -9 ngrok || true
 echo "Stopped existing ngrok processes."
@@ -15,6 +16,7 @@ read -p "Press any key to close..."
 exit 0
 
 :WINDOWS
+title RESTART_NGROK
 echo Restarting ngrok...
 taskkill /IM ngrok.exe /F >nul 2>&1
 echo Stopped existing ngrok processes.
