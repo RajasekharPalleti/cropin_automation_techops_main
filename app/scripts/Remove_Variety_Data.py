@@ -61,12 +61,17 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
             id_col = df.columns[0]
             log(f"⚠️ 'VarietyID' column not explicitly found. Using first column: '{id_col}'")
 
+        total_rows = len(df)
+        processed_count = 0
         for i, row in df.iterrows():
             try:
                 variety_id = row[id_col]
                 if pd.isna(variety_id):
                     continue
                 variety_id = int(variety_id)
+
+                pending_rows = total_rows - processed_count
+                log(f"Processing row {i+1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows} | Variety: {variety_id}")
 
                 # --- Fetch variety data ---
                 try:
@@ -118,6 +123,7 @@ def run(input_excel, output_excel, config_dict, log_callback=None):
                 df.at[i, 'Response'] = str(e)
                 log(f"❌ Error processing row {i+2}: {e}")
 
+            processed_count += 1
             time.sleep(delay_time)
 
         # --- Save output ---

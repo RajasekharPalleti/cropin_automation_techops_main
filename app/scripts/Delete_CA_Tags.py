@@ -108,12 +108,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     # 4. Process Rows
     total_rows = len(df)
+    processed_count = 0
     log(f"Processing {total_rows} rows...")
 
     for index, row in df.iterrows():
         # Using iloc to match original script's column assumption: index 0 (CA_id), index 2 (Tags IDs)
         ca_id = row.iloc[0] if len(row) > 0 else None
         raw_tags = row.iloc[2] if len(row) > 2 else None
+
+        pending_rows = total_rows - processed_count
+        log(f"🔄 Processing row {index+1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows} | CA: {ca_id}")
 
         if pd.isna(ca_id) or pd.isna(raw_tags):
             df.at[index, "Status"] = "Skipped"
@@ -183,6 +187,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log(f"Row {index + 2}: Failed - {err_msg[:100]}")
 
         # Throttle delay
+        processed_count += 1
         time.sleep(delay_time)
 
     # 5. Save Output

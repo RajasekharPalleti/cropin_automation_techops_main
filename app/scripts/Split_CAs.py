@@ -69,7 +69,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # =========================
     # PROCESS ROWS
     # =========================
-    for i in range(len(df)):
+    total_rows = len(df)
+    processed_count = 0
+    for i in range(total_rows):
         try:
             # Using iloc as per user's original script requirement
             # Column 1 -> Index 0: croppable_area_id
@@ -81,6 +83,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             project_id = df.iloc[i, 1]
             # Skip empty rows
             if pd.isna(croppable_area_id) or pd.isna(project_id):
+                processed_count += 1
                 continue
 
             croppable_area_id = int(croppable_area_id)
@@ -137,7 +140,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 for _ in range(split_count)
             ]
 
-            log(f"➡ Processing Row {i+2} | Project {project_id}, CA {croppable_area_id}, Splits {split_count}")
+            pending_rows = total_rows - processed_count
+            log(f"➡ Processing Row {i+1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows} | Project {project_id}, CA {croppable_area_id}, Splits {split_count}")
             
             # API call
             response = requests.post(url, json=payload, headers=headers)
@@ -151,6 +155,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[i, "status"] = "❌ Failed"
                 df.at[i, "Response"] = f"{response.status_code} - {response.text}"
                 
+            processed_count += 1
             time.sleep(delay_time)  # configurable via UI
 
         except Exception as e:

@@ -82,10 +82,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunk1 = df.iloc[:mid_index].copy()
     chunk2 = df.iloc[mid_index:].copy()
 
-    log(f"🔄 Starting processing {len(df)} farmers with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
+    total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
+    log(f"🔄 Starting processing {total_rows} farmers with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
+        nonlocal processed_count
         headers = {"Authorization": f"Bearer {token}"}
         results = [] # List of (index, status, response)
 
@@ -95,69 +100,75 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             status = ""
             response_str = ""
             
-            if not farmer_id or farmer_id.lower() == 'nan':
-                 log(f"[Thread {thread_id}] Skipping empty row {index}")
-                 results.append((index, "Skipped: Empty ID", ""))
-                 continue
-
             try:
-                log(f"[Thread {thread_id}] Fetching: {farmer_id}")
-                get_resp = requests.get(f"{api_url}/{farmer_id}", headers=headers)
-                get_resp.raise_for_status()
-                farmer_data = get_resp.json()
+                if not farmer_id or farmer_id.lower() == 'nan':
+                    log(f"[Thread {thread_id}] Skipping empty row {index}")
+                    results.append((index, "Skipped: Empty ID", ""))
+                    continue
 
-                updates_made = False
+                try:
+                    log(f"[Thread {thread_id}] Fetching: {farmer_id}")
+                    get_resp = requests.get(f"{api_url}/{farmer_id}", headers=headers)
+                    get_resp.raise_for_status()
+                    farmer_data = get_resp.json()
 
-                # Dynamic Update Logic
-                for key_idx, key_name in valid_keys_map.items():
-                    # Map config key index 0 -> value_1, index 1 -> value_2...
-                    col_name = f"value_{key_idx + 1}"
-                    
-                    if col_name in df.columns:
-                        new_value = row[col_name]
-                        if pd.isna(new_value):
-                            new_value = "" # or None? Empty string for text fields usually safe.
+                    updates_made = False
+
+                    # Dynamic Update Logic
+                    for key_idx, key_name in valid_keys_map.items():
+                        # Map config key index 0 -> value_1, index 1 -> value_2...
+                        col_name = f"value_{key_idx + 1}"
+                        
+                        if col_name in df.columns:
+                            new_value = row[col_name]
+                            if pd.isna(new_value):
+                                new_value = "" # or None? Empty string for text fields usually safe.
+                            else:
+                                new_value = str(new_value).strip()
+                            
+                            # Compare with existing
+                            current_value = farmer_data.get(key_name)
+                            if current_value is None: current_value = ""
+                            
+                            if str(current_value).strip() != new_value:
+                                farmer_data[key_name] = new_value
+                                updates_made = True
                         else:
-                            new_value = str(new_value).strip()
-                        
-                        # Compare with existing
-                        current_value = farmer_data.get(key_name)
-                        if current_value is None: current_value = ""
-                        
-                        if str(current_value).strip() != new_value:
-                            farmer_data[key_name] = new_value
-                            updates_made = True
-                    else:
-                        # Column not found for this key
-                        pass
+                            # Column not found for this key
+                            pass
 
-                if not updates_made:
-                     log(f"[Thread {thread_id}] No changes for {farmer_id}")
-                     results.append((index, "Skipped: No changes", ""))
-                     continue
-                
-                # PUT - Use Multipart/DTO as requested
+                    if not updates_made:
+                        log(f"[Thread {thread_id}] No changes for {farmer_id}")
+                        results.append((index, "Skipped: No changes", ""))
+                        continue
+                    
+                    # PUT - Use Multipart/DTO as requested
+                    time.sleep(delay_time)
+                    
+                    multipart_data = {
+                        "dto": (None, json.dumps(farmer_data), "application/json")
+                    }
+                    
+                    put_resp = requests.put(api_url, headers=headers, files=multipart_data)
+                    
+                    put_resp.raise_for_status()
+
+                    status = "Success"
+                    response_str = put_resp.text[:300]
+                    log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
+
+                except Exception as e:
+                    status = f"Failed: {str(e)}"
+                    response_str = str(e)
+                    log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}")
+
                 time.sleep(delay_time)
-                
-                multipart_data = {
-                    "dto": (None, json.dumps(farmer_data), "application/json")
-                }
-                
-                put_resp = requests.put(api_url, headers=headers, files=multipart_data)
-                
-                put_resp.raise_for_status()
-
-                status = "Success"
-                response_str = put_resp.text[:300]
-                log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
-
-            except Exception as e:
-                status = f"Failed: {str(e)}"
-                response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {e}")
-
-            time.sleep(delay_time)
-            results.append((index, status, response_str))
+                results.append((index, status, response_str))
+            finally:
+                with processed_lock:
+                    processed_count += 1
+                    pending_rows = total_rows - processed_count
+                    log(f"[Thread {thread_id}] Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | Farmer: {farmer_id if farmer_id and farmer_id.lower() != 'nan' else 'N/A'}")
 
         return results
 

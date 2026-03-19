@@ -36,8 +36,11 @@ def post_data_to_api(base_api_url, access_token_bearer, input_excel_file, output
     }
 
     # Iterate through each row in the Excel file
+    total_rows = len(df)
+    processed_count = 0
     for index, row in df.iterrows():
-        log(f"Processing iteration {index + 1}...")
+        pending_rows = total_rows - processed_count
+        log(f"Processing iteration {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows}...")
 
         # Construct the payload from the row data
         try:
@@ -72,6 +75,7 @@ def post_data_to_api(base_api_url, access_token_bearer, input_excel_file, output
             df.at[index, 'Response'] = str(e)
             log(f"Error processing {row.iloc[0]}: {e}")
 
+        processed_count += 1
         # Wait for 0.5 second before the next iteration
         time.sleep(delay_time)
 

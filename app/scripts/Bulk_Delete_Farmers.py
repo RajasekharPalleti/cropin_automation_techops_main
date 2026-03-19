@@ -64,7 +64,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         
         farmer_ids = df.loc[valid_indices, "farmer_id"].astype(str).tolist()
 
-        log(f"🚀 Total Farmers to Delete: {len(farmer_ids)}")
+        total_rows = len(farmer_ids)
+        processed_count = 0
+        log(f"🚀 Total Farmers to Delete: {total_rows}")
         
         headers = {
             "Authorization": f"Bearer {token}",
@@ -76,8 +78,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             batch_indices = valid_indices[i:i + BATCH_SIZE]
             
             ids_param = ",".join(batch_slice_ids)
+            pending_rows = total_rows - processed_count
 
-            log(f"\n🗑️ Deleting batch {i // BATCH_SIZE + 1}")
+            log(f"\n🗑️ Deleting batch {i // BATCH_SIZE + 1} | Items: {len(batch_slice_ids)} | Processed: {processed_count} | Pending: {pending_rows}")
             # log(f"📦 Farmer IDs: {ids_param}") # Too verbose for UI logs maybe, keep short
 
             try:
@@ -110,6 +113,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.loc[batch_indices, "Status"] = status
             df.loc[batch_indices[0], "Processed_IDs"] = ids_param
             df.loc[batch_indices[0], "API_Response"] = response_text
+
+            processed_count += len(batch_slice_ids)
 
             # Live save to output
             df.to_excel(output_excel_file, index=False)

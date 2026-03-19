@@ -70,146 +70,146 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         exdata['Response'] = ""
     exdata['Response'] = exdata['Response'].fillna("").astype(str)
 
-    log(f"\n[INFO] Starting to process {len(exdata)} rows from the Excel file")
+    total_rows = len(exdata)
+    processed_count = 0
+    log(f"\n[INFO] Starting to process {total_rows} rows from the Excel file")
 
     headers = {"Authorization": f"Bearer {token}"}
 
     for index, row in exdata.iterrows():
-        log(f"\n[ROW {index + 1}] Processing row")
-
         try:
-            # --- Extract fields from Excel ---
-            plan_id = str(row.get("plan_id", "")).strip()
-            
-            if not plan_id:
-                log(f"[ROW {index + 1}] ⚠️ Skipped: Missing plan_id")
-                continue
+            pending_rows = total_rows - processed_count
+            log(f"\n[ROW {index + 1}/{total_rows}] Progressed: {processed_count} | Pending: {pending_rows}")
 
-            plan_name = row.get("plan_name", "")
-            plantype_id = row.get("plantype_id", "")
-            schedule_type = row.get("schedule_type", "")
-            no_of_days = safe_int(row.get("no_of_days", 0))
-            execute_when = row.get("execute_when", "")
-            reference_date = row.get("reference_date", "")
-            required_days = safe_int(row.get("required_days", 0))
-            recuring = safe_bool(row.get("recuring", False))
-            repeat_after = safe_int(row.get("repeat_after", 0))
-            timePeriod = row.get("timePeriod", "")
-            hasRecuringEndDate = safe_bool(row.get("hasRecuringEndDate", False))
-            recuringEndDate = row.get("recuringEndDate", "")
-            recNoOfDays = safe_int(row.get("recNoOfDays", 0))
-            recExecuteWhen = row.get("recExecuteWhen", "")
-            recReferenceDate = row.get("recReferenceDate", "")
-
-            # --- GET existing plan ---
-            get_url = f"{api_url}/{plan_id}"
-            log(f"[ROW {index + 1}] Sending GET request: {get_url}")
-
-            get_response = requests.get(get_url, headers=headers)
-
-            if get_response.status_code == 200:
-                try:
-                    plan_response = get_response.json()
-                except ValueError:
-                    log(f"[ROW {index + 1}] ❌ Invalid JSON in GET response")
-                    exdata.at[index, 'status'] = "Invalid JSON"
+            try:
+                # --- Extract fields from Excel ---
+                plan_id = str(row.get("plan_id", "")).strip()
+                
+                if not plan_id:
+                    log(f"[ROW {index + 1}] ⚠️ Skipped: Missing plan_id")
                     continue
-                log(f"[ROW {index + 1}] GET request successful")
-            else:
-                log(f"[ROW {index + 1}] ❌ GET failed with status: {get_response.status_code}")
-                exdata.at[index, 'status'] = f"Failed GET: {get_response.status_code}"
-                continue
 
-            # Ensure schedule key exists
-            if "schedule" not in plan_response:
-                plan_response["schedule"] = {}
+                plan_name = row.get("plan_name", "")
+                plantype_id = row.get("plantype_id", "")
+                schedule_type = row.get("schedule_type", "")
+                no_of_days = safe_int(row.get("no_of_days", 0))
+                execute_when = row.get("execute_when", "")
+                reference_date = row.get("reference_date", "")
+                required_days = safe_int(row.get("required_days", 0))
+                recuring = safe_bool(row.get("recuring", False))
+                repeat_after = safe_int(row.get("repeat_after", 0))
+                timePeriod = row.get("timePeriod", "")
+                hasRecuringEndDate = safe_bool(row.get("hasRecuringEndDate", False))
+                recuringEndDate = row.get("recuringEndDate", "")
+                recNoOfDays = safe_int(row.get("recNoOfDays", 0))
+                recExecuteWhen = row.get("recExecuteWhen", "")
+                recReferenceDate = row.get("recReferenceDate", "")
 
-            # --- Conditional update ---
-            if recuring:  # ✅ Update recurring schedule fields
-                log(f"[ROW {index + 1}] Updating recurring schedule fields")
-                plan_response["name"] = plan_name
-                if "data" in plan_response and "information" in plan_response["data"]:
-                    plan_response["data"]["information"]["planName"] = plan_name
+                # --- GET existing plan ---
+                get_url = f"{api_url}/{plan_id}"
+                log(f"[ROW {index + 1}] Sending GET request: {get_url}")
 
-                plan_response["schedule"]["type"] = schedule_type
-                plan_response["schedule"]["noOfDays"] = no_of_days
-                plan_response["schedule"]["executeWhen"] = execute_when
-                plan_response["schedule"]["requiredDays"] = required_days
-                plan_response["schedule"]["recuring"] = recuring
-                plan_response["schedule"]["repeats"] = repeat_after
-                plan_response["schedule"]["timePeriod"] = timePeriod
-                plan_response["schedule"]["hasRecuringEndDate"] = hasRecuringEndDate
-                plan_response["schedule"]["recuringEndDate"] = recuringEndDate
-                plan_response["schedule"]["recNoOfDays"] = recNoOfDays
-                plan_response["schedule"]["recExecuteWhen"] = recExecuteWhen
+                get_response = requests.get(get_url, headers=headers)
 
-                # Handle referenceDate carefully
-                if isinstance(reference_date, int) or str(reference_date).isdigit():
-                    ref_val = int(reference_date)
-                    plan_response["schedule"]["referenceDate"] = ref_val
-                    plan_response["schedule"]["referencePlanId"] = ref_val
+                if get_response.status_code == 200:
+                    try:
+                        plan_response = get_response.json()
+                    except ValueError:
+                        log(f"[ROW {index + 1}] ❌ Invalid JSON in GET response")
+                        exdata.at[index, 'status'] = "Invalid JSON"
+                        continue
+                    log(f"[ROW {index + 1}] GET request successful")
                 else:
-                    plan_response["schedule"]["referenceDate"] = reference_date
+                    log(f"[ROW {index + 1}] ❌ GET failed with status: {get_response.status_code}")
+                    exdata.at[index, 'status'] = f"Failed GET: {get_response.status_code}"
+                    continue
 
-                # Handle recReferenceDate carefully
-                if isinstance(recReferenceDate, int) or str(recReferenceDate).isdigit():
-                    rec_ref_val = int(recReferenceDate)
-                    plan_response["schedule"]["recReferenceDate"] = rec_ref_val
+                # Ensure schedule key exists
+                if "schedule" not in plan_response:
+                    plan_response["schedule"] = {}
+
+                # --- Conditional update ---
+                if recuring:  # ✅ Update recurring schedule fields
+                    log(f"[ROW {index + 1}] Updating recurring schedule fields")
+                    plan_response["name"] = plan_name
+                    if "data" in plan_response and "information" in plan_response["data"]:
+                        plan_response["data"]["information"]["planName"] = plan_name
+
+                    plan_response["schedule"]["type"] = schedule_type
+                    plan_response["schedule"]["noOfDays"] = no_of_days
+                    plan_response["schedule"]["executeWhen"] = execute_when
+                    plan_response["schedule"]["requiredDays"] = required_days
+                    plan_response["schedule"]["recuring"] = recuring
+                    plan_response["schedule"]["repeats"] = repeat_after
+                    plan_response["schedule"]["timePeriod"] = timePeriod
+                    plan_response["schedule"]["hasRecuringEndDate"] = hasRecuringEndDate
+                    plan_response["schedule"]["recuringEndDate"] = recuringEndDate
+                    plan_response["schedule"]["recNoOfDays"] = recNoOfDays
+                    plan_response["schedule"]["recExecuteWhen"] = recExecuteWhen
+
+                    # Handle referenceDate carefully
+                    if isinstance(reference_date, int) or str(reference_date).isdigit():
+                        ref_val = int(reference_date)
+                        plan_response["schedule"]["referenceDate"] = ref_val
+                        plan_response["schedule"]["referencePlanId"] = ref_val
+                    else:
+                        plan_response["schedule"]["referenceDate"] = reference_date
+
+                    # Handle recReferenceDate carefully
+                    if isinstance(recReferenceDate, int) or str(recReferenceDate).isdigit():
+                        rec_ref_val = int(recReferenceDate)
+                        plan_response["schedule"]["recReferenceDate"] = rec_ref_val
+                    else:
+                        plan_response["schedule"]["recReferenceDate"] = recReferenceDate
+
+                else:  # Update non-recurring schedule fields
+                    log(f"[ROW {index + 1}] Updating standard schedule fields")
+                    plan_response["name"] = plan_name
+                    if "data" in plan_response and "information" in plan_response["data"]:
+                        plan_response["data"]["information"]["planName"] = plan_name
+
+                    plan_response["schedule"]["type"] = schedule_type
+                    plan_response["schedule"]["noOfDays"] = no_of_days
+                    plan_response["schedule"]["executeWhen"] = execute_when
+                    plan_response["schedule"]["requiredDays"] = required_days
+
+                    # Handle referenceDate carefully
+                    if isinstance(reference_date, int) or str(reference_date).isdigit():
+                        ref_val = int(reference_date)
+                        plan_response["schedule"]["referenceDate"] = ref_val
+                        plan_response["schedule"]["referencePlanId"] = ref_val
+                    else:
+                        plan_response["schedule"]["referenceDate"] = reference_date
+
+                # --- PUT request to update ---
+                multipart_data = {
+                    "dto": (None, json.dumps(plan_response), "application/json")
+                }
+
+                put_url = api_url
+                log(f"[ROW {index + 1}] Sending PUT request: {put_url}")
+
+                put_response = requests.put(
+                    put_url,
+                    headers=headers,
+                    files=multipart_data
+                )
+
+                if put_response.status_code in [200, 201]:
+                    log(f"[ROW {index + 1}] ✅ PUT successful")
+                    exdata.at[index, 'status'] = "Success"
+                    exdata.at[index, 'Response'] = f"Code: {put_response.status_code}, Message: {put_response.text}"
                 else:
-                    plan_response["schedule"]["recReferenceDate"] = recReferenceDate
+                    log(f"[ROW {index + 1}] ❌ PUT failed, Status: {put_response.status_code}")
+                    exdata.at[index, 'status'] = f"Failed PUT: {put_response.status_code}"
+                    exdata.at[index, 'Response'] = f"Reason: {put_response.reason}, Message: {put_response.text}"
 
-            else:  # Update non-recurring schedule fields
-                log(f"[ROW {index + 1}] Updating standard schedule fields")
-                plan_response["name"] = plan_name
-                if "data" in plan_response and "information" in plan_response["data"]:
-                    plan_response["data"]["information"]["planName"] = plan_name
-
-                plan_response["schedule"]["type"] = schedule_type
-                plan_response["schedule"]["noOfDays"] = no_of_days
-                plan_response["schedule"]["executeWhen"] = execute_when
-                plan_response["schedule"]["requiredDays"] = required_days
-
-                # Handle referenceDate carefully
-                if isinstance(reference_date, int) or str(reference_date).isdigit():
-                    ref_val = int(reference_date)
-                    plan_response["schedule"]["referenceDate"] = ref_val
-                    plan_response["schedule"]["referencePlanId"] = ref_val
-                else:
-                    plan_response["schedule"]["referenceDate"] = reference_date
-
-            # --- PUT request to update ---
-            multipart_data = {
-                "dto": (None, json.dumps(plan_response), "application/json")
-            }
-
-            # Original script used put_url = f"{api_url}" (base URL) for PUT? 
-            # Usually update is PUT /plans/{id} or PUT /plans with body containing ID
-            # In Update_Farmer_Address.py we used base URL for multipart.
-            # The logic in provided script was: put_url = f"{api_url}"
-            # Let's stick to that as it matches the "Project Behaviour" request.
-            put_url = api_url
-            log(f"[ROW {index + 1}] Sending PUT request: {put_url}")
-
-            put_response = requests.put(
-                put_url,
-                headers=headers,
-                files=multipart_data
-            )
-
-            if put_response.status_code in [200, 201]:
-                log(f"[ROW {index + 1}] ✅ PUT successful")
-                exdata.at[index, 'status'] = "Success"
-                exdata.at[index, 'Response'] = f"Code: {put_response.status_code}, Message: {put_response.text}"
-            else:
-                log(f"[ROW {index + 1}] ❌ PUT failed, Status: {put_response.status_code}")
-                exdata.at[index, 'status'] = f"Failed PUT: {put_response.status_code}"
-                exdata.at[index, 'Response'] = f"Reason: {put_response.reason}, Message: {put_response.text}"
-
-            time.sleep(delay_time)  # Throttle API calls
-
-        except Exception as e:
-            log(f"[ROW {index + 1}] ❌ Error: {str(e)}")
-            exdata.at[index, 'status'] = f"Error: {str(e)}"
+                time.sleep(delay_time)  # Throttle API calls
+            except Exception as e:
+                log(f"[ROW {index + 1}] ❌ Error: {str(e)}")
+                exdata.at[index, 'status'] = f"Error: {str(e)}"
+        finally:
+            processed_count += 1
 
     log(f"\n[INFO] Saving results to output Excel: {output_excel_file}")
     try:

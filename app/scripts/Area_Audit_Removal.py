@@ -54,7 +54,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     # Processing Loop
     # User requested: "iterations should not be static" -> process all rows
-    log(f"🔄 Processing {len(df)} rows...")
+    total_rows = len(df)
+    processed_count = 0
+    log(f"🔄 Processing {total_rows} rows...")
     
     success_count = 0
     failure_count = 0
@@ -74,7 +76,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         # If config is exactly "https://cloud.cropin.in/services/farm/api/croppable-areas"
         url = f"{base_api_url}/{ca_id}/area-audit"
         
-        log(f"Processing {ca_id}...")
+        pending_rows = total_rows - processed_count
+        log(f"Processing {ca_id} (Row {index+1}/{total_rows}) | Processed: {processed_count} | Pending: {pending_rows}...")
 
         try:
             response = requests.delete(url, headers=headers)
@@ -97,6 +100,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Response"] = str(e)
             failure_count += 1
 
+        processed_count += 1
         time.sleep(delay_time)  # Rate limit protection
 
     try:

@@ -77,7 +77,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # =========================
     # BATCH PROCESSING
     # =========================
-    for start in range(0, len(df), BATCH_SIZE):
+    total_rows = len(df)
+    processed_count = 0
+    for start in range(0, total_rows, BATCH_SIZE):
         time_delay = float(config.get("delay_time", 5))
         end = start + BATCH_SIZE
         batch_df = df.iloc[start:end]
@@ -118,7 +120,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         if not payload:
             continue
 
-        log(f"📡 Sending batch {start + 1} → {min(end, len(df))} (Size: {len(payload)})")
+        pending_rows = total_rows - processed_count
+        log(f"📡 Sending batch {start + 1} → {min(end, len(df))} (Size: {len(payload)}) | Processed: {processed_count} | Pending: {pending_rows}")
 
         try:
             response = requests.post(plot_risk_url, headers=headers, json=payload)
@@ -164,6 +167,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[idx, "srPlotid"] = "N/A"
         
         # User script had specific sleep
+        processed_count += len(payload)
         time.sleep(time_delay) 
         log(f"waiting for {time_delay} seconds") 
 

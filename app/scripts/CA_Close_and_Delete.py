@@ -133,150 +133,151 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 excel_row = idx_chunk[row_idx] + 2  # +2: 1 for header, 1 for 0-based index
                 log(f"    📌 Row {excel_row} | project_id: {project_id} | croppable_area_id: {ca_id} | project_asset_id: {project_asset_id}")
 
-            # --- 1) CLOSE CA API ---
-            if "close" in ca_action:
-                log(f"    🔒 Closing {len(ca_chunk)} croppable areas...")
-                close_url = f"{base_url}/croppable-areas/closed?reasonId=4&ids={ca_ids_param}"
-
-                start_time_close = time.time()
-                try:
-                    resp_close = requests.get(close_url, headers=headers, timeout=600)
-                    close_status_code = resp_close.status_code
-                    
-                    try:
-                        close_json = resp_close.json()
-                    except:
-                        close_json = None
-
-                    # Summary Extraction
-                    ca_status_map = {}
-                    def extract(obj):
-                        if isinstance(obj, dict):
-                            if "id" in obj and "status" in obj:
-                                ca_status_map[str(obj["id"])] = str(obj["status"])
-                            for v in obj.values():
-                                extract(v)
-                        elif isinstance(obj, list):
-                            for x in obj:
-                                extract(x)
-
-                    if isinstance(close_json, (dict, list)):
-                        extract(close_json)
-
-                    log(f"    📤 Processed IDs ({len(ca_chunk)}): {', '.join(map(str, ca_chunk))}")
-                    log(f"    📥 Response IDs  ({len(ca_status_map)}): {', '.join(ca_status_map.keys()) if ca_status_map else 'None'}")
-                    _missed = set(map(str, ca_chunk)) - set(ca_status_map.keys())
-                    log(f"    📝 IDs missed in response ({len(_missed)}): {', '.join(_missed) if _missed else 'None'}")
-                    
-                    for row_idx, chunk_idx in enumerate(idx_chunk):
-                        current_ca_id = str(ca_chunk[row_idx])
-                        df.at[chunk_idx, "closed_api_http_status"] = str(close_status_code)
-                        
-                        if current_ca_id in ca_status_map:
-                            df.at[chunk_idx, "closed_api_status"] = ca_status_map[current_ca_id]
-                        else:
-                            if ca_status_map:
-                                df.at[chunk_idx, "closed_api_status"] = "Not found in response"
-                            else:
-                                df.at[chunk_idx, "closed_api_status"] = json.dumps(close_json or resp_close.text, default=str)
-                    
-                    elapsed_close = time.time() - start_time_close
-                    if close_status_code == 200:
-                        log(f"    ✅ Close Success (HTTP {close_status_code}) in {elapsed_close:.2f}s")
-                    else:
-                        log(f"    ⚠️ Close Warning (HTTP {close_status_code}) in {elapsed_close:.2f}s")
-
-                except Exception as e:
-                    elapsed_close = time.time() - start_time_close
-                    log(f"    ❌ Close Error: {str(e)} in {elapsed_close:.2f}s")
-                    for chunk_idx in idx_chunk:
-                        df.at[chunk_idx, "closed_api_http_status"] = "Error"
-                        df.at[chunk_idx, "closed_api_status"] = str(e)
-
-                log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
-                time.sleep(delay_time)
-
-            # --- 2) DELETE CROPPABLE AREA API ---
-            if "delete" in ca_action:
-                ca_chunk_for_delete = []
-                project_asset_chunk_for_delete = []
-                idx_chunk_for_delete = []
-
+            try:
+                # --- 1) CLOSE CA API ---
                 if "close" in ca_action:
-                    for row_idx, chunk_idx in enumerate(idx_chunk):
-                        status = str(df.at[chunk_idx, "closed_api_status"]).strip().lower()
-                        if status == "closed":
-                            ca_chunk_for_delete.append(ca_chunk[row_idx])
-                            project_asset_chunk_for_delete.append(project_asset_chunk[row_idx])
-                            idx_chunk_for_delete.append(chunk_idx)
-                        else:
-                            df.at[chunk_idx, "delete_api_http_status"] = "Skipped"
-                            df.at[chunk_idx, "delete_api_status"] = "Skipped (Not closed)"
-                else:
-                    ca_chunk_for_delete = ca_chunk
-                    project_asset_chunk_for_delete = project_asset_chunk
-                    idx_chunk_for_delete = idx_chunk
+                    log(f"    🔒 Closing {len(ca_chunk)} croppable areas...")
+                    close_url = f"{base_url}/croppable-areas/closed?reasonId=4&ids={ca_ids_param}"
 
-                if not ca_chunk_for_delete:
-                    if "close" in ca_action:
-                        log(f"    ⚠️ No croppable areas were successfully closed in this batch. Skipping delete.")
-                else:
-                    ca_ids_param_delete = ",".join(map(str, ca_chunk_for_delete))
-                    project_asset_ids_param_delete = ",".join(map(str, project_asset_chunk_for_delete))
-
-                    log(f"    🗑️ Deleting {len(ca_chunk_for_delete)} croppable_areas...")
-                    # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
-                    delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param_delete}&croppableAreaIds={ca_ids_param_delete}"
-
-                    start_time_delete = time.time()
+                    start_time_close = time.time()
                     try:
-                        resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
-                        delete_status_code = resp_delete.status_code
-
+                        resp_close = requests.get(close_url, headers=headers, timeout=600)
+                        close_status_code = resp_close.status_code
+                        
                         try:
-                            delete_json = resp_delete.json()
+                            close_json = resp_close.json()
                         except:
-                            delete_json = None
+                            close_json = None
 
-                        deletable = None
-                        non_deletable = None
-                        is_deleted = False
+                        # Summary Extraction
+                        ca_status_map = {}
+                        def extract(obj):
+                            if isinstance(obj, dict):
+                                if "id" in obj and "status" in obj:
+                                    ca_status_map[str(obj["id"])] = str(obj["status"])
+                                for v in obj.values():
+                                    extract(v)
+                            elif isinstance(obj, list):
+                                for x in obj:
+                                    extract(x)
 
-                        if delete_status_code in (200, 204) and isinstance(delete_json, dict):
-                            deletable = delete_json.get("deletable")
-                            non_deletable = delete_json.get("nonDeletable")
-                            if deletable is not None and non_deletable is not None:
-                                is_deleted = True
+                        if isinstance(close_json, (dict, list)):
+                            extract(close_json)
 
-                        delete_info = {
-                            "http_status": delete_status_code,
-                            "deletable": deletable,
-                            "nonDeletable": non_deletable,
-                            "deleted": is_deleted
-                        }
-
-                        for chunk_idx in idx_chunk_for_delete:
-                            df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
-                            df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
-
-                        elapsed_delete = time.time() - start_time_delete
-                        if is_deleted:
-                            log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable}) in {elapsed_delete:.2f}s")
+                        log(f"    📤 Processed IDs ({len(ca_chunk)}): {', '.join(map(str, ca_chunk))}")
+                        log(f"    📥 Response IDs  ({len(ca_status_map)}): {', '.join(ca_status_map.keys()) if ca_status_map else 'None'}")
+                        _missed = set(map(str, ca_chunk)) - set(ca_status_map.keys())
+                        log(f"    📝 IDs missed in response ({len(_missed)}): {', '.join(_missed) if _missed else 'None'}")
+                        
+                        for row_idx, chunk_idx in enumerate(idx_chunk):
+                            current_ca_id = str(ca_chunk[row_idx])
+                            df.at[chunk_idx, "closed_api_http_status"] = str(close_status_code)
+                            
+                            if current_ca_id in ca_status_map:
+                                df.at[chunk_idx, "closed_api_status"] = ca_status_map[current_ca_id]
+                            else:
+                                if ca_status_map:
+                                    df.at[chunk_idx, "closed_api_status"] = "Not found in response"
+                                else:
+                                    df.at[chunk_idx, "closed_api_status"] = json.dumps(close_json or resp_close.text, default=str)
+                        
+                        elapsed_close = time.time() - start_time_close
+                        if close_status_code == 200:
+                            log(f"    ✅ Close Success (HTTP {close_status_code}) in {elapsed_close:.2f}s")
                         else:
-                            error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
-                            log(f"    ❌ Delete Failed (HTTP {delete_status_code}) in {elapsed_delete:.2f}s | Response: {error_detail[:500]}")
+                            log(f"    ⚠️ Close Warning (HTTP {close_status_code}) in {elapsed_close:.2f}s")
 
                     except Exception as e:
-                        elapsed_delete = time.time() - start_time_delete
-                        log(f"    ❌ Delete Error: {str(e)} in {elapsed_delete:.2f}s")
-                        for chunk_idx in idx_chunk_for_delete:
-                            df.at[chunk_idx, "delete_api_http_status"] = "Error"
-                            df.at[chunk_idx, "delete_api_status"] = str(e)
+                        elapsed_close = time.time() - start_time_close
+                        log(f"    ❌ Close Error: {str(e)} in {elapsed_close:.2f}s")
+                        for chunk_idx in idx_chunk:
+                            df.at[chunk_idx, "closed_api_http_status"] = "Error"
+                            df.at[chunk_idx, "closed_api_status"] = str(e)
 
                     log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
                     time.sleep(delay_time)
 
-            processed_count += len(idx_chunk)
+                # --- 2) DELETE CROPPABLE AREA API ---
+                if "delete" in ca_action:
+                    ca_chunk_for_delete = []
+                    project_asset_chunk_for_delete = []
+                    idx_chunk_for_delete = []
+
+                    if "close" in ca_action:
+                        for row_idx, chunk_idx in enumerate(idx_chunk):
+                            status = str(df.at[chunk_idx, "closed_api_status"]).strip().lower()
+                            if status == "closed":
+                                ca_chunk_for_delete.append(ca_chunk[row_idx])
+                                project_asset_chunk_for_delete.append(project_asset_chunk[row_idx])
+                                idx_chunk_for_delete.append(chunk_idx)
+                            else:
+                                df.at[chunk_idx, "delete_api_http_status"] = "Skipped"
+                                df.at[chunk_idx, "delete_api_status"] = "Skipped (Not closed)"
+                    else:
+                        ca_chunk_for_delete = ca_chunk
+                        project_asset_chunk_for_delete = project_asset_chunk
+                        idx_chunk_for_delete = idx_chunk
+
+                    if not ca_chunk_for_delete:
+                        if "close" in ca_action:
+                            log(f"    ⚠️ No croppable areas were successfully closed in this batch. Skipping delete.")
+                    else:
+                        ca_ids_param_delete = ",".join(map(str, ca_chunk_for_delete))
+                        project_asset_ids_param_delete = ",".join(map(str, project_asset_chunk_for_delete))
+
+                        log(f"    🗑️ Deleting {len(ca_chunk_for_delete)} croppable_areas...")
+                        # Construct URL explicitly to avoid requests URL-encoding commas (%2C)
+                        delete_url = f"{base_url}/projects/{project_id}/project-assets/selected-ids?ids={project_asset_ids_param_delete}&croppableAreaIds={ca_ids_param_delete}"
+
+                        start_time_delete = time.time()
+                        try:
+                            resp_delete = requests.delete(delete_url, headers=headers, timeout=600)
+                            delete_status_code = resp_delete.status_code
+
+                            try:
+                                delete_json = resp_delete.json()
+                            except:
+                                delete_json = None
+
+                            deletable = None
+                            non_deletable = None
+                            is_deleted = False
+
+                            if delete_status_code in (200, 204) and isinstance(delete_json, dict):
+                                deletable = delete_json.get("deletable")
+                                non_deletable = delete_json.get("nonDeletable")
+                                if deletable is not None and non_deletable is not None:
+                                    is_deleted = True
+
+                            delete_info = {
+                                "http_status": delete_status_code,
+                                "deletable": deletable,
+                                "nonDeletable": non_deletable,
+                                "deleted": is_deleted
+                            }
+
+                            for chunk_idx in idx_chunk_for_delete:
+                                df.at[chunk_idx, "delete_api_http_status"] = str(delete_status_code)
+                                df.at[chunk_idx, "delete_api_status"] = json.dumps(delete_info, default=str)
+
+                            elapsed_delete = time.time() - start_time_delete
+                            if is_deleted:
+                                log(f"    ✅ Delete Success (Deletable: {deletable}, Non-Deletable: {non_deletable}) in {elapsed_delete:.2f}s")
+                            else:
+                                error_detail = json.dumps(delete_json) if delete_json is not None else resp_delete.text
+                                log(f"    ❌ Delete Failed (HTTP {delete_status_code}) in {elapsed_delete:.2f}s | Response: {error_detail[:500]}")
+
+                        except Exception as e:
+                            elapsed_delete = time.time() - start_time_delete
+                            log(f"    ❌ Delete Error: {str(e)} in {elapsed_delete:.2f}s")
+                            for chunk_idx in idx_chunk_for_delete:
+                                df.at[chunk_idx, "delete_api_http_status"] = "Error"
+                                df.at[chunk_idx, "delete_api_status"] = str(e)
+
+                        log(f"    ⏳ Waiting for {delay_time} seconds before next process...")
+                        time.sleep(delay_time)
+            finally:
+                processed_count += len(idx_chunk)
 
     # Final save to output
     try:

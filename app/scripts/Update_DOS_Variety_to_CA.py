@@ -101,6 +101,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         return
 
     total_rows = len(df)
+    processed_count = 0
     log(f"🔄 Starting processing {total_rows} rows...")
 
     import concurrent.futures
@@ -108,11 +109,13 @@ def run(input_excel, output_excel, config, log_callback=None):
 
     # Thread-safe logging
     log_lock = threading.Lock()
+    processed_lock = threading.Lock()
     def thread_safe_log(msg):
         with log_lock:
             log(msg)
 
     def process_row(index, row):
+        nonlocal processed_count
         try:
             CA_id = row["CA_id"]
             CA_name = row["CA_name"]
@@ -169,10 +172,17 @@ def run(input_excel, output_excel, config, log_callback=None):
 
         except requests.exceptions.RequestException as e:
             thread_safe_log(f"❌ Exception for CA_ID {CA_id}: {e}")
-            return index, f"Failed: {str(e)}", "", None
+            result_tuple = (index, f"Failed: {str(e)}", "", None)
         except Exception as e:
             thread_safe_log(f"❌ Error processing row {index+1}: {e}")
-            return index, f"Error: {str(e)}", "", None
+            result_tuple = (index, f"Error: {str(e)}", "", None)
+        finally:
+            with processed_lock:
+                processed_count += 1
+                pending_rows = total_rows - processed_count
+                thread_safe_log(f"🔄 Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | CA: {CA_id}")
+        
+        return result_tuple
 
     # Use ThreadPoolExecutor
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:

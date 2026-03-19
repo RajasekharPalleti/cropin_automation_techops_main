@@ -78,10 +78,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunk1 = df.iloc[:mid_index].copy()
     chunk2 = df.iloc[mid_index:].copy()
 
-    log(f"🔄 Starting processing {len(df)} farmers with 2 threads. Updating Keys in 'data': {list(valid_keys_map.values())}")
+    total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
+    log(f"🔄 Starting processing {total_rows} farmers with 2 threads. Updating Keys in 'data': {list(valid_keys_map.values())}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
+        nonlocal processed_count
         headers = {"Authorization": f"Bearer {token}"}
         results = [] # List of (index, status, response)
 
@@ -91,76 +96,82 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             status = ""
             response_str = ""
             
-            if not farmer_id or farmer_id.lower() == 'nan':
-                 log(f"[Thread {thread_id}] Skipping empty row {index}")
-                 results.append((index, "Skipped: Empty ID", ""))
-                 continue
-
             try:
-                log(f"[Thread {thread_id}] Fetching: {farmer_id}")
-                get_resp = requests.get(f"{api_url}/{farmer_id}", headers=headers)
-                get_resp.raise_for_status()
-                farmer_data = get_resp.json()
+                if not farmer_id or farmer_id.lower() == 'nan':
+                    log(f"[Thread {thread_id}] Skipping empty row {index}")
+                    results.append((index, "Skipped: Empty ID", ""))
+                    continue
 
-                updates_made = False
-
-                # Ensure 'data' object exists
-                if 'data' not in farmer_data or farmer_data['data'] is None:
-                    farmer_data['data'] = {}
-
-                # Dynamic Update Logic
-                for key_idx, key_name in valid_keys_map.items():
-                    col_name = f"value_{key_idx + 1}"
-                    
-                    if col_name in df.columns:
-                        new_value = row[col_name]
-                        if pd.isna(new_value):
-                            continue # Skip if empty in excel
-                        
-                        new_value_str = str(new_value).strip()
-                        
-                        # Compare with existing in 'data'
-                        current_value = farmer_data['data'].get(key_name)
-                        if current_value is None: current_value = ""
-                        
-                        if str(current_value).strip() != new_value_str:
-                            farmer_data['data'][key_name] = new_value_str
-                            updates_made = True
-                    else:
-                        # Optional: warn specific column missing?
-                        pass
-
-                if not updates_made:
-                     log(f"[Thread {thread_id}] No changes for {farmer_id}")
-                     results.append((index, "Skipped: No changes", ""))
-                     continue
-                
-                # PUT
-                time.sleep(delay_time)
-                
-                multipart_data = {
-                    "dto": (None, json.dumps(farmer_data), "application/json")
-                }
-                
-                put_resp = requests.put(api_url, headers=headers, files=multipart_data)
-                
                 try:
-                    put_resp.raise_for_status()
-                    status = "Success"
-                    response_str = put_resp.text[:300]
-                    log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
-                except requests.exceptions.HTTPError as err:
-                     status = f"Failed: {put_resp.status_code}"
-                     response_str = put_resp.text
-                     log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {response_str}")
+                    log(f"[Thread {thread_id}] Fetching: {farmer_id}")
+                    get_resp = requests.get(f"{api_url}/{farmer_id}", headers=headers)
+                    get_resp.raise_for_status()
+                    farmer_data = get_resp.json()
 
-            except Exception as e:
-                status = f"Failed: {str(e)}"
-                response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Exception: {farmer_id} - {e}")
+                    updates_made = False
 
-            time.sleep(delay_time)
-            results.append((index, status, response_str))
+                    # Ensure 'data' object exists
+                    if 'data' not in farmer_data or farmer_data['data'] is None:
+                        farmer_data['data'] = {}
+
+                    # Dynamic Update Logic
+                    for key_idx, key_name in valid_keys_map.items():
+                        col_name = f"value_{key_idx + 1}"
+                        
+                        if col_name in df.columns:
+                            new_value = row[col_name]
+                            if pd.isna(new_value):
+                                continue # Skip if empty in excel
+                            
+                            new_value_str = str(new_value).strip()
+                            
+                            # Compare with existing in 'data'
+                            current_value = farmer_data['data'].get(key_name)
+                            if current_value is None: current_value = ""
+                            
+                            if str(current_value).strip() != new_value_str:
+                                farmer_data['data'][key_name] = new_value_str
+                                updates_made = True
+                        else:
+                            # Optional: warn specific column missing?
+                            pass
+
+                    if not updates_made:
+                        log(f"[Thread {thread_id}] No changes for {farmer_id}")
+                        results.append((index, "Skipped: No changes", ""))
+                        continue
+                    
+                    # PUT
+                    time.sleep(delay_time)
+                    
+                    multipart_data = {
+                        "dto": (None, json.dumps(farmer_data), "application/json")
+                    }
+                    
+                    put_resp = requests.put(api_url, headers=headers, files=multipart_data)
+                    
+                    try:
+                        put_resp.raise_for_status()
+                        status = "Success"
+                        response_str = put_resp.text[:300]
+                        log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
+                    except requests.exceptions.HTTPError as err:
+                        status = f"Failed: {put_resp.status_code}"
+                        response_str = put_resp.text
+                        log(f"[Thread {thread_id}] ❌ Failed: {farmer_id} - {response_str}")
+
+                except Exception as e:
+                    status = f"Failed: {str(e)}"
+                    response_str = str(e)
+                    log(f"[Thread {thread_id}] ❌ Exception: {farmer_id} - {e}")
+
+                time.sleep(delay_time)
+                results.append((index, status, response_str))
+            finally:
+                with processed_lock:
+                    processed_count += 1
+                    pending_rows = total_rows - processed_count
+                    log(f"[Thread {thread_id}] Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | Farmer: {farmer_id if farmer_id and farmer_id.lower() != 'nan' else 'N/A'}")
 
         return results
 

@@ -182,7 +182,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log("❌ 'ca_id' column not found in Excel sheet!")
         return
 
-    log(f"🔄 Starting with {len(df)} croppable areas using {MAX_WORKERS} workers...")
+    total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
+    log(f"🔄 Starting with {total_rows} croppable areas using {MAX_WORKERS} workers...")
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -195,6 +199,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         for future in as_completed(futures):
             result = future.result()
             results.append(result)
+            with processed_lock:
+                processed_count += 1
+                pending_rows = total_rows - processed_count
+                log(f"Progress: {processed_count}/{total_rows} | Pending: {pending_rows}")
 
     # Merge results and save
     log("Processing complete. Merging results...")

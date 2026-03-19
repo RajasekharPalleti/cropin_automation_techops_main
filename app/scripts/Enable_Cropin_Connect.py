@@ -62,6 +62,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         df[col] = df[col].fillna("").astype(str)
 
     total_rows = len(df)
+    processed_count = 0
     log(f"Total rows to process: {total_rows}")
 
     for start in range(0, total_rows, BATCH_SIZE):
@@ -123,6 +124,9 @@ def run(input_excel, output_excel, config, log_callback=None):
             df.loc[batch_index, "Response"] = str(e)
             log(f"❌ Exception: {e}")
 
+        processed_count += len(batch_df)
+        pending_rows = total_rows - processed_count
+        log(f"🔄 Batch Processed | Total Processed: {processed_count}/{total_rows} | Pending: {pending_rows}")
         time.sleep(delay_time)
 
     log("Saving output file...")

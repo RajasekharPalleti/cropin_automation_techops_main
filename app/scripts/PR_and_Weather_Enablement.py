@@ -67,6 +67,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         return "N/A"
 
     # Iterate over rows
+    total_rows = len(df)
+    processed_count = 0
     for index, row in df.iterrows():
         try:
             # Flexible reading for croppable_area_id
@@ -89,7 +91,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     if val and val.lower() != 'nan':
                         farmer_id = val
             
-            log(f"🔄 Processing row {index + 1}: CroppableAreaId = {croppable_area_id}, FarmerId = {farmer_id}")
+            pending_rows = total_rows - processed_count
+            log(f"🔄 Processing row {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows} | CA: {croppable_area_id}")
 
             # Construct payloads
             plot_risk_payload = [{"croppableAreaId": croppable_area_id, "farmerId": farmer_id}]
@@ -159,6 +162,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "status"] = f"⚠️ Error: {error_message}"
             log(f"⚠️ Error in row {index + 1}: {error_message}")
 
+        processed_count += 1
         time.sleep(delay_time)
 
     # Save output

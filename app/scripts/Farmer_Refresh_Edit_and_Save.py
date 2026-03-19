@@ -132,6 +132,9 @@ def run(input_excel, output_excel, config, log_callback=None):
     futures = []
     
     total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
     log(f"🚀 Starting processing {total_rows} farmers with {MAX_WORKERS} threads...")
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -146,9 +149,11 @@ def run(input_excel, output_excel, config, log_callback=None):
             index, status, message = future.result()
             df.at[index, "Status"] = status
             df.at[index, "Message"] = message
-            completed_count += 1
-            if completed_count % 10 == 0:
-                 log(f"Progress: {completed_count}/{total_rows}")
+            with processed_lock:
+                processed_count += 1
+                pending_rows = total_rows - processed_count
+                if processed_count % 5 == 0 or processed_count == total_rows:
+                    log(f"Progress: {processed_count}/{total_rows} | Pending: {pending_rows}")
 
     log("💾 Writing output Excel...")
     try:

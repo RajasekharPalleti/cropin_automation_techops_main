@@ -115,10 +115,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"❌ Could not map columns for keys: {missing}")
         return
 
-    log(f"🔄 Starting processing {len(df)} assets. Column Mapping: {key_col_map}")
+    total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
+    log(f"🔄 Starting processing {total_rows} assets. Column Mapping: {key_col_map}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
+        nonlocal processed_count
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         results = [] # List of (index, status, response)
 
@@ -128,70 +133,76 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             status = ""
             response_str = ""
             
-            if not asset_id or asset_id.lower() == 'nan':
-                 results.append((index, "Skipped: Empty ID", ""))
-                 continue
-
             try:
-                # log(f"[Thread {thread_id}] Fetching: {asset_id}")
-                get_resp = requests.get(f"{get_url_base}/{asset_id}", headers=headers)
-                get_resp.raise_for_status()
-                asset_data = get_resp.json()
-
-                updates_made = False
-
-                if "address" in asset_data and isinstance(asset_data["address"], dict):
-                    # Dynamic Update using pre-calculated map
-                    for key_name, col_name in key_col_map.items():
-                        if col_name in df.columns:
-                            new_value = row[col_name]
-                            if pd.isna(new_value):
-                                new_value = ""
-                            else:
-                                new_value = str(new_value).strip()
-                            
-                            current_val = asset_data["address"].get(key_name, "")
-                            if str(current_val) != new_value:
-                                asset_data["address"][key_name] = new_value
-                                updates_made = True
-                else:
-                    status = "Failed: No address data"
-                    results.append((index, status, ""))
-                    continue
-
-                if not updates_made:
-                     # log(f"[Thread {thread_id}] No changes for {asset_id}")
-                     results.append((index, "Skipped: No changes", ""))
+                if not asset_id or asset_id.lower() == 'nan':
+                     results.append((index, "Skipped: Empty ID", ""))
                      continue
-                
-                # PUT
-                
-                # For multipart/form-data, do NOT manually set Content-Type.
-                put_headers = {"Authorization": f"Bearer {token}"}
 
-                multipart_data = {
-                    "dto": (None, json.dumps(asset_data), "application/json")
-                }
-                
-                put_resp = requests.put(put_url_final, headers=put_headers, files=multipart_data)
-                put_resp.raise_for_status()
+                try:
+                    # log(f"[Thread {thread_id}] Fetching: {asset_id}")
+                    get_resp = requests.get(f"{get_url_base}/{asset_id}", headers=headers)
+                    get_resp.raise_for_status()
+                    asset_data = get_resp.json()
 
-                status = "Success"
-                response_str = put_resp.text[:600]
-                log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
+                    updates_made = False
 
-            except Exception as e:
-                # Capture full response text if available for better debugging
-                error_details = ""
-                if hasattr(e, 'response') and e.response is not None:
-                     error_details = f" - Server Response: {e.response.text[:200]}"
-                
-                status = f"Failed: {str(e)}"
-                response_str = str(e) + error_details
-                log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}{error_details}")
+                    if "address" in asset_data and isinstance(asset_data["address"], dict):
+                        # Dynamic Update using pre-calculated map
+                        for key_name, col_name in key_col_map.items():
+                            if col_name in df.columns:
+                                new_value = row[col_name]
+                                if pd.isna(new_value):
+                                    new_value = ""
+                                else:
+                                    new_value = str(new_value).strip()
+                                
+                                current_val = asset_data["address"].get(key_name, "")
+                                if str(current_val) != new_value:
+                                    asset_data["address"][key_name] = new_value
+                                    updates_made = True
+                    else:
+                        status = "Failed: No address data"
+                        results.append((index, status, ""))
+                        continue
 
-            time.sleep(delay_time)
-            results.append((index, status, response_str))
+                    if not updates_made:
+                         # log(f"[Thread {thread_id}] No changes for {asset_id}")
+                         results.append((index, "Skipped: No changes", ""))
+                         continue
+                    
+                    # PUT
+                    
+                    # For multipart/form-data, do NOT manually set Content-Type.
+                    put_headers = {"Authorization": f"Bearer {token}"}
+
+                    multipart_data = {
+                        "dto": (None, json.dumps(asset_data), "application/json")
+                    }
+                    
+                    put_resp = requests.put(put_url_final, headers=put_headers, files=multipart_data)
+                    put_resp.raise_for_status()
+
+                    status = "Success"
+                    response_str = put_resp.text[:600]
+                    log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
+
+                except Exception as e:
+                    # Capture full response text if available for better debugging
+                    error_details = ""
+                    if hasattr(e, 'response') and e.response is not None:
+                         error_details = f" - Server Response: {e.response.text[:200]}"
+                    
+                    status = f"Failed: {str(e)}"
+                    response_str = str(e) + error_details
+                    log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}{error_details}")
+
+                time.sleep(delay_time)
+                results.append((index, status, response_str))
+            finally:
+                with processed_lock:
+                    processed_count += 1
+                    pending_rows = total_rows - processed_count
+                    log(f"[Thread {thread_id}] Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | Asset: {asset_id if asset_id and asset_id.lower() != 'nan' else 'N/A'}")
 
         return results
 

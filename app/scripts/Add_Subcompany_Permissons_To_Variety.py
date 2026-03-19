@@ -51,6 +51,9 @@ def run(input_excel, output_excel, config, log_callback=None):
         df['Status'] = df['Status'].fillna("").astype(str)
         df['Response'] = df['Response'].fillna("").astype(str)
 
+        total_rows = len(df)
+        processed_count = 0
+
         headers = {"Authorization": f"Bearer {token}"}
 
         for i, row in df.iterrows():
@@ -102,7 +105,9 @@ def run(input_excel, output_excel, config, log_callback=None):
                         update_response = update_variety(token, variety_data, base_url)
                         df.at[i, 'Status'] = "Success"
                         df.at[i, 'Response'] = json.dumps(update_response)
-                        log(f"🚀 Variety ID {variety_id} updated with SubCompanies: {', '.join(ids_added)}")
+                        
+                        pending_rows = total_rows - processed_count
+                        log(f"🚀 Variety ID {variety_id} updated with SubCompanies: {', '.join(ids_added)} (Row {i+2}/{total_rows+1}) | Processed: {processed_count} | Pending: {pending_rows}")
                     except Exception as update_err:
                         df.at[i, 'Status'] = "Failed"
                         df.at[i, 'Response'] = f"Update error: {update_err}"
@@ -117,6 +122,7 @@ def run(input_excel, output_excel, config, log_callback=None):
                 df.at[i, 'Response'] = str(e)
                 log(f"❌ Error processing row {i+2}: {e}")
 
+            processed_count += 1
             time.sleep(delay_time)  # prevent hitting API too fast
 
         # --- Save output ---

@@ -65,6 +65,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Warning: Could not find 'CA_Id' header. Falling back to Column: {ca_id_col}")
 
     total_rows = len(df)
+    processed_count = 0
     log(f"Scanning {total_rows} rows to group by CA_Id...")
 
     # Group by CA_Id using pandas
@@ -105,7 +106,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             batch_num = (i // batch_size) + 1
             total_batches = (total_tasks + batch_size - 1) // batch_size
             
-            log(f"[CA: {ca_id_str}] Batch {batch_num}/{total_batches}: Deleting {len(batch)} tasks...")
+            pending_total = total_rows - processed_count
+            log(f"[CA: {ca_id_str}] Batch {batch_num}/{total_batches}: Deleting {len(batch)} tasks... | Total Processed: {processed_count} | Total Pending: {pending_total}")
             
             try:
                 # 1. Delete Tasks Request
@@ -168,6 +170,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 log(f"[CA: {ca_id_str}] Batch {batch_num}: Failed - {err_msg[:100]}")
 
             # Throttle delay
+            processed_count += len(batch)
             time.sleep(delay_time)
 
     # Save Output

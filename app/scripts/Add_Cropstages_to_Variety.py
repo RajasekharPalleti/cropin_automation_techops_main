@@ -75,6 +75,9 @@ def run(input_excel, output_excel, config, log_callback=None):
     df['Status'] = df['Status'].fillna("").astype(str)
     df['Response'] = df['Response'].fillna("").astype(str)
 
+    total_rows = len(df)
+    processed_count = 0
+
     headers = {"Authorization": f"Bearer {token}"}
     
     log("⏳ Fetching crop stages...")
@@ -103,7 +106,8 @@ def run(input_excel, output_excel, config, log_callback=None):
                 log(f"\n⏳ Skipping row {i+2} due to missing data.")
                 continue
 
-            log(f"\n⏳ Processing Variety ID: {variety_id}, Crop Stage: {crop_stage_name}")
+            pending_rows = total_rows - processed_count
+            log(f"\n⏳ Processing Variety ID: {variety_id}, Crop Stage: {crop_stage_name} (Row {i+2}/{total_rows+1}) | Processed: {processed_count} | Pending: {pending_rows}")
 
             variety_response = requests.get(f"{variety_url}/{variety_id}", headers=headers)
             variety_response.raise_for_status()
@@ -146,10 +150,11 @@ def run(input_excel, output_excel, config, log_callback=None):
             
             update_response = update_variety(token, variety_id, variety_data)
             log(f"✅ Updated variety with new crop stage: {crop_stage_name}")
-            df.at[i, 'Status'] = "Success"
             df.at[i, 'Response'] = "Updated Successfully"
 
+            processed_count += 1
         except Exception as e:
+            processed_count += 1
             log(f"❌ Failed to process row {i+2}: {str(e)}")
             df.at[i, 'Status'] = "Failed"
             df.at[i, 'Response'] = str(e)

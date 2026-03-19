@@ -57,72 +57,90 @@ def run(input_excel, output_excel, config, log_callback=None):
     df["CA_Response"] = df["CA_Response"].fillna("").astype(str)
 
     total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
     log(f"Processing {total_rows} rows with {worker_count} workers. Delay: {thread_delay}s")
 
     # Helper function to process a single row
     def process_row(index, row):
+        nonlocal processed_count
         result = {"index": index, "status": "", "response": ""}
         try:
-            # Row access logic: A=0, C=2, D=3.
-            if len(row) < 4:
-                return {"index": index, "status": "Skipped: Row has insufficient columns", "response": ""}
+            try:
+                # Row access logic: A=0, C=2, D=3.
+                if len(row) < 4:
+                    result["status"] = "Skipped: Row has insufficient columns"
+                    return result
 
-            CA_id = row.iloc[0]
-            Latitude = row.iloc[2]
-            Longitude = row.iloc[3]
+                CA_id = row.iloc[0]
+                Latitude = row.iloc[2]
+                Longitude = row.iloc[3]
 
-            if pd.isna(CA_id) or pd.isna(Latitude) or pd.isna(Longitude):
-                return {"index": index, "status": "Skipped: Missing Data (CA_ID, Lat, or Long)", "response": ""}
+                if pd.isna(CA_id) or pd.isna(Latitude) or pd.isna(Longitude):
+                    result["status"] = "Skipped: Missing Data (CA_ID, Lat, or Long)"
+                    return result
 
-            # Delay before GET
-            time.sleep(thread_delay)
-            # GET
-            get_response = requests.get(f"{api_url}/{CA_id}", headers=headers)
-            if get_response.status_code != 200:
-                log(f"Row {index + 2}: GET Failed ({get_response.status_code}) for CA_ID: {CA_id}")
-                return {"index": index, "status": f"GET Failed: {get_response.status_code}", "response": ""}
+                # Delay before GET
+                time.sleep(thread_delay)
+                # GET
+                get_response = requests.get(f"{api_url}/{CA_id}", headers=headers)
+                if get_response.status_code != 200:
+                    log(f"Row {index + 2}: GET Failed ({get_response.status_code}) for CA_ID: {CA_id}")
+                    result["status"] = f"GET Failed: {get_response.status_code}"
+                    return result
 
-            CA_data = get_response.json()
-            
-            # Update fields
-            CA_data["latitude"] = Latitude
-            CA_data["longitude"] = Longitude
-
-            if ("areaAudit" in CA_data and CA_data["areaAudit"] is not None 
-                and isinstance(CA_data["areaAudit"], dict)
-                and CA_data["areaAudit"].get("latitude") is not None):
+                CA_data = get_response.json()
                 
-                CA_data["areaAudit"]["latitude"] = Latitude
-                CA_data["areaAudit"]["longitude"] = Longitude
-                CA_data["cropAudited"] = True
-            else:
-                CA_data["areaAudit"] = {
-                    "geoInfo": {
-                        "type": "FeatureCollection",
-                        "features": [{"type": "Feature", "properties": {}, "geometry": {"type": "MultiPolygon", "coordinates": []}}]
-                    },
-                    "latitude": Latitude,
-                    "longitude": Longitude,
-                    "altitude": None
-                }
-                CA_data["cropAudited"] = False
+                # Update fields
+                CA_data["latitude"] = Latitude
+                CA_data["longitude"] = Longitude
 
-            # Delay before PUT
-            time.sleep(thread_delay) # configured delay
-            
-            # PUT
-            put_response = requests.put(f"{api_url}/area-audit", headers=headers, data=json.dumps(CA_data))
-            
-            if put_response.status_code in (200, 204):
-                log(f"Row {index + 2}: Success for CA_ID: {CA_id}")
-                return {"index": index, "status": "Success", "response": put_response.text}
-            else:
-                log(f"Row {index + 2}: PUT Failed ({put_response.status_code}) for CA_ID: {CA_id}")
-                return {"index": index, "status": "Failed", "response": put_response.text}
+                if ("areaAudit" in CA_data and CA_data["areaAudit"] is not None 
+                    and isinstance(CA_data["areaAudit"], dict)
+                    and CA_data["areaAudit"].get("latitude") is not None):
+                    
+                    CA_data["areaAudit"]["latitude"] = Latitude
+                    CA_data["areaAudit"]["longitude"] = Longitude
+                    CA_data["cropAudited"] = True
+                else:
+                    CA_data["areaAudit"] = {
+                        "geoInfo": {
+                            "type": "FeatureCollection",
+                            "features": [{"type": "Feature", "properties": {}, "geometry": {"type": "MultiPolygon", "coordinates": []}}]
+                        },
+                        "latitude": Latitude,
+                        "longitude": Longitude,
+                        "altitude": None
+                    }
+                    CA_data["cropAudited"] = False
 
-        except Exception as e:
-            log(f"Row {index + 2}: Exception: {e}")
-            return {"index": index, "status": f"Failed: {str(e)}", "response": ""}
+                # Delay before PUT
+                time.sleep(thread_delay) # configured delay
+                
+                # PUT
+                put_response = requests.put(f"{api_url}/area-audit", headers=headers, data=json.dumps(CA_data))
+                
+                if put_response.status_code in (200, 204):
+                    log(f"Row {index + 2}: Success for CA_ID: {CA_id}")
+                    result["status"] = "Success"
+                    result["response"] = put_response.text
+                else:
+                    log(f"Row {index + 2}: PUT Failed ({put_response.status_code}) for CA_ID: {CA_id}")
+                    result["status"] = "Failed"
+                    result["response"] = put_response.text
+
+            except Exception as e:
+                log(f"Row {index + 2}: Exception: {e}")
+                result["status"] = f"Failed: {str(e)}"
+                result["response"] = ""
+        finally:
+            with processed_lock:
+                processed_count += 1
+                pending_rows = total_rows - processed_count
+                log(f"🔄 Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | Row {index+1}")
+        
+        return result
 
     # Execute with ThreadPool
     with ThreadPoolExecutor(max_workers=int(worker_count)) as executor:

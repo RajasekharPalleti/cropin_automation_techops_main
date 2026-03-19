@@ -71,8 +71,9 @@ def run(input_excel, output_excel, config, log_callback=None):
             df[col] = ""
         df[col] = df[col].fillna("").astype(str)
 
-    total = len(df)
-    log(f"Total rows to process: {total}")
+    total_rows = len(df)
+    processed_count = 0
+    log(f"Total rows to process: {total_rows}")
 
     for i in range(0, total, BATCH_SIZE):
         batch_df = df.iloc[i:i + BATCH_SIZE]
@@ -83,9 +84,10 @@ def run(input_excel, output_excel, config, log_callback=None):
 
         ids_param = ",".join(user_ids)
         batch_num = (i // BATCH_SIZE) + 1
+        pending_rows = total_rows - processed_count
 
-        log(f"🔁 Processing Batch {batch_num} (Rows {i+2} to {min(i+BATCH_SIZE+1, total+1)})")
-        log(f"👥 User IDs count: {len(user_ids)}")
+        log(f"🔁 Processing Batch {batch_num} (Rows {i+2} to {min(i+BATCH_SIZE+1, total_rows+1)}) | Items: {len(user_ids)} | Processed: {processed_count} | Pending: {pending_rows}")
+        # log(f"👥 User IDs count: {len(user_ids)}")
 
         try:
             response = requests.delete(
@@ -113,6 +115,7 @@ def run(input_excel, output_excel, config, log_callback=None):
         df.at[first_index, "Processed_User_Ids"] = ids_param
         df.at[first_index, "API_Response"] = response_text
         
+        processed_count += len(user_ids)
         time.sleep(delay_time)
 
     log("Saving output file...")

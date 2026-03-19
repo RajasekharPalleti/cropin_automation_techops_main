@@ -45,7 +45,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         'Content-Type': 'application/json'
     }
 
-    log(f"Processing {len(df)} rows...")
+    total_rows = len(df)
+    processed_count = 0
+    log(f"Processing {total_rows} rows...")
 
     for index, row in df.iterrows():
         try:
@@ -150,7 +152,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             if pd.notna(parent_id) and str(parent_id).strip() != '':
                 payload['parentId'] = parent_id
 
-            log(f"Adding variety: {name}...")
+            pending_rows = total_rows - processed_count
+            log(f"Adding variety: {name} (Row {index+1}/{total_rows}) | Processed: {processed_count} | Pending: {pending_rows}...")
             response = requests.post(base_api_url, headers=headers, json=payload)
 
             if response.status_code == 201:
@@ -167,6 +170,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, 'Status'] = "Error"
             df.at[index, 'Response'] = str(e)
             
+        processed_count += 1
         time.sleep(delay_time)
 
     try:

@@ -135,7 +135,9 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     df["Status"] = df["Status"].fillna("").astype(str)
     df["Response"] = df["Response"].fillna("").astype(str)
 
-    log(f"🔄 Processing {len(df)} rows...")
+    total_rows = len(df)
+    processed_count = 0
+    log(f"🔄 Processing {total_rows} rows...")
 
     for index, row in df.iterrows():
         try:
@@ -263,7 +265,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             headers = {'Authorization': f'Bearer {token}'}
             multipart_data = {"dto": (None, json.dumps(user_payload), "application/json")}
             
-            log(f"🚀 Creating User: {user_name} (Row {index+2})")
+            pending_rows = total_rows - processed_count
+            log(f"🚀 Creating User: {user_name} (Row {index+2}/{total_rows + 1}) | Processed: {processed_count} | Pending: {pending_rows}")
             resp = requests.post(user_api_url, headers=headers, files=multipart_data)
             
             if resp.status_code in [200, 201]:
@@ -275,7 +278,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 df.at[index, 'Status'] = f"Failed: {resp.status_code}"
                 df.at[index, 'Response'] = resp.text
 
+            
+            processed_count += 1
         except Exception as e:
+            processed_count += 1
             log(f"❌ Error row {index+2}: {e}")
             df.at[index, 'Status'] = "Error"
             df.at[index, 'Response'] = str(e)

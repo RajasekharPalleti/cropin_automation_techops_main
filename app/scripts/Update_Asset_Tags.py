@@ -33,7 +33,7 @@ def parse_tags(raw):
             pass
     return result
 
-def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeout=30, delay_time=1):
+def process_chunk(df_chunk, api_url, token, thread_id, shared_stats, log_callback=None, timeout=30, delay_time=1):
     
     def log(msg):
         if log_callback:
@@ -68,71 +68,78 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
             continue
 
         try:
-            # log(f"[Thread {thread_id}] Getting asset for: {asset_id}")
-            get_response = requests.get(f"{api_url}/{asset_id}", headers=headers, timeout=timeout)
-            get_response.raise_for_status()
-            asset_data = get_response.json()
+            try:
+                # log(f"[Thread {thread_id}] Getting asset for: {asset_id}")
+                get_response = requests.get(f"{api_url}/{asset_id}", headers=headers, timeout=timeout)
+                get_response.raise_for_status()
+                asset_data = get_response.json()
 
-            if "data" in asset_data and isinstance(asset_data["data"], dict):
-                existing_tags = asset_data["data"].get("tags", [])
-                if existing_tags is None:
-                    existing_tags = []
-                
-                # Merge logic: Append new tags if they don't exist
-                # Logic: Keep all existing, add new ones unique
-                # Assuming simple scalars (int/str) or check equality
-                
-                # Normalize types to avoid duplicates like "123" vs 123 if needed
-                # But assets tags can be whatever. Let's assume standard equality check.
-                
-                updated_tags = list(existing_tags)
-                to_add = []
-                for tag in asset_tags:
-                    if tag not in existing_tags:
-                        to_add.append(tag)
-                        updated_tags.append(tag)
-                
-                if not to_add:
-                    status = "Skipped: All IDs already present"
+                if "data" in asset_data and isinstance(asset_data["data"], dict):
+                    existing_tags = asset_data["data"].get("tags", [])
+                    if existing_tags is None:
+                        existing_tags = []
+                    
+                    # Merge logic: Append new tags if they don't exist
+                    # Logic: Keep all existing, add new ones unique
+                    # Assuming simple scalars (int/str) or check equality
+                    
+                    # Normalize types to avoid duplicates like "123" vs 123 if needed
+                    # But assets tags can be whatever. Let's assume standard equality check.
+                    
+                    updated_tags = list(existing_tags)
+                    to_add = []
+                    for tag in asset_tags:
+                        if tag not in existing_tags:
+                            to_add.append(tag)
+                            updated_tags.append(tag)
+                    
+                    if not to_add:
+                        status = "Skipped: All IDs already present"
+                        results.append((index, status, response_str))
+                        continue
+
+                    asset_data["data"]["tags"] = updated_tags
+                else:
+                    status = "Failed: No data property in response"
                     results.append((index, status, response_str))
                     continue
 
-                asset_data["data"]["tags"] = updated_tags
-            else:
-                status = "Failed: No data property in response"
-                results.append((index, status, response_str))
-                continue
+                time.sleep(delay_time)
+
+                multipart_data = {
+                    "dto": (None, json.dumps(asset_data), "application/json")
+                }
+
+                # PUT to base URL as per user code: requests.put(api_url, ...)
+                # This implies api_url is the collection resource, and the DTO contains the ID or the update is handled via DTO.
+                # In user code: requests.put(api_url, ...)
+                put_response = requests.put(api_url, headers=headers, files=multipart_data, timeout=timeout)
+                
+                if put_response.status_code in [200, 201, 204]:
+                    status = "Success"
+                    response_str = put_response.text[:500]
+                    log(f"[Row {row_num}] Updated Asset '{asset_name}' ({asset_id})")
+                else:
+                    status = f"Failed: {put_response.status_code}"
+                    response_str = put_response.text[:500]
+                    log(f"[Row {row_num}] Failed to update Asset '{asset_name}' ({asset_id}): {put_response.status_code}")
+
+            except requests.exceptions.RequestException as e:
+                status = f"Failed: {str(e)}"
+                if hasattr(e, 'response') and e.response is not None:
+                    response_str = f"{e.response.status_code} - {e.response.text}"
+                else:
+                    response_str = str(e)
+                log(f"[Row {row_num}] Error for Asset '{asset_name}' ({asset_id}): {response_str[:100]}")
 
             time.sleep(delay_time)
-
-            multipart_data = {
-                "dto": (None, json.dumps(asset_data), "application/json")
-            }
-
-            # PUT to base URL as per user code: requests.put(api_url, ...)
-            # This implies api_url is the collection resource, and the DTO contains the ID or the update is handled via DTO.
-            # In user code: requests.put(api_url, ...)
-            put_response = requests.put(api_url, headers=headers, files=multipart_data, timeout=timeout)
-            
-            if put_response.status_code in [200, 201, 204]:
-                status = "Success"
-                response_str = put_response.text[:500]
-                log(f"[Row {row_num}] Updated Asset '{asset_name}' ({asset_id})")
-            else:
-                status = f"Failed: {put_response.status_code}"
-                response_str = put_response.text[:500]
-                log(f"[Row {row_num}] Failed to update Asset '{asset_name}' ({asset_id}): {put_response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            status = f"Failed: {str(e)}"
-            if hasattr(e, 'response') and e.response is not None:
-                response_str = f"{e.response.status_code} - {e.response.text}"
-            else:
-                response_str = str(e)
-            log(f"[Row {row_num}] Error for Asset '{asset_name}' ({asset_id}): {response_str[:100]}")
-
-        time.sleep(delay_time)
-        results.append((index, status, response_str))
+            results.append((index, status, response_str))
+        finally:
+            if shared_stats:
+                with shared_stats["lock"]:
+                    shared_stats["processed"] += 1
+                    pending = shared_stats["total"] - shared_stats["processed"]
+                    log(f"[Thread {thread_id}] Processed: {shared_stats['processed']}/{shared_stats['total']} | Pending: {pending} | Asset: {asset_id}")
 
     return results
 
@@ -192,13 +199,18 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Adjust workers
     workers = min(len(chunks), max_workers)
     
-    log(f"Starting execution with {workers} threads...")
+    import threading
+    shared_stats = {
+        "total": n,
+        "processed": 0,
+        "lock": threading.Lock()
+    }
 
     all_results = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = []
         for i, chunk in enumerate(chunks):
-            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, log_callback, delay_time=delay_time))
+            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, shared_stats, log_callback, delay_time=delay_time))
         
         for f in futures:
             try:

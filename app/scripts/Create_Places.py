@@ -141,6 +141,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     session = requests.Session()
     total_rows = len(df)
+    processed_count = 0
     log(f"Starting place creation for {total_rows} rows...")
 
     for index, row in df.iterrows():
@@ -162,7 +163,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Failure Reason"] = "Latitude or Longitude is not a valid number"
             continue
 
-        log(f"📍 Executing Row {index + 1} of {total_rows}: Creating place '{place_name}' at {lat_f},{lng_f}")
+        pending_rows = total_rows - processed_count
+        log(f"📍 Executing Row {index + 1} of {total_rows}: Creating place '{place_name}' | Processed: {processed_count} | Pending: {pending_rows}")
 
         try:
             # 1. Fetch Address
@@ -203,6 +205,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, "Failure Reason"] = str(e)
             log(f"   ❌ Error: {str(e)}")
 
+        processed_count += 1
         time.sleep(delay_time)
 
     try:

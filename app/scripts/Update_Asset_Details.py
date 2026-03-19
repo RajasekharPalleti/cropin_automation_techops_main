@@ -81,10 +81,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     chunk1 = df.iloc[:mid_index].copy()
     chunk2 = df.iloc[mid_index:].copy()
 
-    log(f"🔄 Starting processing {len(df)} assets with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
+    total_rows = len(df)
+    processed_count = 0
+    import threading
+    processed_lock = threading.Lock()
+    log(f"🔄 Starting processing {total_rows} assets with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
     
     # Thread Function
     def process_chunk(df_chunk, thread_id):
+        nonlocal processed_count
         headers = {"Authorization": f"Bearer {token}"}
         results = [] # List of (index, status, response)
 
@@ -94,88 +99,94 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             status = ""
             response_str = ""
             
-            if not asset_id or asset_id.lower() == 'nan':
-                 log(f"[Thread {thread_id}] Skipping empty row {index}")
-                 results.append((index, "Skipped: Empty ID", ""))
-                 continue
-
             try:
-                log(f"[Thread {thread_id}] Fetching: {asset_id}")
-                get_resp = requests.get(f"{api_url}/{asset_id}", headers=headers)
-                get_resp.raise_for_status()
-                asset_data = get_resp.json()
+                if not asset_id or asset_id.lower() == 'nan':
+                    log(f"[Thread {thread_id}] Skipping empty row {index}")
+                    results.append((index, "Skipped: Empty ID", ""))
+                    continue
 
-                updates_made = False
+                try:
+                    log(f"[Thread {thread_id}] Fetching: {asset_id}")
+                    get_resp = requests.get(f"{api_url}/{asset_id}", headers=headers)
+                    get_resp.raise_for_status()
+                    asset_data = get_resp.json()
 
-                # Dynamic Update Logic
-                for key_idx, key_name in valid_keys_map.items():
-                    col_name = f"value_{key_idx + 1}"
-                    
-                    if col_name in df.columns:
-                        raw_value = row[col_name]
-                        if pd.isna(raw_value):
-                            raw_value = ""
+                    updates_made = False
 
-                        final_value = str(raw_value).strip()
-                        is_complex = False
-
-                        # Try parsing as JSON if string looks like object/list
-                        if isinstance(raw_value, str):
-                            s_val = raw_value.strip()
-                            if (s_val.startswith('{') and s_val.endswith('}')) or \
-                               (s_val.startswith('[') and s_val.endswith(']')):
-                                try:
-                                    parsed_json = json.loads(s_val)
-                                    final_value = parsed_json
-                                    is_complex = True
-                                except Exception:
-                                    pass
-
-                        # Compare with existing
-                        current_value = asset_data.get(key_name)
+                    # Dynamic Update Logic
+                    for key_idx, key_name in valid_keys_map.items():
+                        col_name = f"value_{key_idx + 1}"
                         
-                        update_needed = False
-                        if is_complex:
-                             if current_value != final_value:
-                                 update_needed = True
+                        if col_name in df.columns:
+                            raw_value = row[col_name]
+                            if pd.isna(raw_value):
+                                raw_value = ""
+
+                            final_value = str(raw_value).strip()
+                            is_complex = False
+
+                            # Try parsing as JSON if string looks like object/list
+                            if isinstance(raw_value, str):
+                                s_val = raw_value.strip()
+                                if (s_val.startswith('{') and s_val.endswith('}')) or \
+                                   (s_val.startswith('[') and s_val.endswith(']')):
+                                    try:
+                                        parsed_json = json.loads(s_val)
+                                        final_value = parsed_json
+                                        is_complex = True
+                                    except Exception:
+                                        pass
+
+                            # Compare with existing
+                            current_value = asset_data.get(key_name)
+                            
+                            update_needed = False
+                            if is_complex:
+                                 if current_value != final_value:
+                                     update_needed = True
+                            else:
+                                 curr_str = str(current_value).strip() if current_value is not None else ""
+                                 if curr_str != final_value:
+                                     update_needed = True
+                            
+                            if update_needed:
+                                asset_data[key_name] = final_value
+                                updates_made = True
                         else:
-                             curr_str = str(current_value).strip() if current_value is not None else ""
-                             if curr_str != final_value:
-                                 update_needed = True
-                        
-                        if update_needed:
-                            asset_data[key_name] = final_value
-                            updates_made = True
-                    else:
-                        pass
+                            pass
 
-                if not updates_made:
-                     log(f"[Thread {thread_id}] No changes for {asset_id}")
-                     results.append((index, "Skipped: No changes", ""))
-                     continue
-                
-                # PUT - Use Multipart/DTO (Assuming Asset API works same as Farmer API)
+                    if not updates_made:
+                        log(f"[Thread {thread_id}] No changes for {asset_id}")
+                        results.append((index, "Skipped: No changes", ""))
+                        continue
+                    
+                    # PUT - Use Multipart/DTO (Assuming Asset API works same as Farmer API)
+                    time.sleep(delay_time)
+                    
+                    multipart_data = {
+                        "dto": (None, json.dumps(asset_data), "application/json")
+                    }
+                    
+                    put_resp = requests.put(api_url, headers=headers, files=multipart_data)
+                    
+                    put_resp.raise_for_status()
+
+                    status = "Success"
+                    response_str = put_resp.text[:600]
+                    log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
+
+                except Exception as e:
+                    status = f"Failed: {str(e)}"
+                    response_str = str(e)
+                    log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}")
+
                 time.sleep(delay_time)
-                
-                multipart_data = {
-                    "dto": (None, json.dumps(asset_data), "application/json")
-                }
-                
-                put_resp = requests.put(api_url, headers=headers, files=multipart_data)
-                
-                put_resp.raise_for_status()
-
-                status = "Success"
-                response_str = put_resp.text[:600]
-                log(f"[Thread {thread_id}] ✅ Success: {asset_id}")
-
-            except Exception as e:
-                status = f"Failed: {str(e)}"
-                response_str = str(e)
-                log(f"[Thread {thread_id}] ❌ Failed: {asset_id} - {e}")
-
-            time.sleep(delay_time)
-            results.append((index, status, response_str))
+                results.append((index, status, response_str))
+            finally:
+                with processed_lock:
+                    processed_count += 1
+                    pending_rows = total_rows - processed_count
+                    log(f"[Thread {thread_id}] Processed: {processed_count}/{total_rows} | Pending: {pending_rows} | Asset: {asset_id if asset_id and asset_id.lower() != 'nan' else 'N/A'}")
 
         return results
 

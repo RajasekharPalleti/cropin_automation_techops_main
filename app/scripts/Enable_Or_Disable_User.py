@@ -67,52 +67,57 @@ def run(input_excel_path, output_excel_path, config, log_callback=None):
     df["Response"] = df["Response"].fillna("").astype(str)
 
     total_rows = len(df)
+    processed_count = 0
     log(f"Processing {total_rows} rows...")
 
     for index, row in df.iterrows():
         user_id = row.get("user_id")
         enable_flag = row.get("enableFlag")
 
-        if pd.isna(user_id) or pd.isna(enable_flag):
-            df.at[index, "Status"] = "⚠️ Skipped: Missing Data"
-            continue
-
-        # Normalize enableFlag (true/false)
-        enable_flag_str = str(enable_flag).lower()
-        if enable_flag_str not in ["true", "false"]:
-            df.at[index, "Status"] = "❌ Invalid enableFlag"
-            continue
-
-        # Construct URL
-        # Ensure user_id is int
         try:
-             u_id = int(user_id)
-        except:
-             df.at[index, "Status"] = "❌ Invalid User ID"
-             continue
+            if pd.isna(user_id) or pd.isna(enable_flag):
+                df.at[index, "Status"] = "⚠️ Skipped: Missing Data"
+                continue
 
-        url = f"{api_base_url}/enable/{u_id}?enableFlag={enable_flag_str}"
+            # Normalize enableFlag (true/false)
+            enable_flag_str = str(enable_flag).lower()
+            if enable_flag_str not in ["true", "false"]:
+                df.at[index, "Status"] = "❌ Invalid enableFlag"
+                continue
 
-        log(f"🔄 Processing row {index + 1}/{total_rows} | UserID: {u_id} | enableFlag: {enable_flag_str}")
+            # Construct URL
+            # Ensure user_id is int
+            try:
+                 u_id = int(user_id)
+            except:
+                 df.at[index, "Status"] = "❌ Invalid User ID"
+                 continue
 
-        try:
-            response = requests.put(url, headers=headers)
+            url = f"{api_base_url}/enable/{u_id}?enableFlag={enable_flag_str}"
 
-            if response.status_code in [200, 204]:
-                df.at[index, "Status"] = "✅ Success"
-                df.at[index, "Response"] = response.text if response.text else "Success"
-                log(f"✅ User {u_id} updated successfully")
-            else:
-                df.at[index, "Status"] = f"❌ Failed: {response.status_code}"
-                df.at[index, "Response"] = response.text
-                log(f"❌ Failed for User {u_id}: {response.status_code} | {response.text}")
+            pending_rows = total_rows - processed_count
+            log(f"🔄 Row {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows} | UserID: {u_id} | enableFlag: {enable_flag_str}")
 
-        except Exception as e:
-            df.at[index, "Status"] = "❌ Error"
-            df.at[index, "Response"] = str(e)
-            log(f"❌ Exception for User {u_id}: {e}")
+            try:
+                response = requests.put(url, headers=headers)
 
-        time.sleep(delay_time)
+                if response.status_code in [200, 204]:
+                    df.at[index, "Status"] = "✅ Success"
+                    df.at[index, "Response"] = response.text if response.text else "Success"
+                    log(f"✅ User {u_id} updated successfully")
+                else:
+                    df.at[index, "Status"] = f"❌ Failed: {response.status_code}"
+                    df.at[index, "Response"] = response.text
+                    log(f"❌ Failed for User {u_id}: {response.status_code} | {response.text}")
+
+            except Exception as e:
+                df.at[index, "Status"] = "❌ Error"
+                df.at[index, "Response"] = str(e)
+                log(f"❌ Exception for User {u_id}: {e}")
+
+            time.sleep(delay_time)
+        finally:
+            processed_count += 1
 
     log("💾 Saving output Excel...")
     try:

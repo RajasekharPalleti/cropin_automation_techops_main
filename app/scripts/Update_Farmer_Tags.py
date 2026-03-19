@@ -33,7 +33,7 @@ def parse_tags(raw):
             pass
     return result
 
-def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeout=30, delay_time=1):
+def process_chunk(df_chunk, api_url, token, thread_id, shared_stats, log_callback=None, timeout=30, delay_time=1):
     
     def log(msg):
         if log_callback:
@@ -67,61 +67,68 @@ def process_chunk(df_chunk, api_url, token, thread_id, log_callback=None, timeou
             continue
 
         try:
-            get_response = requests.get(f"{api_url}/{farmer_id}", headers=headers, timeout=timeout)
-            get_response.raise_for_status()
-            farmer_data = get_response.json()
+            try:
+                get_response = requests.get(f"{api_url}/{farmer_id}", headers=headers, timeout=timeout)
+                get_response.raise_for_status()
+                farmer_data = get_response.json()
 
-            if "data" in farmer_data and isinstance(farmer_data["data"], dict):
-                existing_tags = farmer_data["data"].get("tags", [])
-                if existing_tags is None:
-                    existing_tags = []
+                if "data" in farmer_data and isinstance(farmer_data["data"], dict):
+                    existing_tags = farmer_data["data"].get("tags", [])
+                    if existing_tags is None:
+                        existing_tags = []
 
-                # Merge logic: Append new tags if they don't exist
-                updated_tags = list(existing_tags)
-                to_add = []
-                for tag in farmer_tags:
-                    if tag not in existing_tags:
-                        to_add.append(tag)
-                        updated_tags.append(tag)
+                    # Merge logic: Append new tags if they don't exist
+                    updated_tags = list(existing_tags)
+                    to_add = []
+                    for tag in farmer_tags:
+                        if tag not in existing_tags:
+                            to_add.append(tag)
+                            updated_tags.append(tag)
 
-                if not to_add:
-                    status = "Skipped: All IDs already present"
+                    if not to_add:
+                        status = "Skipped: All IDs already present"
+                        results.append((index, status, response_str))
+                        continue
+
+                    farmer_data["data"]["tags"] = updated_tags
+                else:
+                    status = "Failed: No data property in response"
                     results.append((index, status, response_str))
                     continue
 
-                farmer_data["data"]["tags"] = updated_tags
-            else:
-                status = "Failed: No data property in response"
-                results.append((index, status, response_str))
-                continue
+                time.sleep(delay_time)
+
+                multipart_data = {
+                    "dto": (None, json.dumps(farmer_data), "application/json")
+                }
+
+                put_response = requests.put(api_url, headers=headers, files=multipart_data, timeout=timeout)
+
+                if put_response.status_code in [200, 201, 204]:
+                    status = "Success"
+                    response_str = put_response.text[:500]
+                    log(f"[Row {row_num}] Updated Farmer '{farmer_name}' ({farmer_id})")
+                else:
+                    status = f"Failed: {put_response.status_code}"
+                    response_str = put_response.text[:500]
+                    log(f"[Row {row_num}] Failed to update Farmer '{farmer_name}' ({farmer_id}): {put_response.status_code}")
+
+            except requests.exceptions.RequestException as e:
+                status = f"Failed: {str(e)}"
+                if hasattr(e, 'response') and e.response is not None:
+                    response_str = f"{e.response.status_code} - {e.response.text}"
+                else:
+                    response_str = str(e)
+                log(f"[Row {row_num}] Error for Farmer '{farmer_name}' ({farmer_id}): {response_str[:100]}")
 
             time.sleep(delay_time)
-
-            multipart_data = {
-                "dto": (None, json.dumps(farmer_data), "application/json")
-            }
-
-            put_response = requests.put(api_url, headers=headers, files=multipart_data, timeout=timeout)
-
-            if put_response.status_code in [200, 201, 204]:
-                status = "Success"
-                response_str = put_response.text[:500]
-                log(f"[Row {row_num}] Updated Farmer '{farmer_name}' ({farmer_id})")
-            else:
-                status = f"Failed: {put_response.status_code}"
-                response_str = put_response.text[:500]
-                log(f"[Row {row_num}] Failed to update Farmer '{farmer_name}' ({farmer_id}): {put_response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            status = f"Failed: {str(e)}"
-            if hasattr(e, 'response') and e.response is not None:
-                response_str = f"{e.response.status_code} - {e.response.text}"
-            else:
-                response_str = str(e)
-            log(f"[Row {row_num}] Error for Farmer '{farmer_name}' ({farmer_id}): {response_str[:100]}")
-
-        time.sleep(delay_time)
-        results.append((index, status, response_str))
+            results.append((index, status, response_str))
+        finally:
+            if shared_stats:
+                with shared_stats["lock"]:
+                    shared_stats["processed"] += 1
+                    pending = shared_stats["total"] - shared_stats["processed"]
+                    log(f"[Thread {thread_id}] Processed: {shared_stats['processed']}/{shared_stats['total']} | Pending: {pending} | Farmer: {farmer_id}")
 
     return results
 
@@ -180,13 +187,18 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Adjust workers
     workers = min(len(chunks), max_workers)
 
-    log(f"Starting execution with {workers} threads...")
+    import threading
+    shared_stats = {
+        "total": n,
+        "processed": 0,
+        "lock": threading.Lock()
+    }
 
     all_results = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = []
         for i, chunk in enumerate(chunks):
-            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, log_callback, delay_time=delay_time))
+            futures.append(ex.submit(process_chunk, chunk, api_url, token, i+1, shared_stats, log_callback, delay_time=delay_time))
 
         for f in futures:
             try:
