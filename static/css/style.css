@@ -573,6 +573,9 @@ body {
     color: #444;
     transition: background-color 0.1s;
     border-bottom: 1px solid #fafafa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .dropdown-list li:hover {
@@ -584,6 +587,30 @@ body {
     background-color: #f1f8e9;
     color: var(--primary-color);
     font-weight: 600;
+}
+
+.star-icon {
+    font-size: 1.1rem;
+    color: #cbd5e1;
+    transition: all 0.2s;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.star-icon:hover {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    transform: scale(1.2);
+}
+
+.star-icon.active {
+    color: #f59e0b;
+}
+
+.dropdown-separator {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 0;
 }
 
 /* Script Details Section */

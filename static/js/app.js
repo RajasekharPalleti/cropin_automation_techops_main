@@ -57,6 +57,23 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scriptsData = scriptsData; // Expose for execution.js if needed
 
     // ================================================================
+    // FAVORITE SCRIPTS LOGIC
+    // ================================================================
+    let favoriteScripts = JSON.parse(localStorage.getItem('favorite_scripts') || '[]');
+
+    const toggleFavorite = (scriptName, event) => {
+        event.stopPropagation();
+        const index = favoriteScripts.indexOf(scriptName);
+        if (index > -1) {
+            favoriteScripts.splice(index, 1);
+        } else {
+            favoriteScripts.push(scriptName);
+        }
+        localStorage.setItem('favorite_scripts', JSON.stringify(favoriteScripts));
+        populateDropdown(scriptsData);
+    };
+
+    // ================================================================
     // CREDENTIAL PERSISTENCE
     // ================================================================
     const tenantIn = document.getElementById('tenant-code');
@@ -114,22 +131,49 @@ document.addEventListener('DOMContentLoaded', () => {
         dropdownList.innerHTML = '';
         scriptSelect.innerHTML = '<option value="" disabled selected>Select a script...</option>';
 
-        scripts.forEach(scriptObj => {
+        // Sort scripts: favorites first (alphabetical), then others (alphabetical)
+        const favorites = scripts.filter(s => favoriteScripts.includes(s.name))
+                                .sort((a, b) => a.name.localeCompare(b.name));
+        const others = scripts.filter(s => !favoriteScripts.includes(s.name))
+                               .sort((a, b) => a.name.localeCompare(b.name));
+
+        const renderItem = (scriptObj, isFavorite) => {
             const scriptName = scriptObj.name;
             let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
             displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
 
+            // Native select option
             const option = document.createElement('option');
             option.value = scriptName;
-            option.textContent = displayName;
+            option.textContent = (isFavorite ? '⭐ ' : '') + displayName;
             scriptSelect.appendChild(option);
 
+            // Custom list item
             const li = document.createElement('li');
-            li.textContent = displayName;
             li.dataset.value = scriptName;
             li.addEventListener('click', () => selectScript(scriptName, displayName));
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = displayName;
+            li.appendChild(nameSpan);
+
+            const star = document.createElement('span');
+            star.className = 'star-icon' + (isFavorite ? ' active' : '');
+            star.innerHTML = isFavorite ? '★' : '☆';
+            star.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+            star.addEventListener('click', (e) => toggleFavorite(scriptName, e));
+            li.appendChild(star);
+
             dropdownList.appendChild(li);
-        });
+        };
+
+        if (favorites.length > 0) {
+            favorites.forEach(s => renderItem(s, true));
+            const separator = document.createElement('li');
+            separator.className = 'dropdown-separator';
+            dropdownList.appendChild(separator);
+        }
+        others.forEach(s => renderItem(s, false));
     }
 
     function selectScript(value, displayName) {
@@ -281,19 +325,44 @@ document.addEventListener('DOMContentLoaded', () => {
             // Script matches if EVERY token typed by the user is found in either the name or display name
             return tokens.every(token => searchableText.includes(token));
         });
+        
+        // Use the same logic as populateDropdown for sorting and rendering
         dropdownList.innerHTML = '';
         if (filtered.length > 0) {
-            filtered.forEach(scriptObj => {
+            const favorites = filtered.filter(s => favoriteScripts.includes(s.name))
+                                    .sort((a, b) => a.name.localeCompare(b.name));
+            const others = filtered.filter(s => !favoriteScripts.includes(s.name))
+                                   .sort((a, b) => a.name.localeCompare(b.name));
+
+            const renderItem = (scriptObj, isFavorite) => {
                 const scriptName = scriptObj.name;
                 let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
                 displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
 
                 const li = document.createElement('li');
-                li.textContent = displayName;
                 li.dataset.value = scriptName;
                 li.addEventListener('click', () => selectScript(scriptName, displayName));
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = displayName;
+                li.appendChild(nameSpan);
+
+                const star = document.createElement('span');
+                star.className = 'star-icon' + (isFavorite ? ' active' : '');
+                star.innerHTML = isFavorite ? '★' : '☆';
+                star.addEventListener('click', (e) => toggleFavorite(scriptName, e));
+                li.appendChild(star);
+
                 dropdownList.appendChild(li);
-            });
+            };
+
+            if (favorites.length > 0) {
+                favorites.forEach(s => renderItem(s, true));
+                const separator = document.createElement('li');
+                separator.className = 'dropdown-separator';
+                dropdownList.appendChild(separator);
+            }
+            others.forEach(s => renderItem(s, false));
         } else {
             const li = document.createElement('li');
             li.className = 'no-results';
