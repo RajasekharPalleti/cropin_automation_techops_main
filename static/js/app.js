@@ -127,53 +127,73 @@ document.addEventListener('DOMContentLoaded', () => {
     // ================================================================
     // SCRIPT DROPDOWN — populate & select
     // ================================================================
-    function populateDropdown(scripts) {
-        dropdownList.innerHTML = '';
-        scriptSelect.innerHTML = '<option value="" disabled selected>Select a script...</option>';
+    // ─── Shared helpers used by both populateDropdown and the search filter ────
 
-        // Sort scripts: favorites first (alphabetical), then others (alphabetical)
-        const favorites = scripts.filter(s => favoriteScripts.includes(s.name))
-                                .sort((a, b) => a.name.localeCompare(b.name));
-        const others = scripts.filter(s => !favoriteScripts.includes(s.name))
-                               .sort((a, b) => a.name.localeCompare(b.name));
+    /** Returns { favorites, others } — both arrays sorted A→Z. */
+    function sortByFavorites(list) {
+        const favorites = list.filter(s =>  favoriteScripts.includes(s.name))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+        const others    = list.filter(s => !favoriteScripts.includes(s.name))
+                              .sort((a, b) => a.name.localeCompare(b.name));
+        return { favorites, others };
+    }
 
-        const renderItem = (scriptObj, isFavorite) => {
-            const scriptName = scriptObj.name;
-            let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
-            displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
+    /** Builds one <li> (name + star) and appends it to container. */
+    function renderListItem(container, scriptObj, isFavorite) {
+        const scriptName = scriptObj.name;
+        let displayName  = scriptName.replace('.py', '').replace(/_/g, ' ');
+        displayName      = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
 
-            // Native select option
-            const option = document.createElement('option');
-            option.value = scriptName;
-            option.textContent = (isFavorite ? '⭐ ' : '') + displayName;
-            scriptSelect.appendChild(option);
+        const li = document.createElement('li');
+        li.dataset.value = scriptName;
+        li.addEventListener('click', () => selectScript(scriptName, displayName));
 
-            // Custom list item
-            const li = document.createElement('li');
-            li.dataset.value = scriptName;
-            li.addEventListener('click', () => selectScript(scriptName, displayName));
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = displayName;
+        li.appendChild(nameSpan);
 
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = displayName;
-            li.appendChild(nameSpan);
+        const star = document.createElement('span');
+        star.className = 'star-icon' + (isFavorite ? ' active' : '');
+        star.innerHTML  = isFavorite ? '★' : '☆';
+        star.title      = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+        star.addEventListener('click', (e) => toggleFavorite(scriptName, e));
+        li.appendChild(star);
 
-            const star = document.createElement('span');
-            star.className = 'star-icon' + (isFavorite ? ' active' : '');
-            star.innerHTML = isFavorite ? '★' : '☆';
-            star.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
-            star.addEventListener('click', (e) => toggleFavorite(scriptName, e));
-            li.appendChild(star);
+        container.appendChild(li);
+        return { displayName };   // caller may need displayName for <option> text
+    }
 
-            dropdownList.appendChild(li);
+    /** Appends sorted favorites + separator + others to container and (optionally) select. */
+    function renderSortedList(container, list, selectEl) {
+        const { favorites, others } = sortByFavorites(list);
+
+        const append = (scriptObj, isFavorite) => {
+            const { displayName } = renderListItem(container, scriptObj, isFavorite);
+            if (selectEl) {
+                const option = document.createElement('option');
+                option.value       = scriptObj.name;
+                option.textContent = (isFavorite ? '⭐ ' : '') + displayName;
+                selectEl.appendChild(option);
+            }
         };
 
+        favorites.forEach(s => append(s, true));
         if (favorites.length > 0) {
-            favorites.forEach(s => renderItem(s, true));
-            const separator = document.createElement('li');
-            separator.className = 'dropdown-separator';
-            dropdownList.appendChild(separator);
+            const sep = document.createElement('li');
+            sep.className = 'dropdown-separator';
+            container.appendChild(sep);
         }
-        others.forEach(s => renderItem(s, false));
+        others.forEach(s => append(s, false));
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+
+    function populateDropdown(scripts) {
+        const previousValue = scriptSelect.value;   // preserve current selection
+        dropdownList.innerHTML = '';
+        scriptSelect.innerHTML = '<option value="" disabled selected>Select a script...</option>';
+        renderSortedList(dropdownList, scripts, scriptSelect);
+        if (previousValue) scriptSelect.value = previousValue;  // restore after re-render
     }
 
     function selectScript(value, displayName) {
@@ -326,43 +346,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return tokens.every(token => searchableText.includes(token));
         });
         
-        // Use the same logic as populateDropdown for sorting and rendering
+        // Render filtered results using the shared helpers
         dropdownList.innerHTML = '';
         if (filtered.length > 0) {
-            const favorites = filtered.filter(s => favoriteScripts.includes(s.name))
-                                    .sort((a, b) => a.name.localeCompare(b.name));
-            const others = filtered.filter(s => !favoriteScripts.includes(s.name))
-                                   .sort((a, b) => a.name.localeCompare(b.name));
-
-            const renderItem = (scriptObj, isFavorite) => {
-                const scriptName = scriptObj.name;
-                let displayName = scriptName.replace('.py', '').replace(/_/g, ' ');
-                displayName = displayName.replace(/([a-z])([A-Z])/g, '$1 $2');
-
-                const li = document.createElement('li');
-                li.dataset.value = scriptName;
-                li.addEventListener('click', () => selectScript(scriptName, displayName));
-
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = displayName;
-                li.appendChild(nameSpan);
-
-                const star = document.createElement('span');
-                star.className = 'star-icon' + (isFavorite ? ' active' : '');
-                star.innerHTML = isFavorite ? '★' : '☆';
-                star.addEventListener('click', (e) => toggleFavorite(scriptName, e));
-                li.appendChild(star);
-
-                dropdownList.appendChild(li);
-            };
-
-            if (favorites.length > 0) {
-                favorites.forEach(s => renderItem(s, true));
-                const separator = document.createElement('li');
-                separator.className = 'dropdown-separator';
-                dropdownList.appendChild(separator);
-            }
-            others.forEach(s => renderItem(s, false));
+            renderSortedList(dropdownList, filtered); // no selectEl — don't rebuild <select>
         } else {
             const li = document.createElement('li');
             li.className = 'no-results';
