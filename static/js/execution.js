@@ -35,6 +35,75 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUploadedFilename = null;
 
     // ----------------------------------------------------------------
+    // Helper: extract plain text from console-content lines
+    // ----------------------------------------------------------------
+    function getConsoleText() {
+        if (!consoleContent) return '';
+        return Array.from(consoleContent.querySelectorAll('.console-line, div'))
+            .map(el => el.textContent)
+            .join('\n')
+            .trim();
+    }
+
+    // ----------------------------------------------------------------
+    // Copy Logs button
+    // ----------------------------------------------------------------
+    const copyLogsBtn = document.getElementById('copy-logs-btn');
+    if (copyLogsBtn) {
+        copyLogsBtn.addEventListener('click', () => {
+            const text = getConsoleText();
+            if (!text) { window.showToast('No console output to copy.', 'error'); return; }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyLogsBtn.innerHTML = '<span class="material-icons" style="font-size:0.95rem;">check</span> Copied!';
+                    setTimeout(() => {
+                        copyLogsBtn.innerHTML = '<span class="material-icons" style="font-size:0.95rem;">content_copy</span> Copy';
+                    }, 2000);
+                }).catch(() => window.showToast('Failed to copy. Try downloading instead.', 'error'));
+            } else {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+                copyLogsBtn.innerHTML = '<span class="material-icons" style="font-size:0.95rem;">check</span> Copied!';
+                setTimeout(() => {
+                    copyLogsBtn.innerHTML = '<span class="material-icons" style="font-size:0.95rem;">content_copy</span> Copy';
+                }, 2000);
+            }
+        });
+    }
+
+    // ----------------------------------------------------------------
+    // Download Logs button
+    // ----------------------------------------------------------------
+    const downloadLogsBtn = document.getElementById('download-logs-btn');
+    if (downloadLogsBtn) {
+        downloadLogsBtn.addEventListener('click', () => {
+            const text = getConsoleText();
+            if (!text) { window.showToast('No console output to download.', 'error'); return; }
+
+            const scriptName = (document.getElementById('script-select')?.value || 'script').replace('.py', '');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `${scriptName}_logs_${timestamp}.txt`;
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // ----------------------------------------------------------------
     // Dynamic Stop button
     // ----------------------------------------------------------------
     const stopBtn = document.createElement('button');
@@ -577,6 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUploadedFilename) formData.append('input_filename', currentUploadedFilename);
         formData.append('config', JSON.stringify(config));
         formData.append('run_time', scheduleDatetime.value);
+        formData.append('recurrence', document.getElementById('schedule-recurrence')?.value || 'none');
+        formData.append('max_retries', document.getElementById('schedule-max-retries')?.value || '1');
+
 
         fetch('/api/schedule', { method: 'POST', body: formData })
             .then(r => {
@@ -683,17 +755,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pendingJobs = jobs.filter(j => j.status === 'pending');
         const runningJobs = jobs.filter(j => j.status === 'running');
-        const historyJobs = jobs.filter(j => ['completed', 'failed', 'cancelled'].includes(j.status));
+        const historyJobs = jobs.filter(j => ['completed', 'failed', 'cancelled', 'missed'].includes(j.status));
 
         // Render Pending
         if (pendingJobs.length === 0) {
             if (schedContainer) schedContainer.innerHTML = '<p style="color:#666; font-style:italic;">No upcoming scheduled scripts.</p>';
         } else {
-            if (schedContainer) schedContainer.innerHTML = pendingJobs.map(j => `
+            if (schedContainer) schedContainer.innerHTML = pendingJobs.map(j => {
+                const recurrenceBadge = (j.recurrence && j.recurrence !== 'none')
+                    ? `<span style="background:#6a1b9a; color:white; padding:2px 7px; border-radius:10px; font-size:0.7rem; margin-left:8px; vertical-align:middle;">🔁 ${j.recurrence === 'daily' ? 'Daily' : 'Weekly'}</span>`
+                    : '';
+                const retryBadge = (j.retry_count && j.retry_count > 0)
+                    ? `<span style="color:#e65100; font-size:0.8rem; margin-top:3px; display:block;">⚠ Retry attempt ${j.retry_count}/${j.max_retries}</span>`
+                    : '';
+                return `
                 <div id="job-card-${j.job_id}" style="border:1px solid #ddd; padding:15px; border-radius:6px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
                     <div id="job-info-${j.job_id}">
-                        <strong style="color:#333; font-size:1.1rem;">${j.script_name}</strong>
+                        <span style="color:#333; font-size:1.1rem; font-weight:600;">${j.script_name}</span>${recurrenceBadge}
                         <div style="color:#666; font-size:0.9rem; margin-top:5px;" id="job-time-${j.job_id}">📅 ${new Date(j.run_time).toLocaleString()}</div>
+                        ${retryBadge}
                     </div>
                     <div style="display:flex; gap:10px;" id="job-actions-${j.job_id}">
                         <button onclick="window.runJobNow('${j.job_id}')" class="btn-primary" style="padding:6px 12px; font-size:0.9rem;">▶ Run Now</button>
@@ -701,8 +781,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button onclick="window.deleteJob('${j.job_id}')" class="btn-secondary" style="color:#dc3545; border-color:#dc3545; padding:6px 12px; font-size:0.9rem;">Delete</button>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
+
 
         // Render Running
         if (runningJobs.length === 0) {
@@ -742,6 +824,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (j.status === 'cancelled') {
                         statusColor = '#ffc107'; // Yellow/Orange
                         statusText = 'Cancelled';
+                    } else if (j.status === 'missed') {
+                        statusColor = '#6c757d'; // Grey
+                        statusText = 'Missed';
                     }
 
                     const timeStr = j.completed_at ? new Date(j.completed_at).toLocaleString() : 'Recently';
@@ -750,9 +835,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="border:1px solid #ddd; padding:12px; border-radius:6px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
                             <div>
                                 <strong style="color:#333;">${j.script_name}</strong>
+                                ${j.recurrence && j.recurrence !== 'none' ? `<span style="background:#6a1b9a; color:white; padding:1px 6px; border-radius:9px; font-size:0.65rem; margin-left:6px;">🔁 ${j.recurrence}</span>` : ''}
                                 <div style="color:#666; font-size:0.85rem; margin-top:4px;">
                                     Finished: ${timeStr}
                                 </div>
+                                ${j.retry_count ? `<div style="color:#e65100; font-size:0.78rem; margin-top:2px;">Retried ${j.retry_count}/${j.max_retries} time(s)</div>` : ''}
                             </div>
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <span style="background:${statusColor}; color:white; padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:bold;">${statusText}</span>

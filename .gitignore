@@ -14,3 +14,4 @@ scheduled_jobs.json
 scheduled_uploads/
 tests/
 tmp/
+scheduled_jobs.json

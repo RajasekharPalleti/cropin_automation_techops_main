@@ -592,7 +592,9 @@ async def schedule_script(
     script_name: str = Form(...),
     input_filename: str = Form(None),
     config: str = Form(...),
-    run_time: str = Form(...)  # Expected ISO format YYYY-MM-DDTHH:MM
+    run_time: str = Form(...),          # Expected ISO format YYYY-MM-DDTHH:MM
+    recurrence: str = Form("none"),     # none / daily / weekly
+    max_retries: int = Form(1),         # 0 = no retry, 1+ = retry N times
 ):
     """Save the script details and permanently archive the input file for a scheduled run."""
     import uuid
@@ -628,7 +630,10 @@ async def schedule_script(
             "status": "pending",
             "created_at": datetime.now().isoformat(),
             "config": config_dict,
-            "input_file": permanent_input_path
+            "input_file": permanent_input_path,
+            "recurrence": recurrence,
+            "max_retries": max_retries,
+            "retry_count": 0,
         }
 
         # Save to JSON
@@ -653,7 +658,7 @@ async def get_scheduled_jobs():
     jobs = load_jobs()
     pending = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] == "pending"]
     running = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] == "running"]
-    history = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] in ["completed", "failed", "cancelled"]]
+    history = [dict(data, job_id=jid) for jid, data in jobs.items() if data["status"] in ["completed", "failed", "cancelled", "missed"]]
     
     # Sort history by completed_at desc
     history.sort(key=lambda x: x.get("completed_at", ""), reverse=True)

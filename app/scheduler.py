@@ -3,7 +3,7 @@ import os
 import asyncio
 import importlib.util
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from app.script_configs import SCRIPTS_DIR, OUTPUT_DIR
@@ -32,6 +32,92 @@ def save_jobs(jobs):
             json.dump(jobs, f, indent=4)
     except Exception as e:
         logger.error(f"Error saving scheduled jobs: {e}")
+
+def mark_missed_jobs_on_startup():
+    """
+    Called once at server startup.
+    Any job that is still 'pending' but whose run_time is already in the past
+    is immediately marked 'missed' so it never runs silently late.
+    """
+    jobs = load_jobs()
+    now = datetime.now()
+    changed = False
+
+    for job_id, data in jobs.items():
+        if data.get("status") != "pending":
+            continue
+        try:
+            run_dt = datetime.fromisoformat(data["run_time"])
+            if now > run_dt:
+                logger.warning(
+                    f"[Startup] Job {job_id} ({data.get('script_name', '?')}) "
+                    f"was scheduled for {data['run_time']} but was never executed "
+                    "(server was down). Marking as 'missed'."
+                )
+                jobs[job_id]["status"] = "missed"
+                jobs[job_id]["error"] = (
+                    f"Job missed: server was offline during the scheduled window "
+                    f"({data['run_time']})."
+                )
+                jobs[job_id]["completed_at"] = now.isoformat()
+                changed = True
+        except (ValueError, KeyError):
+            pass  # Ignore malformed run_time entries
+
+    if changed:
+        save_jobs(jobs)
+        logger.info("[Startup] Missed-job sweep complete.")
+
+
+def _schedule_next_occurrence(parent_job_id: str, job_data: dict) -> None:
+    """
+    Creates a new pending job for the next daily or weekly run.
+    Called after a recurring job completes (successfully or permanently failed).
+    """
+    import uuid
+    recurrence = job_data.get("recurrence", "none")
+    if not recurrence or recurrence == "none":
+        return
+
+    now = datetime.now()
+    try:
+        base_dt = datetime.fromisoformat(job_data["run_time"])
+    except (ValueError, KeyError):
+        base_dt = now
+
+    if recurrence == "daily":
+        next_dt = base_dt + timedelta(days=1)
+        if next_dt <= now:          # catch-up guard
+            next_dt = now + timedelta(days=1)
+    elif recurrence == "weekly":
+        next_dt = base_dt + timedelta(weeks=1)
+        if next_dt <= now:
+            next_dt = now + timedelta(weeks=1)
+    else:
+        return
+
+    new_job_id = str(uuid.uuid4())
+    new_job = {
+        "job_id":      new_job_id,
+        "script_name": job_data["script_name"],
+        "run_time":    next_dt.strftime("%Y-%m-%dT%H:%M"),
+        "status":      "pending",
+        "created_at":  now.isoformat(),
+        "config":      job_data["config"],
+        "input_file":  job_data.get("input_file"),
+        "recurrence":  recurrence,
+        "max_retries": job_data.get("max_retries", 1),
+        "retry_count": 0,
+        "parent_job_id": parent_job_id,
+    }
+    jobs = load_jobs()
+    jobs[new_job_id] = new_job
+    save_jobs(jobs)
+    logger.info(
+        f"[Recurring] Next '{job_data['script_name']}' run queued for "
+        f"{new_job['run_time']} (job {new_job_id[:8]})"
+    )
+
 
 async def process_scheduled_script(job_id: str, job_data: dict):
     """
@@ -122,25 +208,48 @@ async def process_scheduled_script(job_id: str, job_data: dict):
         else:
             raise Exception(f"Script {script_name} does not have a 'run' function.")
 
-        # Mark as completed in JSON if it wasn't aborted midway
+        # Mark as completed / handle recurrence
         if not manager.is_cancelled(job_id):
             jobs = load_jobs()
             if job_id in jobs:
                 jobs[job_id]["status"] = "completed"
                 jobs[job_id]["completed_at"] = datetime.now().isoformat()
                 save_jobs(jobs)
+            # Queue next occurrence AFTER saving, so load_jobs gets a fresh copy
+            _schedule_next_occurrence(job_id, job_data)
 
     except Exception as e:
         logger.error(f"[{script_name}] Execution failed: {e}")
         logger.error(traceback.format_exc())
-        
-        # Mark as failed in JSON
+
         jobs = load_jobs()
         if job_id in jobs:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
-            jobs[job_id]["completed_at"] = datetime.now().isoformat()
-            save_jobs(jobs)
+            retry_count  = jobs[job_id].get("retry_count", 0)
+            max_retries  = jobs[job_id].get("max_retries", 1)
+            recurrence   = jobs[job_id].get("recurrence", "none")
+
+            if retry_count < max_retries:
+                # Re-queue same job for retry in 5 minutes
+                next_run = (datetime.now() + timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M")
+                jobs[job_id]["status"]      = "pending"
+                jobs[job_id]["retry_count"] = retry_count + 1
+                jobs[job_id]["run_time"]    = next_run
+                jobs[job_id]["last_error"]  = str(e)
+                save_jobs(jobs)
+                logger.warning(
+                    f"[{script_name}] Retry {retry_count + 1}/{max_retries} "
+                    f"scheduled for {next_run} (job {job_id[:8]})"
+                )
+            else:
+                # Retries exhausted — mark permanently failed
+                jobs[job_id]["status"]       = "failed"
+                jobs[job_id]["error"]        = str(e)
+                jobs[job_id]["completed_at"] = datetime.now().isoformat()
+                save_jobs(jobs)
+                # Still queue next recurrence even if this run ultimately failed
+                if recurrence and recurrence != "none":
+                    _schedule_next_occurrence(job_id, jobs[job_id])
+
 
 async def schedule_runner_task():
     """Poller loop running as a background asyncio task in main.py lifespan"""

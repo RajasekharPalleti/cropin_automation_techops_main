@@ -402,10 +402,22 @@
 
             <!-- Console (Now outside grid, full width at bottom) -->
             <div class="console-box" id="console-box" style="display: none; margin-top: 30px;">
-                <div class="console-header" style="color: #666; margin-bottom: 5px; font-size: 0.8rem;">Console Output
+                <div class="console-header" style="display: flex; align-items: center; justify-content: space-between; color: #666; margin-bottom: 5px; font-size: 0.8rem;">
+                    <span>Console Output</span>
+                    <div style="display: flex; gap: 6px;">
+                        <button id="copy-logs-btn" title="Copy logs to clipboard"
+                            style="display:flex; align-items:center; gap:4px; padding:3px 8px; font-size:0.75rem; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer; color:#444;">
+                            <span class="material-icons" style="font-size:0.95rem;">content_copy</span> Copy
+                        </button>
+                        <button id="download-logs-btn" title="Download logs as .txt file"
+                            style="display:flex; align-items:center; gap:4px; padding:3px 8px; font-size:0.75rem; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer; color:#444;">
+                            <span class="material-icons" style="font-size:0.95rem;">download</span> Download
+                        </button>
+                    </div>
                 </div>
                 <div class="console-content" id="console-content"></div>
             </div>
+
 
         </div>
     </div>
@@ -503,14 +515,31 @@
                     script to automatically execute. <strong>Note: Times are based on IST (Indian Standard
                         Time).</strong></p>
                 <div class="input-group">
-                    <label for="schedule-datetime">Run Date & Time</label>
+                    <label for="schedule-datetime">Run Date &amp; Time</label>
                     <input type="datetime-local" id="schedule-datetime"
                         style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
                         required>
                 </div>
+                <div class="input-group" style="margin-top: 12px;">
+                    <label for="schedule-recurrence">🔁 Repeat</label>
+                    <select id="schedule-recurrence" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                        <option value="none" selected>None (One-time)</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                    </select>
+                </div>
+                <div class="input-group" style="margin-top: 12px;">
+                    <label for="schedule-max-retries">🔄 Auto-retry on Failure</label>
+                    <select id="schedule-max-retries" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                        <option value="0">No retries</option>
+                        <option value="1" selected>1 retry (5 min delay)</option>
+                        <option value="2">2 retries</option>
+                        <option value="3">3 retries</option>
+                    </select>
+                </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                     <button id="cancel-schedule-run-btn" class="btn-secondary">Cancel</button>
-                    <button id="save-schedule-run-btn" class="btn-primary" style="background-color: #6a1b9a;">Save &
+                    <button id="save-schedule-run-btn" class="btn-primary" style="background-color: #6a1b9a;">Save &amp;
                         Schedule</button>
                 </div>
             </div>

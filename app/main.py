@@ -150,7 +150,7 @@ from app.script_configs import (
 )
 from app.state import manager, backup_manager
 from app.routes import router
-from app.scheduler import schedule_runner_task
+from app.scheduler import schedule_runner_task, mark_missed_jobs_on_startup
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +188,9 @@ async def lifespan(app: FastAPI):
                         shutil.rmtree(file_path)
                 except Exception as e:
                     print(f"Failed to delete {file_path}. Reason: {e}")
+
+    # Mark any pending jobs whose run_time has already passed as 'missed'
+    mark_missed_jobs_on_startup()
 
     asyncio.create_task(periodic_cleanup_task())
     asyncio.create_task(schedule_runner_task())
