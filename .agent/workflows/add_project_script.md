@@ -39,6 +39,7 @@ Follow these steps strictly whenever adding a new script:
     - Add a new block inside the `SCRIPT_CONFIGS` dictionary with the script name as the key (e.g., `"New_Script.py": { ... }`).
     - Define the base API URL (`url`, `url2`), the display labels (`label`, `label2`), and any necessary boolean UI flags (e.g., `"show_pr_weather": True`, `"show_address_config": True`).
     - The frontend (`static/js/app.js` and `index.html`) will *automatically* render the required configuration fields based on these flags! No JavaScript or HTML changes are needed.
+    - **UI to Backend Linkage Check (CRITICAL)**: If a new UI configuration flag or input element is added, strictly verify that `buildScriptConfig()` in `static/js/execution.js` correctly reads this new UI element and includes it in the `config` payload sent to the backend. Ensure the script correctly reads it via `config.get(...)`.
 
 4. **Final System Verification**
     - Verify the script is listed in the UI.

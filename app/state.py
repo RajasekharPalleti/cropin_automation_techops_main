@@ -125,27 +125,40 @@ class ConnectionManager:
             print(f"Client {client_id} disconnected.")
 
     async def send_log(self, message: str, client_id: str):
-        """Archive a log message and push it to the live SSE queue."""
-        
-        # Prepend timestamp only if it's not a control message protocol marker
+        """Archive a log message and push it to the live SSE queue.
+
+        SSE uses newline characters as frame delimiters, so any \n embedded
+        inside a message would silently truncate it in the browser.  We split
+        on newlines and send each non-empty line as its own SSE event.  Empty
+        lines (e.g. a leading \n used for visual spacing) are sent as a blank
+        log entry so the UI still renders a gap row.
+        """
         is_control = any(message.startswith(p) for p in ["JOB_COMPLETED::", "JOB_FAILED::", "JOB_STOPPED::"])
-        if not is_control and message != "STOP_UI_NOW":
-            timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-            message = f"{timestamp} {message}"
 
         if client_id not in self.client_logs:
             self.client_logs[client_id] = []
             self.client_counters[client_id] = 0
 
-        self.client_counters[client_id] += 1
-        msg_id = self.client_counters[client_id]
+        # Control/sentinel messages are never multi-line – send as-is.
+        if is_control or message == "STOP_UI_NOW":
+            self.client_counters[client_id] += 1
+            msg_id = self.client_counters[client_id]
+            self.client_logs[client_id].append((msg_id, message))
+            if client_id in self.active_connections:
+                await self.active_connections[client_id].put((msg_id, message))
+            return
 
-        # 1. Archive for replay
-        self.client_logs[client_id].append((msg_id, message))
-
-        # 2. Stream if client is connected
-        if client_id in self.active_connections:
-            await self.active_connections[client_id].put((msg_id, message))
+        # Split on newlines so embedded \n never breaks the SSE frame.
+        timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+        lines = message.split("\n")
+        for line in lines:
+            # Blank lines become an empty timestamped entry (visual spacer).
+            formatted = f"{timestamp} {line}" if line.strip() else ""
+            self.client_counters[client_id] += 1
+            msg_id = self.client_counters[client_id]
+            self.client_logs[client_id].append((msg_id, formatted))
+            if client_id in self.active_connections:
+                await self.active_connections[client_id].put((msg_id, formatted))
 
     async def stream_logs(self, client_id: str):
         """Generator that yields SSE-formatted messages for a client."""

@@ -36,6 +36,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     try:
         # Load Excel
         df = pd.read_excel(input_excel_file)
+        log(f"📘 Excel file loaded successfully")
+        log(f" Time Delay given for script is: {delay_time}")
         
         if "farmer_id" not in df.columns:
             # Try case-insensitive matching
@@ -93,8 +95,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                 status_code = response.status_code
                 response_text = response.text
+                response_json = response.json()
+                deletable = response_json.get("deletable")
 
-                if status_code in [200, 204]:
+                if status_code in [200, 204] and deletable > 0:
                     status = "✅ Deleted"
                     log(f"✅ Batch {i // BATCH_SIZE + 1} deleted successfully")
                 else:

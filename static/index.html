@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TechOps Automation Console</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=6">
+    <link rel="stylesheet" href="/static/css/style.css?v=7">
     <link rel="stylesheet" href="/static/css/admin_logs.css?v=5">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -400,18 +400,15 @@
                 </div>
             </div>
 
-            <!-- Console (Now outside grid, full width at bottom) -->
-            <div class="console-box" id="console-box" style="display: none; margin-top: 30px;">
-                <div class="console-header" style="display: flex; align-items: center; justify-content: space-between; color: #666; margin-bottom: 5px; font-size: 0.8rem;">
+            <div class="console-box" id="console-box" style="display: none;">
+                <div class="console-header">
                     <span>Console Output</span>
-                    <div style="display: flex; gap: 6px;">
-                        <button id="copy-logs-btn" title="Copy logs to clipboard"
-                            style="display:flex; align-items:center; gap:4px; padding:3px 8px; font-size:0.75rem; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer; color:#444;">
-                            <span class="material-icons" style="font-size:0.95rem;">content_copy</span> Copy
+                    <div class="console-actions">
+                        <button id="copy-logs-btn" class="console-header-btn" title="Copy logs to clipboard">
+                            <span class="material-icons">content_copy</span> Copy
                         </button>
-                        <button id="download-logs-btn" title="Download logs as .txt file"
-                            style="display:flex; align-items:center; gap:4px; padding:3px 8px; font-size:0.75rem; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; cursor:pointer; color:#444;">
-                            <span class="material-icons" style="font-size:0.95rem;">download</span> Download
+                        <button id="download-logs-btn" class="console-header-btn" title="Download logs as .txt file">
+                            <span class="material-icons">download</span> Download
                         </button>
                     </div>
                 </div>

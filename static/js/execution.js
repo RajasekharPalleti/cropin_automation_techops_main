@@ -382,37 +382,43 @@ document.addEventListener('DOMContentLoaded', () => {
             base_api_url: document.getElementById('base-api-url').value,
         };
 
-        const scriptNameForCfg = scriptSelect.value;
-        const useFarmerId = document.getElementById('use-farmer-id')?.value;
-        if (useFarmerId) config.use_farmer_id = useFarmerId;
+        // scriptSelect.value is available via the outer-scope `scriptSelect` ref if needed
 
-        // 1. Threading Config
+        // 1. PR / Weather Config — only send use_farmer_id when section is visible
+        const prWeatherConfig = document.getElementById('pr-weather-config');
+        if (prWeatherConfig && prWeatherConfig.style.display !== 'none') {
+            const useFarmerId = document.getElementById('use-farmer-id')?.value;
+            if (useFarmerId) config.use_farmer_id = useFarmerId;
+        }
+
+        // 2. Threading Config
         const threadingContainer = document.getElementById('threading-config');
         if (threadingContainer && threadingContainer.style.display !== 'none') {
             config.worker_count = parseInt(document.getElementById('worker-count')?.value) || 1;
         }
 
-        // 2. Extra Appended Config (Secondary URL & Google API)
+        // 3. Extra Appended Config (Secondary URL & Google API)
         const secondaryGroup = document.getElementById('group-secondary-url');
         if (secondaryGroup && secondaryGroup.style.display !== 'none') {
             const secondBaseApiUrl = document.getElementById('second-base-api-url')?.value;
             if (secondBaseApiUrl) config.second_base_api_url = secondBaseApiUrl;
         }
 
+        // 4. Google API Config
         const googleApiConfig = document.getElementById('google-api-config');
         if (googleApiConfig && googleApiConfig.style.display !== 'none') {
             const xApiKey = document.getElementById('x-api-key')?.value;
             if (xApiKey) config.x_api_key = xApiKey;
         }
 
-        // 3. CA Control Config
+        // 5. CA Control Config
         const caControl = document.getElementById('ca-close-delete-config');
         if (caControl && caControl.style.display !== 'none') {
             config.ca_action = document.getElementById('ca-action-select')?.value || 'none';
             config.ca_x_api_key = document.getElementById('ca-x-api-key')?.value || 'SEF5qQ6RTDGFWUc36SNuCKGYW1tVuGgGrX1iApUs5DGOc7MS';
         }
 
-        // 3.5 Common Batch Size Config
+        // 6. Common Batch Size Config
         const commonBatchConfig = document.getElementById('common-batch-config');
         if (commonBatchConfig && commonBatchConfig.style.display !== 'none') {
             let batchSizeRaw = parseInt(document.getElementById('common-batch-size')?.value);
@@ -425,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
             config.batch_size = batchSizeRaw;
         }
 
-        // 4. Attribute Config (Generic Attributes)
+        // 7. Attribute Config (Generic Attributes)
         const attributeConfig = document.getElementById('attribute-config');
         if (attributeConfig && attributeConfig.style.display !== 'none') {
             const attrCount = parseInt(document.getElementById('attr-count-select').value) || 1;
@@ -438,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
             config.fields_to_remove = attrKeys;
         }
 
-        // 5. Address Config
+        // 8. Address Config
         const addressConfig = document.getElementById('address-config');
         if (addressConfig && addressConfig.style.display !== 'none') {
             const addrCount = parseInt(document.getElementById('addr-count-select').value) || 1;
@@ -453,14 +459,14 @@ document.addEventListener('DOMContentLoaded', () => {
             config.fields_to_remove = addrKeys;
         }
 
-        // 6. Area Audit Config
+        // 9. Area Audit Config
         const areaAuditConfig = document.getElementById('area-audit-config');
         if (areaAuditConfig && areaAuditConfig.style.display !== 'none') {
             config.unit = document.getElementById('area-unit-select')?.value || 'Hectare';
             config.force_crop_audited = document.getElementById('force-crop-audited')?.value || 'true';
         }
 
-        // 7. Variety Removal Config
+        // 10. Variety Removal Config
         const varietyRemovalConfig = document.getElementById('variety-removal-config');
         if (varietyRemovalConfig && varietyRemovalConfig.style.display !== 'none') {
             const remCount = parseInt(document.getElementById('removal-count-select')?.value) || 1;
@@ -475,10 +481,17 @@ document.addEventListener('DOMContentLoaded', () => {
             config.fields_to_remove = remKeys;
         }
 
-        // 9. Coordinate Order Config
+        // 11. Coordinate Order Config
         const coordOrderConfig = document.getElementById('coordinate-order-config');
         if (coordOrderConfig && coordOrderConfig.style.display !== 'none') {
             config.coordinate_order = document.getElementById('coordinate-order')?.value || 'Long, Lat';
+        }
+
+        // 12. Time Delay Config — always read when the section is visible
+        const timeDelayConfig = document.getElementById('time-delay-config');
+        if (timeDelayConfig && timeDelayConfig.style.display !== 'none') {
+            const delayVal = parseFloat(document.getElementById('delay-time-input')?.value);
+            config.delay_time = isNaN(delayVal) || delayVal < 0 ? 1 : delayVal;
         }
 
         return config;
