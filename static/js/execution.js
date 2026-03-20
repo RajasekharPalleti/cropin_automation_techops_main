@@ -571,7 +571,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const scheduleDatetime = document.getElementById('schedule-datetime');
 
     if (openScheduleModalBtn) openScheduleModalBtn.addEventListener('click', () => {
-        if (scheduleModal) scheduleModal.style.display = 'block';
+        if (scheduleModal) {
+            // Set min to current time (YYYY-MM-DDTHH:MM)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+            if (scheduleDatetime) {
+                scheduleDatetime.min = minDateTime;
+                // Default to 5 minutes from now if empty or in past
+                if (!scheduleDatetime.value || scheduleDatetime.value < minDateTime) {
+                    const future = new Date(now.getTime() + 5 * 60000);
+                    const fYear = future.getFullYear();
+                    const fMonth = String(future.getMonth() + 1).padStart(2, '0');
+                    const fDay = String(future.getDate()).padStart(2, '0');
+                    const fHours = String(future.getHours()).padStart(2, '0');
+                    const fMinutes = String(future.getMinutes()).padStart(2, '0');
+                    scheduleDatetime.value = `${fYear}-${fMonth}-${fDay}T${fHours}:${fMinutes}`;
+                }
+            }
+            scheduleModal.style.display = 'block';
+        }
     });
 
     const hideScheduleModal = () => { if (scheduleModal) scheduleModal.style.display = 'none'; };
@@ -628,6 +652,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         openScheduleModalBtn.addEventListener('mouseenter', updateTooltip);
         openScheduleModalBtn.addEventListener('mouseleave', hideTooltip);
+    }
+
+    if (scheduleDatetime) {
+        scheduleDatetime.addEventListener('change', () => {
+            if (scheduleDatetime.min && scheduleDatetime.value < scheduleDatetime.min) {
+                window.showToast('Please select a future date and time.', 'warning');
+                scheduleDatetime.value = scheduleDatetime.min;
+            }
+        });
     }
 
     if (saveScheduleBtn) saveScheduleBtn.addEventListener('click', () => {

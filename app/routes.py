@@ -599,6 +599,14 @@ async def schedule_script(
     """Save the script details and permanently archive the input file for a scheduled run."""
     import uuid
     
+    # Validate run_time is in the future
+    try:
+        requested_time = datetime.fromisoformat(run_time)
+        if requested_time < datetime.now():
+            raise HTTPException(status_code=400, detail="Scheduled time must be in the future.")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Expected ISO format.")
+    
     try:
         try:
             config_dict = json.loads(config)
