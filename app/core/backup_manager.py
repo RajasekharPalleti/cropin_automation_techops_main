@@ -1,12 +1,24 @@
-import os
 import datetime
 import time
+import socket
+import logging
+
+# FORCE IPv4 globally to prevent WinError 10060 timeouts on IPv6-enabled corporate networks
+orig_getaddrinfo = socket.getaddrinfo
+def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+    return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = getaddrinfo_ipv4
+
+# Set global timeout for all socket operations
+socket.setdefaulttimeout(30)
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from app.script_configs import HTTP_PROXY, HTTPS_PROXY
+import os
 
 class BackupManager:
     SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -34,6 +46,15 @@ class BackupManager:
     def __init__(self):
         self.creds = None
         self.service = None
+        
+        # Apply proxy settings if configured
+        if HTTP_PROXY:
+            os.environ['http_proxy'] = HTTP_PROXY
+            print(f"BackupManager: Using HTTP proxy: {HTTP_PROXY}")
+        if HTTPS_PROXY:
+            os.environ['https_proxy'] = HTTPS_PROXY
+            print(f"BackupManager: Using HTTPS proxy: {HTTPS_PROXY}")
+            
         self._authenticate()
 
     def _authenticate(self):
@@ -44,7 +65,8 @@ class BackupManager:
                 try:
                     sa_creds = service_account.Credentials.from_service_account_file(
                         self.SERVICE_ACCOUNT_FILE, scopes=self.SCOPES)
-                    sa_service = build('drive', 'v3', credentials=sa_creds)
+                    sa_service = build('drive', 'v3', credentials=sa_creds, cache_discovery=False)
+
                     
                     # Verify credentials with a lightweight call
                     sa_service.files().list(pageSize=1, fields="files(id)").execute()
@@ -108,7 +130,8 @@ class BackupManager:
                         print(f"BackupManager: OAuth flow failed: {e}")
                         return
 
-            self.service = build('drive', 'v3', credentials=self.creds)
+            self.service = build('drive', 'v3', credentials=self.creds, cache_discovery=False)
+
             print("BackupManager: Successfully authenticated with Google Drive (User Credentials).")
 
         except Exception as e:

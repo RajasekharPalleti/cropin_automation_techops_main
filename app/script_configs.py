@@ -12,6 +12,12 @@ TEMPLATES_DIR = "sample_templates"  # Excel template files
 SERVER_HOST = "0.0.0.0"
 SERVER_PORT = 4444
 
+# Proxy settings (for Google Drive API in corporate networks)
+# Set these if you get WinError 10060 (Timeout) errors.
+# Example: "http://proxy.cropin.in:8080"
+HTTP_PROXY  = ""
+HTTPS_PROXY = ""
+
 # SSE / streaming settings
 SSE_HEARTBEAT_TIMEOUT = 15.0  # seconds — keeps TCP connection alive when idle
 
