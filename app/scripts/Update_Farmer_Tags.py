@@ -107,11 +107,11 @@ def process_chunk(df_chunk, api_url, token, thread_id, shared_stats, log_callbac
                 if put_response.status_code in [200, 201, 204]:
                     status = "Success"
                     response_str = put_response.text[:500]
-                    log(f"[Row {row_num}] Updated Farmer '{farmer_name}' ({farmer_id})")
+                    log(f"[Row {row_num}] Updated Farmer name {farmer_name} and farmer id {farmer_id} with tags {updated_tags}")
                 else:
                     status = f"Failed: {put_response.status_code}"
                     response_str = put_response.text[:500]
-                    log(f"[Row {row_num}] Failed to update Farmer '{farmer_name}' ({farmer_id}): {put_response.status_code}")
+                    log(f"[Row {row_num}] Failed to update Farmer name {farmer_name} and farmer id {farmer_id} with tags {updated_tags}: {put_response.status_code}")
 
             except requests.exceptions.RequestException as e:
                 status = f"Failed: {str(e)}"
@@ -119,7 +119,7 @@ def process_chunk(df_chunk, api_url, token, thread_id, shared_stats, log_callbac
                     response_str = f"{e.response.status_code} - {e.response.text}"
                 else:
                     response_str = str(e)
-                log(f"[Row {row_num}] Error for Farmer '{farmer_name}' ({farmer_id}): {response_str[:100]}")
+                log(f"[Row {row_num}] Error for Farmer name {farmer_name} and farmer id {farmer_id}: {response_str[:500]}")
 
             time.sleep(delay_time)
             results.append((index, status, response_str))
