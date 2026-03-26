@@ -31,9 +31,21 @@ def execute_force_restart():
         safe_log_print("Fetching latest changes from repository...")
         subprocess.check_call(["git", "fetch", "origin", "main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
+        import shutil
+        backup_file = "scheduled_jobs.json.bak"
+        if os.path.exists("scheduled_jobs.json"):
+            shutil.copy2("scheduled_jobs.json", backup_file)
+            safe_log_print("scheduled_jobs.json backed up.")
+            
         # Hard reset to pull everything (ignoring deployment.config for manual force)
         safe_log_print("Pulling latest code (reset --hard)...")
         subprocess.check_call(["git", "reset", "--hard", "origin/main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        if os.path.exists(backup_file):
+            shutil.copy2(backup_file, "scheduled_jobs.json")
+            os.remove(backup_file)
+            safe_log_print("scheduled_jobs.json restored.")
+            
         safe_log_print("Git update successful.")
         
     except Exception as e:

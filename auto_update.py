@@ -93,7 +93,20 @@ def execute_update_process():
     try:
         print("Pulling latest changes from Git (origin main)...")
         subprocess.check_call(["git", "fetch", "origin", "main"])
+        
+        import shutil
+        backup_file = "scheduled_jobs.json.bak"
+        if os.path.exists("scheduled_jobs.json"):
+            shutil.copy2("scheduled_jobs.json", backup_file)
+            print("scheduled_jobs.json backed up.")
+            
         subprocess.check_call(["git", "reset", "--hard", "origin/main"])
+        
+        if os.path.exists(backup_file):
+            shutil.copy2(backup_file, "scheduled_jobs.json")
+            os.remove(backup_file)
+            print("scheduled_jobs.json restored.")
+            
         print("Git pull successful!")
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Git pull failed with code {e.returncode}. Aborting update.")
