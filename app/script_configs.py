@@ -274,6 +274,12 @@ SCRIPT_CONFIGS = {
         "label2": "CA TASK API URL",
         "requires_input": True,
     },
+    "Delete_Task_No_Batch.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/tasks/bulk",
+        "label": "Delete API URL",
+        "requires_input": True,
+        "show_batch_config": True,
+    },
     "Create_Places.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/place",
         "label": "Place API URL",
