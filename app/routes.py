@@ -420,6 +420,7 @@ async def list_scripts():
                 "show_threading": config.get("show_threading", False),
                 "show_coordinate_order": config.get("show_coordinate_order", False),
                 "show_batch_config": config.get("show_batch_config", False),
+                "unlimited_batch_size": config.get("unlimited_batch_size", False),
                 "show_time_delay": config.get("show_time_delay", True)
             })
 

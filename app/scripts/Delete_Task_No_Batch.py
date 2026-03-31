@@ -1,7 +1,7 @@
 """
 Delete tasks via bulk delete API in configurable batches of Task IDs (no CA grouping, no verification).
 Captures the raw API response for each batch and stores it against every processed Task ID row.
-Batch size is configurable from the UI (max 100, default 100).
+Batch size is configurable from the UI.
 
 Inputs:
 Excel file with 'Task_Id' column only (one task ID per row).
