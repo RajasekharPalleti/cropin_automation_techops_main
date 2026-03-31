@@ -2,7 +2,7 @@
 Enables Plot Risk in bulk (batch mode) for multiple areas.
 
 Inputs:
-Excel file with: croppable_area_id (required), farmer_id (optional - only needed if 'Include Farmer ID?' is set to 'Yes (From Excel)' in config). Sheet name should be "result" or it will pick the first sheet. Batch size: 25.
+Excel file with: croppable_area_id (required), farmer_id (optional - only needed if 'Include Farmer ID?' is set to 'Yes (From Excel)' in config). Sheet name should be "result" or it will pick the first sheet. Batch size is configurable via the UI (default: 25, max: 100).
 """
 import pandas as pd
 import requests
@@ -72,7 +72,8 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df[col] = ""
         df[col] = df[col].fillna("").astype(str)
 
-    BATCH_SIZE = 25
+    BATCH_SIZE = int(config.get("batch_size", 25))
+    log(f"⚙️ Batch size: {BATCH_SIZE}")
 
     # =========================
     # BATCH PROCESSING

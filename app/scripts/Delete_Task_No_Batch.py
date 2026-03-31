@@ -28,9 +28,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     batch_size = int(config.get("batch_size", 100))
     if batch_size < 1:
         batch_size = 1
-    if batch_size > 100:
-        log(f"Warning: Batch size {batch_size} exceeds maximum of 100. Capping to 100.")
-        batch_size = 100
 
     if not token:
         log("Error: Authorization token missing.")

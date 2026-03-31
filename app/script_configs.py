@@ -130,6 +130,7 @@ SCRIPT_CONFIGS = {
         "label": "Base Api Url",
         "requires_input": True,
         "show_pr_weather": True,
+        "show_batch_config": True,
     },
     "Edit_Plans_in_Variety_with_or_without_recurring.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/plans",
