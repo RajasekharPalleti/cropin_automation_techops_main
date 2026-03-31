@@ -280,6 +280,7 @@ SCRIPT_CONFIGS = {
         "label": "Delete API URL",
         "requires_input": True,
         "show_batch_config": True,
+        "unlimited_batch_size": True,
     },
     "Create_Places.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/place",

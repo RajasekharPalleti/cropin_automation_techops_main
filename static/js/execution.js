@@ -421,11 +421,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. Common Batch Size Config
         const commonBatchConfig = document.getElementById('common-batch-config');
         if (commonBatchConfig && commonBatchConfig.style.display !== 'none') {
-            let batchSizeRaw = parseInt(document.getElementById('common-batch-size')?.value);
-            if (isNaN(batchSizeRaw) || batchSizeRaw < 1) batchSizeRaw = 100;
-            if (batchSizeRaw > 100) {
+            const batchInput = document.getElementById('common-batch-size');
+            const selectedScriptName = document.getElementById('script-select')?.value;
+            const selectedScriptData = (window.scriptsData || []).find(s => s.name === selectedScriptName);
+            const isUnlimited = selectedScriptData?.unlimited_batch_size === true;
+
+            let batchSizeRaw = parseInt(batchInput?.value);
+            if (isNaN(batchSizeRaw) || batchSizeRaw < 1) batchSizeRaw = isUnlimited ? 200 : 100;
+            if (!isUnlimited && batchSizeRaw > 100) {
                 window.showToast("Batch size cannot exceed 100. Lowering to 100.", "error", "Invalid Input");
-                document.getElementById('common-batch-size').value = 100;
+                batchInput.value = 100;
                 batchSizeRaw = 100;
             }
             config.batch_size = batchSizeRaw;

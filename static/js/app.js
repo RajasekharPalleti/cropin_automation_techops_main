@@ -57,6 +57,39 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scriptsData = scriptsData; // Expose for execution.js if needed
 
     // ================================================================
+    // REAL-TIME BATCH SIZE VALIDATION
+    // ================================================================
+    const batchSizeInputEl = document.getElementById('common-batch-size');
+    if (batchSizeInputEl) {
+        batchSizeInputEl.addEventListener('input', function () {
+            const selectedScriptName = scriptSelect?.value;
+            const selectedScriptData = (window.scriptsData || []).find(s => s.name === selectedScriptName);
+            const isUnlimited = selectedScriptData?.unlimited_batch_size === true;
+            if (!isUnlimited) {
+                // Only enforce max while typing. Don't aggressively enforce min while typing 
+                // because the user might have backspaced to "1" with the intention of typing "15"
+                if (this.value !== "") {
+                    let val = parseInt(this.value);
+                    if (val > 100) {
+                        window.showToast('Batch size cannot exceed 100. Lowering to 100.', 'error', 'Invalid Input');
+                        this.value = 100;
+                    }
+                }
+            }
+        });
+
+        // Also add a change listener to handle if they leave the field empty or < 1
+        batchSizeInputEl.addEventListener('change', function () {
+            const selectedScriptName = scriptSelect?.value;
+            const selectedScriptData = (window.scriptsData || []).find(s => s.name === selectedScriptName);
+            if (!selectedScriptData?.unlimited_batch_size) {
+                 let val = parseInt(this.value);
+                 if (isNaN(val) || val < 1) { this.value = 100; }
+            }
+        });
+    }
+
+    // ================================================================
     // FAVORITE SCRIPTS LOGIC
     // ================================================================
     let favoriteScripts = JSON.parse(localStorage.getItem('favorite_scripts') || '[]');
@@ -252,6 +285,16 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('threading-config', selectedScript.show_threading);
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
             toggle('common-batch-config', selectedScript.show_batch_config);
+            // Update label/placeholder to reflect limit (actual enforcement is in execution.js)
+            const batchSizeInput = document.getElementById('common-batch-size');
+            const batchSizeLabel = document.querySelector('label[for="common-batch-size"]');
+            if (selectedScript.unlimited_batch_size) {
+                if (batchSizeInput) batchSizeInput.placeholder = 'e.g. 200';
+                if (batchSizeLabel) batchSizeLabel.textContent = 'Batch Size (No Limit)';
+            } else {
+                if (batchSizeInput) batchSizeInput.placeholder = 'Default 100';
+                if (batchSizeLabel) batchSizeLabel.textContent = 'Batch Size (Max 100)';
+            }
             toggle('google-api-config', selectedScript.show_google_api_config);
             toggle('coordinate-order-config', selectedScript.show_coordinate_order);
             document.getElementById('time-delay-config').style.display = 'block';
