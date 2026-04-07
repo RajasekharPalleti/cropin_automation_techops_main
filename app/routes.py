@@ -161,6 +161,13 @@ async def clear_session(client_id: str):
 @router.post("/api/stop/{client_id}")
 async def stop_execution(client_id: str, admin: bool = False):
     """Request cancellation of a running script for a given client, or a Scheduled background job."""
+    
+    async def force_detach_later(job_id: str, delay: int = 5):
+        await asyncio.sleep(delay)
+        if manager.is_cancelled(job_id) and manager.is_active(job_id):
+            print(f"DEBUG: Job {job_id} did not stop gracefully in {delay}s. Forcing detach.")
+            manager.detach_job(job_id)
+
     if client_id.startswith("Scheduled_"):
         real_id = client_id.replace("Scheduled_", "")
         from app.scheduler import load_jobs, save_jobs
@@ -179,8 +186,10 @@ async def stop_execution(client_id: str, admin: bool = False):
                 manager.request_cancel(target_job_key)
                 if admin:
                     await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", target_job_key)
+                # Give it 5 seconds to gracefully stop before forcefully removing it from active state
+                asyncio.create_task(force_detach_later(target_job_key, 5))
             
-            return {"status": "stopping", "message": "Scheduled Job marked as cancelled."}
+            return {"status": "stopping", "message": "Scheduled Job marked as cancelled and will detach shortly."}
             
         return {"status": "ignored", "message": "Scheduled Job not running or not found."}
 
@@ -189,7 +198,10 @@ async def stop_execution(client_id: str, admin: bool = False):
         manager.request_cancel(client_id)
         if admin:
             await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
-        return {"status": "stopping", "message": "Stop requested. Process will terminate shortly."}
+        
+        # Give it 5 seconds to naturally raise JobStoppedException and clean up
+        asyncio.create_task(force_detach_later(client_id, 5))
+        return {"status": "stopping", "message": "Stop requested. Process will detach shortly if unresponsive."}
         
     return {"status": "ignored", "message": "No active process found."}
 
@@ -265,13 +277,22 @@ async def stop_all_jobs():
     """Request cancellation of all running scripts (Interactive and Scheduled) and notify clients."""
     stopped_count = 0
     active_clients = list(manager.active_tasks)
+    
+    async def force_detach_later(job_ids: list, delay: int = 5):
+        await asyncio.sleep(delay)
+        for job_id in job_ids:
+            if manager.is_cancelled(job_id) and manager.is_active(job_id):
+                print(f"DEBUG: Job {job_id} did not stop gracefully in global stop_all. Forcing detach.")
+                manager.detach_job(job_id)
+                
+    jobs_to_track = []
 
     # 1. Stop all active background processes (Interactive & Scheduled) tracked by the SSE Manager
     for client_id in active_clients:
-        if not manager.is_cancelled(client_id):
-            manager.request_cancel(client_id)
-            await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
-            stopped_count += 1
+        manager.request_cancel(client_id)
+        await manager.send_log("JOB_STOPPED::Closed forcefully by admin.", client_id)
+        jobs_to_track.append(client_id)
+        stopped_count += 1
             
     # 2. Specifically update the persistent state of Scheduled Jobs in the JSON ledger
     from app.scheduler import load_jobs, save_jobs
@@ -283,11 +304,17 @@ async def stop_all_jobs():
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = "Cancelled forcefully by admin via 'Stop All Processes'."
             manager.request_cancel(job_id) # Ensure they disappear from list too
+            if job_id not in jobs_to_track:
+                jobs_to_track.append(job_id)
             jobs_modified = True
-            stopped_count += 1
+            if job_id not in active_clients:
+                stopped_count += 1
             
     if jobs_modified:
         save_jobs(jobs)
+        
+    if jobs_to_track:
+        asyncio.create_task(force_detach_later(jobs_to_track, 5))
 
     return {
         "status": "success",

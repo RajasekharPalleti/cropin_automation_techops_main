@@ -83,6 +83,25 @@ class ConnectionManager:
     def request_cancel(self, client_id: str):
         self.cancellation_requests.add(client_id)
 
+    def detach_job(self, client_id: str):
+        """
+        Immediately removes the job from active status and drops its machine locks,
+        but KEEPS it in the cancellation_requests set.
+        This forces the UI to unlock even if the backend script is stuck in a loop
+        or slow network call. The background thread will still encounter the cancellation
+        flag on its next log_callback and terminate.
+        """
+        self.cancellation_requests.add(client_id)
+
+        if client_id in self.active_tasks:
+            self.active_tasks.remove(client_id)
+
+        self.client_script_map.pop(client_id, None)
+
+        machine_key = self.client_machine_map.pop(client_id, None)
+        if machine_key and machine_key in self.active_machines:
+            self.active_machines.remove(machine_key)
+
     def is_cancelled(self, client_id: str) -> bool:
         return client_id in self.cancellation_requests
 
