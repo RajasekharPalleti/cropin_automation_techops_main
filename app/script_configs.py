@@ -71,6 +71,7 @@ SCRIPT_CONFIGS = {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
         "label": "Base Api Url",
         "requires_input": True,
+        "show_threading": True,
     },
     "Update_Asset_Additional_Attribute.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/assets",
@@ -213,11 +214,13 @@ SCRIPT_CONFIGS = {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",
         "label": "Base Api Url",
         "requires_input": True,
+        "show_threading": True,
     },
     "Asset_Refresh_Edit_and_Save.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/assets",
         "label": "Base Api Url",
         "requires_input": True,
+        "show_threading": True,
     },
     "Delete_Farmer_Tags.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",

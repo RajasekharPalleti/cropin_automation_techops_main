@@ -186,10 +186,11 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     processed_count = 0
     import threading
     processed_lock = threading.Lock()
-    log(f"🔄 Starting with {total_rows} croppable areas using {MAX_WORKERS} workers...")
+    worker_count = int(config.get("worker_count", 2))
+    log(f"🔄 Starting with {total_rows} croppable areas using {worker_count} workers...")
 
     results = []
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
         # Pass the Excel row number (1-based) to the worker so it can print it.
         futures = {
             executor.submit(process_croppable_area, ca_id, token, idx): ca_id

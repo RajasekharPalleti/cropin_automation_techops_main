@@ -30,7 +30,7 @@ def run(input_excel, output_excel, config, log_callback=None):
     api_url = api_url.rstrip('/')
 
     MAX_RETRIES = 2
-    MAX_WORKERS = 4
+    MAX_WORKERS = int(config.get("worker_count", 2))
     delay_time = float(config.get("delay_time", 1))
     # ========================================== #
 
