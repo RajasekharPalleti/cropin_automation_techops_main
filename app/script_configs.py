@@ -210,6 +210,11 @@ SCRIPT_CONFIGS = {
         "label": "Base Api Url",
         "requires_input": True,
     },
+    "Update_CA_Name.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/croppable-areas",
+        "label": "Base Api Url",
+        "requires_input": True,
+    },
     "Farmer_Refresh_Edit_and_Save.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",
         "label": "Base Api Url",
