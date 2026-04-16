@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             };
-            setupCountDropdown('attr-count-select', 'group-key');
+            setupCountDropdown('attr-count-select', 'group-key', 6);
             setupCountDropdown('removal-count-select', 'group-remove');
             setupCountDropdown('addr-count-select', 'group-addr');
 
