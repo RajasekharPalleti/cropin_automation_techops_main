@@ -2,7 +2,7 @@
 Updates additional attributes for assets based on configured keys.
 
 Inputs:
-Excel file with 'asset_id' and columns matching configured attribute keys.
+Excel file with 'asset_id' and columns matching configured attribute key as column names as per the order or additional_attribute_1, additional_attribute_2, etc.
 """
 import pandas as pd
 import requests
@@ -93,10 +93,18 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 if "data" in asset_data and isinstance(asset_data["data"], dict):
                     # Iterate over configured keys
                     for key_idx, key_name in valid_keys_map.items():
-                        # Map to Excel column: additional_attribute_{key_idx + 1}
-                        col_name = f"additional_attribute_{key_idx + 1}"
+                        # Map to Excel column: exact key, then generic name, then positional
+                        col_name = None
+                        if key_name in df.columns:
+                            col_name = key_name
+                        elif f"additional_attribute_{key_idx + 1}" in df.columns:
+                            col_name = f"additional_attribute_{key_idx + 1}"
+                        elif (key_idx + 1) < len(df.columns):
+                            pos_col = df.columns[key_idx + 1]
+                            if pos_col not in ["Status", "Response"]:
+                                col_name = pos_col
                         
-                        if col_name in df.columns:
+                        if col_name and col_name in df.columns:
                             new_value = row[col_name]
                             # Handle NaNs
                             if pd.isna(new_value):

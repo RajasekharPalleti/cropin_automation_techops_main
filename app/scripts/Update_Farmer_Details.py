@@ -116,10 +116,17 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
                     # Dynamic Update Logic
                     for key_idx, key_name in valid_keys_map.items():
-                        # Map config key index 0 -> value_1, index 1 -> value_2...
-                        col_name = f"value_{key_idx + 1}"
+                        col_name = None
+                        if key_name in df.columns:
+                            col_name = key_name
+                        elif f"value_{key_idx + 1}" in df.columns:
+                            col_name = f"value_{key_idx + 1}"
+                        elif (key_idx + 1) < len(df.columns):
+                            pos_col = df.columns[key_idx + 1]
+                            if pos_col not in ["Status", "Response"]:
+                                col_name = pos_col
                         
-                        if col_name in df.columns:
+                        if col_name and col_name in df.columns:
                             new_value = row[col_name]
                             if pd.isna(new_value):
                                 new_value = "" # or None? Empty string for text fields usually safe.
