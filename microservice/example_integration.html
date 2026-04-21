@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Friend's Website – Cropin Integration Example</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; background: #f5f5f5; }
+    .card {
+      background: #fff; border-radius: 10px; padding: 32px;
+      max-width: 480px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    h2 { margin-top: 0; color: #1976d2; }
+    p  { color: #444; line-height: 1.6; }
+
+    /* ---------------------------------------------------------------
+       COPY ONLY THE BLOCK BELOW INTO YOUR FRIEND'S REAL WEBSITE
+       --------------------------------------------------------------- */
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>My Website</h2>
+    <p>Click the button below to open the Cropin Automation tool.</p>
+
+    <!-- 1. Placeholder where the button will appear -->
+    <div id="cropin-btn"></div>
+  </div>
+
+
+  <!-- ================================================================
+       INTEGRATION SNIPPET – copy these 3 blocks into friend's website
+       ================================================================
+
+    STEP 1: Load the widget script from the launcher
+            (launcher must be running on friend's machine)
+  -->
+  <script src="http://localhost:4445/widget.js"></script>
+
+  <!--
+    STEP 2: Initialise the button wherever you placed the <div>
+  -->
+  <script>
+    CropinLauncher.init({
+      // Where the launcher microservice is running
+      launcherUrl: "http://localhost:4445",
+
+      // Where the main Cropin Automation app will run
+      appUrl: "http://localhost:4444",
+
+      // The <div> that will receive the button
+      container: "#cropin-btn",
+
+      // Text shown on the button before app is running
+      buttonText: "Launch Cropin Automation",
+
+      // Open the app in a new browser tab (true) or same tab (false)
+      openInNewTab: true,
+
+      // Optional: customise the button appearance
+      buttonStyle: {
+        padding: "12px 28px",
+        fontSize: "15px",
+        fontWeight: "600",
+        borderRadius: "8px",
+        background: "#1976d2",   // blue (turns green when app is running)
+        color: "#fff",
+      },
+    });
+  </script>
+
+  <!--
+    ================================================================
+    HOW IT WORKS
+    ================================================================
+
+    On friend's machine the folder layout should be:
+
+      C:\Projects\                            (or ~/projects/ on Mac/Linux)
+      ├── cropin_automation_techops\          ← your app
+      │   ├── app\
+      │   ├── microservice\
+      │   │   ├── launcher.py
+      │   │   ├── start_launcher.bat          ← Windows: double-click this
+      │   │   ├── start_launcher.sh           ← Mac/Linux: run this
+      │   │   └── button_widget.js
+      │   └── ...
+      └── friends_website\                    ← friend's project
+          └── index.html  ← paste the snippet above here
+
+    Steps for friend:
+      1. Copy the entire cropin_automation_techops\ folder to their machine.
+      2. Double-click microservice\start_launcher.bat  (Windows)
+         OR run:  bash microservice/start_launcher.sh  (Mac / Linux)
+         → This starts the lightweight launcher on port 4445.
+         → Leave this terminal/window open (or set it to auto-start).
+      3. Paste the integration snippet into their website HTML.
+      4. Open their website → click the button → app launches on port 4444!
+
+    Ports used:
+      4445  – launcher (always-on, ~5 MB RAM, starts/stops the main app)
+      4444  – main Cropin Automation app (started on demand)
+
+    ================================================================
+  -->
+
+</body>
+</html>
