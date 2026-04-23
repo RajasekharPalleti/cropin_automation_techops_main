@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (attributeConfig && attributeConfig.style.display !== 'none') {
             const attrCount = parseInt(document.getElementById('attr-count-select').value) || 1;
             let attrKeys = [];
-            ['attr-key-1', 'attr-key-2', 'attr-key-3', 'attr-key-4', 'attr-key-5', 'attr-key-6'].forEach((id, i) => {
+            ['attr-key-1', 'attr-key-2', 'attr-key-3', 'attr-key-4', 'attr-key-5', 'attr-key-6', 'attr-key-7', 'attr-key-8', 'attr-key-9', 'attr-key-10'].forEach((id, i) => {
                 if (i < attrCount) attrKeys.push(document.getElementById(id)?.value || '');
             });
             config.attr_keys = attrKeys;
