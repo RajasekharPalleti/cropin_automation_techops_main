@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addressConfig && addressConfig.style.display !== 'none') {
             const addrCount = parseInt(document.getElementById('addr-count-select').value) || 1;
             let addrKeys = [];
-            ['address-key-1', 'address-key-2', 'address-key-3', 'address-key-4'].forEach((id, i) => {
+            ['address-key-1', 'address-key-2', 'address-key-3', 'address-key-4', 'address-key-5', 'address-key-6', 'address-key-7', 'address-key-8', 'address-key-9', 'address-key-10'].forEach((id, i) => {
                 if (i < addrCount) {
                     const v = document.getElementById(id)?.value;
                     if (v) addrKeys.push(v);

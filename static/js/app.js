@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             setupCountDropdown('attr-count-select', 'group-key', 10);
             setupCountDropdown('removal-count-select', 'group-remove');
-            setupCountDropdown('addr-count-select', 'group-addr');
+            setupCountDropdown('addr-count-select', 'group-addr', 10);
 
             // Upload vs Direct Run mode
             const stepOne = document.querySelector('.step-one');
