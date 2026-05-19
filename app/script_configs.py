@@ -302,6 +302,11 @@ SCRIPT_CONFIGS = {
         "requires_input": True,
         "show_coordinate_order": True,
     },
+    "Update_Asset_Declared_Area.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/assets",
+        "label": "Update Declared Area API",
+        "requires_input": True,
+    },
 }
 
 # Fallback config used when a script is not listed in SCRIPT_CONFIGS above.

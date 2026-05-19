@@ -88,23 +88,30 @@ def execute_force_restart():
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
         if os.path.exists(start_bat):
             # Using 'start' is the most robust way to get a new visible window on Windows
-            subprocess.Popen(f'start cmd /c "{start_bat}"', shell=True)
+            subprocess.Popen(f'start cmd /c "{start_bat}" --no-pause', shell=True)
             safe_log_print("run_server.bat launched in new window.")
         else:
             safe_log_print(f"ERROR: Could not find {start_bat}")
     except Exception as e:
         safe_log_print(f"ERROR starting Server: {e}")
         
-    safe_log_print("Force killing ngrok terminal...")
+    safe_log_print("Force killing ngrok and old cmd tabs...")
     subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Force close the old cmd.exe tabs to prevent accumulation using exact window titles
+    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
     time.sleep(5)
 
     safe_log_print("Starting Ngrok in NEW visible terminal...")
     try:
         ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
         if os.path.exists(ngrok_bat):
-            subprocess.Popen(f'start cmd /c "{ngrok_bat}"', shell=True)
+            subprocess.Popen(f'start cmd /c "{ngrok_bat}" --no-pause', shell=True)
             safe_log_print("Ngrok restarted in new window.")
         else:
             safe_log_print(f"ERROR: Could not find {ngrok_bat}")

@@ -29,4 +29,5 @@ echo.
 pushd %~dp0\..\
 ngrok http 4444
 popd
+if "%~1"=="--no-pause" exit /b
 pause

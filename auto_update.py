@@ -129,7 +129,7 @@ def execute_update_process():
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
         if os.path.exists(start_bat):
             # Use Popen to spawn it freely in the background
-            subprocess.Popen(f'"{start_bat}"', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            subprocess.Popen(f'"{start_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             print("run_server.bat launched successfully.")
         else:
             print(f"ERROR: Could not find {start_bat}")
@@ -141,12 +141,19 @@ def execute_update_process():
     try:
         # Kill any existing ngrok processes
         subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Kill the old cmd.exe windows to prevent tab accumulation using exact window titles
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
         time.sleep(10)
         
         # Start a fresh ngrok instance pointing to port 4444
         ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
         if os.path.exists(ngrok_bat):
-            subprocess.Popen(f'"{ngrok_bat}"', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            subprocess.Popen(f'"{ngrok_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             print("Ngrok restarted successfully.")
         else:
             print(f"ERROR: Could not find {ngrok_bat}")

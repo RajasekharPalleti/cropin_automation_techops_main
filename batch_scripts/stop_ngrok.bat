@@ -23,4 +23,5 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo No ngrok process was running, or failed to kill.
 )
+if "%~1"=="--no-pause" exit /b
 pause

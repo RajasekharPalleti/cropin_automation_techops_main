@@ -42,4 +42,5 @@ echo Installing/Updating requirements...
 pip install -r requirements.txt
 python -m app.main
 popd
+if "%~1"=="--no-pause" exit /b
 pause
