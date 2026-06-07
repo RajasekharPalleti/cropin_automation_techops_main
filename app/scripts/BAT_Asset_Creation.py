@@ -181,15 +181,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 "data": {},
                 "images": {},
                 "companyStatus": "ACTIVE",
-                "address": address_obj,
                 "declaredArea": {
                     "enableConversion": "true",
                     "unit": "HECTARE",
-                    "count": declared_area_count,
-                    "name": name_val,
-                    "ownerId": owner_val,
-                    "address": address_obj
-                }
+                    "count": declared_area_count
+                },
+                "name": name_val,
+                "ownerId": owner_val,
+                "address": address_obj
             }
 
             multipart_data = {"dto": (None, json.dumps(asset_payload), "application/json")}
