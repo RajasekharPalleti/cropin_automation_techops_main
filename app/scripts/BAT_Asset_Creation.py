@@ -50,28 +50,31 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    # 3. Detect column names from Excel flexibly
-    name_col = next((c for c in df.columns if c.lower().replace('_', '').replace(' ', '') in ['assetname', 'name']), None)
+    # 3. Detect column names from Excel
+    # Asset name column is "Asset Name" or column 0
+    name_col = next((c for c in df.columns if c.strip().lower() == "asset name"), None)
+    if not name_col and len(df.columns) > 0:
+        name_col = df.columns[0]
     if not name_col:
-        name_col = next((c for c in df.columns if 'name' in c.lower()), None)
-    if not name_col:
-        log("❌ Could not identify 'Asset Name' column (expected 'Asset Name' or 'name')")
+        log("❌ Could not identify 'Asset Name' column.")
         return
     log(f"ℹ️ Found Asset Name column: '{name_col}'")
 
-    owner_col = next((c for c in df.columns if c.lower().replace('_', '').replace(' ', '') in ['farmerid', 'ownerid', 'farmer_id', 'owner_id']), None)
+    # Farmer ID column is "Farmer ID" or column 1
+    owner_col = next((c for c in df.columns if c.strip().lower() == "farmer id"), None)
+    if not owner_col and len(df.columns) > 1:
+        owner_col = df.columns[1]
     if not owner_col:
-        owner_col = next((c for c in df.columns if 'farmer' in c.lower() or 'owner' in c.lower()), None)
-    if not owner_col:
-        log("❌ Could not identify 'Farmer ID' / 'Owner ID' column (expected 'Farmer ID' or 'ownerId')")
+        log("❌ Could not identify 'Farmer ID' column.")
         return
     log(f"ℹ️ Found Farmer ID column: '{owner_col}'")
 
-    area_col = next((c for c in df.columns if c.lower().replace('_', '').replace(' ', '') in ['declaredarea', 'declared_area', 'area']), None)
+    # Declared Area column is "Declared Area" or column 2
+    area_col = next((c for c in df.columns if c.strip().lower() == "declared area"), None)
+    if not area_col and len(df.columns) > 2:
+        area_col = df.columns[2]
     if not area_col:
-        area_col = next((c for c in df.columns if 'area' in c.lower() or 'count' in c.lower()), None)
-    if not area_col:
-        log("❌ Could not identify 'Declared Area' column (expected 'Declared Area' or 'declared_area')")
+        log("❌ Could not identify 'Declared Area' column.")
         return
     log(f"ℹ️ Found Declared Area column: '{area_col}'")
 
@@ -161,28 +164,31 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 continue
 
             # Build Payload
+            address_obj = {
+                "country": "Brazil",
+                "formattedAddress": "Brazil",
+                "administrativeAreaLevel1": "",
+                "locality": "",
+                "postalCode": "",
+                "houseNo": "",
+                "buildingName": "",
+                "placeId": "ChIJzyjM68dZnAARYz4p8gYVWik",
+                "latitude": -14.235004,
+                "longitude": -51.92528
+            }
+
             asset_payload = {
                 "data": {},
                 "images": {},
                 "companyStatus": "ACTIVE",
+                "address": address_obj,
                 "declaredArea": {
                     "enableConversion": "true",
                     "unit": "HECTARE",
                     "count": declared_area_count,
                     "name": name_val,
                     "ownerId": owner_val,
-                    "address": {
-                        "country": "Brazil",
-                        "formattedAddress": "Brazil",
-                        "administrativeAreaLevel1": "",
-                        "locality": "",
-                        "postalCode": "",
-                        "houseNo": "",
-                        "buildingName": "",
-                        "placeId": "ChIJzyjM68dZnAARYz4p8gYVWik",
-                        "latitude": -14.235004,
-                        "longitude": -51.92528
-                    }
+                    "address": address_obj
                 }
             }
 
