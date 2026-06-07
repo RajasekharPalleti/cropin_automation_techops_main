@@ -3,12 +3,15 @@ import requests
 import subprocess
 import os
 import sys
+import socket
 
 # Standalone force restart script
 # Mirrors the restart logic from auto_update.py but without the Git pull.
 
 SHUTDOWN_URL = "http://127.0.0.1:4444/api/server/shutdown"
 SAFE_LOG_FILE = "server.log"
+SERVER_PORT = 4444
+SERVER_STARTUP_TIMEOUT = 120  # Max seconds to wait for server to come up
 
 def safe_log_print(*args):
     msg = " ".join(str(a) for a in args)
@@ -21,6 +24,20 @@ def safe_log_print(*args):
             f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [ForceRestart] " + msg + "\n")
     except Exception:
         pass
+
+def wait_for_server(port=SERVER_PORT, timeout=SERVER_STARTUP_TIMEOUT):
+    """Poll port until server is listening or timeout (seconds) is reached."""
+    safe_log_print(f"Waiting for server to come up on port {port} (max {timeout}s)...")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                safe_log_print(f"Server is UP on port {port}. Proceeding.")
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(2)
+    safe_log_print(f"WARNING: Server did not come up within {timeout}s. Launching ngrok anyway.")
+    return False
 
 def execute_force_restart():
     safe_log_print("--------------------------------------------------")
@@ -51,7 +68,7 @@ def execute_force_restart():
     except Exception as e:
         safe_log_print(f"ERROR during Git update: {e}. Proceeding with restart only.")
     
-    # 1. Stop the Server (via API first for grace, then direct kill)
+    # 1. Stop the Server gracefully via API first
     safe_log_print("Initiating Server Shutdown via API...")
     try:
         requests.post(SHUTDOWN_URL, timeout=5)
@@ -59,54 +76,57 @@ def execute_force_restart():
     except Exception as e:
         safe_log_print(f"Warning: API shutdown signal failed (Server might be hung): {e}")
     
-    # Give it a moment to process the API call, then ensure it's dead
+    # Give it a moment to process the API call
     time.sleep(3)
     
-    safe_log_print("Ensuring port 4444 is clear and closing old terminals/updaters...")
+    # 2. Kill ALL old processes (server + ngrok + terminals) BEFORE starting anything new.
+    #    This prevents the new CROPIN_SERVER window from being killed by a later taskkill.
+    safe_log_print("Killing all old server, ngrok processes and their terminal windows...")
     try:
-        # 1. Kill the process on 4444
+        # Kill the process listening on port 4444
         stop_bat = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
         if os.path.exists(stop_bat):
             subprocess.call(f'echo. | "{stop_bat}"', shell=True)
-            
-        # 2. Force kill the CMD window with CROPIN_SERVER title
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
-        # 3. Kill any old auto_update.py background process to handover the baton
-        # We use wmic to find processes with 'auto_update.py' in the command line
+        # Kill ngrok process
+        subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Kill old CMD windows by title (only OLD ones — new ones haven't been created yet)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Kill any old auto_update.py background process to hand over the baton
         subprocess.call('wmic process where "commandline like \'%auto_update.py%\'" delete', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
-        safe_log_print("Old server terminal and auto-updater killed.")
+        safe_log_print("All old server/ngrok processes and terminal windows killed.")
     except Exception as e:
-        safe_log_print(f"Error clearing server port/terminal/updater: {e}")
+        safe_log_print(f"Error during cleanup of old processes: {e}")
 
-    # Wait for OS to free the socket
+    # 3. Wait for OS to fully release port 4444
+    safe_log_print("Waiting for OS to release port 4444...")
     time.sleep(5)
 
+    # 4. Start the new Server in a NEW visible terminal
     safe_log_print("Starting Server in NEW visible terminal...")
     try:
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
         if os.path.exists(start_bat):
-            # Using 'start' is the most robust way to get a new visible window on Windows
+            # 'start cmd /k' keeps the window open even if the process exits
             subprocess.Popen(f'start cmd /c "{start_bat}" --no-pause', shell=True)
             safe_log_print("run_server.bat launched in new window.")
         else:
             safe_log_print(f"ERROR: Could not find {start_bat}")
     except Exception as e:
         safe_log_print(f"ERROR starting Server: {e}")
-        
-    safe_log_print("Force killing ngrok and old cmd tabs...")
-    subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    # Force close the old cmd.exe tabs to prevent accumulation using exact window titles
-    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    time.sleep(5)
 
+    # 5. CRITICAL: Wait until the server is actually listening on port 4444
+    #    before starting ngrok. This is what caused ERR_NGROK_8012 before —
+    #    ngrok was starting while server was still running pip install / booting.
+    wait_for_server(port=SERVER_PORT, timeout=SERVER_STARTUP_TIMEOUT)
+
+    # 6. Start Ngrok ONLY AFTER the server is confirmed up
     safe_log_print("Starting Ngrok in NEW visible terminal...")
     try:
         ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))

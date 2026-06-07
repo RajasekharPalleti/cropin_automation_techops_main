@@ -5,6 +5,7 @@ import os
 import schedule
 import sys
 import datetime
+import socket
 
 def safe_log_print(*args, **kwargs):
     msg = " ".join(str(a) for a in args)
@@ -26,6 +27,24 @@ print = safe_log_print
 
 STATUS_URL = "http://127.0.0.1:4444/api/server/status"
 SHUTDOWN_URL = "http://127.0.0.1:4444/api/server/shutdown"
+SERVER_PORT = 4444
+SERVER_STARTUP_TIMEOUT = 120  # Max seconds to wait for server to come up
+
+
+def wait_for_server(port=SERVER_PORT, timeout=SERVER_STARTUP_TIMEOUT):
+    """Poll port until server is listening or timeout (seconds) is reached."""
+    print(f"Waiting for server to come up on port {port} (max {timeout}s)...")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2):
+                print(f"Server is UP on port {port}. Proceeding.")
+                return True
+        except (ConnectionRefusedError, OSError):
+            time.sleep(2)
+    print(f"WARNING: Server did not come up within {timeout}s. Launching ngrok anyway.")
+    return False
+
 
 def execute_update_process():
     print("--------------------------------------------------")
@@ -112,45 +131,63 @@ def execute_update_process():
         print(f"ERROR: Git pull failed with code {e.returncode}. Aborting update.")
         return
 
-    # 4. Stop the Server (via API to gracefully finish whatever it is doing before death)
-    print("Initiating Server Shutdown via stop_server.bat...")
+    # 4. Stop the Server gracefully via API first
+    print("Initiating Server Shutdown via API...")
     try:
         requests.post(SHUTDOWN_URL, timeout=5)
         print("Server shutdown signal sent successfully.")
     except requests.exceptions.ConnectionError:
         print("Server is already offline, no need to shut down.")
-    
-    # Give the batch script or OS 10 seconds to fully kill the process and free port 4444
-    time.sleep(10)
 
-    # 5. Start the Server again
+    # Give it a moment to process the API call
+    time.sleep(3)
+
+    # 5. Kill ALL old processes (server + ngrok + terminals) BEFORE starting anything new.
+    #    This prevents the new CROPIN_SERVER window from being killed by a later taskkill.
+    print("Killing all old server, ngrok processes and their terminal windows...")
+    try:
+        # Kill the process listening on port 4444
+        stop_bat = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
+        if os.path.exists(stop_bat):
+            subprocess.call(f'echo. | "{stop_bat}"', shell=True)
+
+        # Kill ngrok process
+        subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Kill old CMD windows by title (only OLD ones — new ones haven't been created yet)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',   '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        print("All old server/ngrok processes and terminal windows killed.")
+    except Exception as e:
+        print(f"Error during cleanup of old processes: {e}")
+
+    # 6. Wait for OS to fully release port 4444
+    print("Waiting for OS to release port 4444...")
+    time.sleep(5)
+
+    # 7. Start the new Server in a NEW visible terminal
     print("Starting Server via run_server.bat...")
     try:
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
         if os.path.exists(start_bat):
-            # Use Popen to spawn it freely in the background
             subprocess.Popen(f'"{start_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             print("run_server.bat launched successfully.")
         else:
             print(f"ERROR: Could not find {start_bat}")
     except Exception as e:
         print(f"ERROR running run_server.bat: {e}")
-        
-    # 6. Restart Ngrok to ensure the tunnel is fresh
-    print("Restarting Ngrok tunnel...")
+
+    # 8. CRITICAL: Wait until the server is actually listening on port 4444
+    #    before starting ngrok. This is what caused ERR_NGROK_8012 —
+    #    ngrok was starting while server was still running pip install / booting.
+    wait_for_server(port=SERVER_PORT, timeout=SERVER_STARTUP_TIMEOUT)
+
+    # 9. Start Ngrok ONLY AFTER the server is confirmed up
+    print("Starting Ngrok tunnel...")
     try:
-        # Kill any existing ngrok processes
-        subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # Kill the old cmd.exe windows to prevent tab accumulation using exact window titles
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        time.sleep(10)
-        
-        # Start a fresh ngrok instance pointing to port 4444
         ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
         if os.path.exists(ngrok_bat):
             subprocess.Popen(f'"{ngrok_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
@@ -159,10 +196,10 @@ def execute_update_process():
             print(f"ERROR: Could not find {ngrok_bat}")
     except Exception as e:
         print(f"ERROR restarting Ngrok: {e}")
-        
+
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Update Process Finished.")
     print("--------------------------------------------------")
-    
+
     # CRITICAL: Because run_server.bat automatically launches a NEW auto_update.py background task,
     # this current background process must terminate itself to avoid multiplying exponentially over time.
     print("Handing off the baton to the new instance. Exiting current updater process.")
