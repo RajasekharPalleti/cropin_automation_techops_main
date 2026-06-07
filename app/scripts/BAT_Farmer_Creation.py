@@ -1,7 +1,7 @@
 """
 Creates farmers for BAT system using a POST request with multipart form data.
 Reads farmer names from an Excel sheet, creates them, and writes back the generated Farmer ID,
-Status, and the raw Response.
+Status, and the raw Response. Supports multithreading via worker_count config.
 
 Author: Rajasekhar Palleti
 
@@ -12,6 +12,8 @@ import pandas as pd
 import requests
 import json
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
@@ -19,7 +21,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             log_callback(msg)
         print(msg)
 
-    # 1. Configuration Validation
+    # ================= CONFIG ================= #
     token = config.get("token")
     if not token:
         log("❌ No token provided in configuration.")
@@ -31,7 +33,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
         log(f"Using default Farmer API URL: {api_url}")
     api_url = api_url.rstrip('/')
 
+    MAX_WORKERS = int(config.get("worker_count", 2))
     delay_time = float(config.get("delay_time", 1.0))
+    # ========================================== #
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+        # ❌ Do NOT set Content-Type manually. requests sets the multipart boundary automatically.
+    }
 
     # 2. Load Excel File
     log(f"📂 Loading input Excel file: {input_excel_file}")
@@ -66,40 +75,24 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     total_rows = len(df)
     processed_count = 0
+    processed_lock = threading.Lock()
 
     # Count already-executed rows for resume support
     already_done = df[df['Status'].str.strip().str.lower() == 'success'].shape[0]
     log(f"📊 Total rows: {total_rows} | Already Executed: {already_done} | Pending: {total_rows - already_done}")
-    log(f"🚀 Starting farmer creation...")
+    log(f"🚀 Starting farmer creation with {MAX_WORKERS} workers...")
 
-    headers = {
-        "Authorization": f"Bearer {token}"
-        # ❌ Do NOT set Content-Type manually. requests sets the multipart boundary automatically.
-    }
-
-    # 5. Process Row-by-Row
-    for index, row in df.iterrows():
-
-        # Skip already successfully executed rows (resume support)
-        current_status = str(row.get('Status', '')).strip().lower()
-        if current_status == 'success':
-            processed_count += 1
-            continue
-
-        name_val = str(row.get(name_col, "")).strip()
-
+    # -------------------------------------------------
+    # Worker function
+    # -------------------------------------------------
+    def process_farmer(index, name_val):
         if not name_val or name_val.lower() in ["nan", "none", ""]:
             log(f"⚠️ Row {index+2} skipped: Farmer Name is empty.")
-            df.at[index, 'Status'] = "Skipped"
-            df.at[index, 'Response'] = "Empty Farmer Name"
-            processed_count += 1
-            df.to_excel(output_excel_file, index=False)
-            continue
+            return index, "Skipped", "Empty Farmer Name", "N/A"
 
-        pending_rows = total_rows - processed_count
-        log(f"🔄 Creating Farmer: {name_val} | Row {index+2}/{total_rows+1} | Processed: {processed_count} | Pending: {pending_rows}")
+        log(f"🔄 Creating Farmer: {name_val} | Row {index+2}")
 
-        # 6. Build Payload
+        # Build Payload
         farmer_payload = {
             "status": "DISABLE",
             "data": {},
@@ -230,7 +223,6 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             resp = requests.post(api_url, headers=headers, files=multipart_data)
 
             if resp.status_code in [200, 201]:
-                # Parse Farmer ID from response
                 farmer_id = "N/A"
                 try:
                     resp_json = resp.json()
@@ -240,29 +232,49 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                         farmer_id = resp_json[0].get("id") or resp_json[0].get("farmerId") or "N/A"
                 except Exception:
                     pass
-
-                df.at[index, 'Status'] = "Success"
-                df.at[index, 'Response'] = resp.text[:500]
-                df.at[index, 'Farmer ID'] = str(farmer_id)
                 log(f"✅ Success: Created farmer '{name_val}' with ID: {farmer_id}")
+                return index, "Success", resp.text[:500], str(farmer_id)
             else:
                 log(f"❌ Failed: Row {index+2} - HTTP {resp.status_code}: {resp.text[:300]}")
-                df.at[index, 'Status'] = f"Failed: {resp.status_code}"
-                df.at[index, 'Response'] = resp.text
-                df.at[index, 'Farmer ID'] = "N/A"
+                return index, f"Failed: {resp.status_code}", resp.text, "N/A"
 
         except Exception as e:
             log(f"❌ Error: Row {index+2} - {e}")
-            df.at[index, 'Status'] = "Error"
-            df.at[index, 'Response'] = str(e)
-            df.at[index, 'Farmer ID'] = "N/A"
+            return index, "Error", str(e), "N/A"
 
-        processed_count += 1
-        # Live save after every row so progress is never lost
-        df.to_excel(output_excel_file, index=False)
-        time.sleep(delay_time)
+    # -------------------------------------------------
+    # Multithreading execution
+    # -------------------------------------------------
+    futures = []
 
-    # 7. Final Save & Summary
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for index, row in df.iterrows():
+            # Skip already successfully executed rows (resume support)
+            current_status = str(row.get('Status', '')).strip().lower()
+            if current_status == 'success':
+                with processed_lock:
+                    processed_count += 1
+                continue
+
+            name_val = str(row.get(name_col, "")).strip()
+            futures.append(executor.submit(process_farmer, index, name_val))
+            time.sleep(delay_time / MAX_WORKERS)  # Proportional stagger to prevent burst
+
+        for future in as_completed(futures):
+            index, status, response, farmer_id = future.result()
+            df.at[index, 'Status'] = status
+            df.at[index, 'Response'] = response
+            df.at[index, 'Farmer ID'] = farmer_id
+
+            with processed_lock:
+                processed_count += 1
+                pending_rows = total_rows - processed_count
+                log(f"📈 Progress: {processed_count}/{total_rows} | Pending: {pending_rows}")
+
+            # Live save after each completed future
+            df.to_excel(output_excel_file, index=False)
+
+    # Final Save & Summary
     try:
         df.to_excel(output_excel_file, index=False)
         log(f"\n🎯 Process completed. Processed: {processed_count} | Total: {total_rows}")
