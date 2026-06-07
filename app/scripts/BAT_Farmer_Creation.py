@@ -66,7 +66,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     total_rows = len(df)
     processed_count = 0
-    log(f"🚀 Starting creation of {total_rows} farmers...")
+    skipped_count = 0
+
+    # Count already-executed rows
+    already_done = df[df['Status'].str.strip().str.lower() == 'success'].shape[0]
+    log(f"📊 Total rows: {total_rows} | Already Executed: {already_done} | Pending: {total_rows - already_done}")
+    log(f"🚀 Starting creation of farmers...")
 
     headers = {
         "Authorization": f"Bearer {token}"
@@ -77,14 +82,23 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     for index, row in df.iterrows():
         name_val = str(row.get(name_col, "")).strip()
 
+        # Skip already successfully executed rows
+        current_status = str(row.get('Status', '')).strip().lower()
+        if current_status == 'success':
+            processed_count += 1
+            skipped_count += 1
+            continue
+
         if not name_val or name_val.lower() in ["nan", "none"]:
             log(f"⚠️ Row {index+2} skipped: Farmer Name is empty.")
             df.at[index, 'Status'] = "Skipped"
             df.at[index, 'Response'] = "Empty Farmer Name"
             processed_count += 1
+            df.to_excel(output_excel_file, index=False)
             continue
 
-        log(f"🔄 Creating Farmer: {name_val} (Row {index+2}/{total_rows+1}) | Pending: {total_rows - processed_count - 1}")
+        pending = total_rows - processed_count - 1
+        log(f"🔄 Creating Farmer: {name_val} | Row {index+2}/{total_rows+1} | Executed: {processed_count} | Pending: {pending}")
 
         # Construct the payload
         farmer_payload = {
@@ -246,11 +260,15 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, 'Farmer ID'] = "N/A"
 
         processed_count += 1
+        # Live save after every row
+        df.to_excel(output_excel_file, index=False)
         time.sleep(delay_time)
 
-    # 4. Save results to output file
+    # 4. Final Save
     try:
         df.to_excel(output_excel_file, index=False)
-        log(f"💾 Results successfully written to output Excel: {output_excel_file}")
+        executed = processed_count - skipped_count
+        log(f"\n🎯 Process completed. Executed: {executed} | Skipped (already done): {skipped_count}")
+        log(f"💾 Results saved to: {output_excel_file}")
     except Exception as e:
         log(f"❌ Error writing output file: {e}")
