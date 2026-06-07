@@ -33,17 +33,17 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     delay_time = float(config.get("delay_time", 1.0))
 
-    # 2. Loading Excel File
+    # 2. Load Excel File
     log(f"📂 Loading input Excel file: {input_excel_file}")
     try:
         df = pd.read_excel(input_excel_file)
-        # remove unnamed columns
+        # Remove unnamed columns
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     except Exception as e:
         log(f"❌ Error reading Excel file: {e}")
         return
 
-    # Check for farmer name column
+    # 3. Detect Farmer Name column
     name_col = None
     possible_cols = ['farmer_name', 'Farmer Name', 'firstName', 'Name', 'name']
     for col in df.columns:
@@ -53,12 +53,12 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     if not name_col:
         if len(df.columns) > 0:
             name_col = df.columns[0]
-            log(f"⚠️ Farmer Name column not explicitly found. Using first column: {name_col}")
+            log(f"⚠️ Farmer Name column not found. Using first column: '{name_col}'")
         else:
             log("❌ Excel sheet is empty or has no columns.")
             return
 
-    # Ensure Status, Response, and Farmer ID columns exist and are cast to string to avoid TypeError
+    # 4. Ensure output columns exist and are string-safe
     for col in ["Status", "Response", "Farmer ID"]:
         if col not in df.columns:
             df[col] = ""
@@ -66,30 +66,29 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     total_rows = len(df)
     processed_count = 0
-    skipped_count = 0
 
-    # Count already-executed rows
+    # Count already-executed rows for resume support
     already_done = df[df['Status'].str.strip().str.lower() == 'success'].shape[0]
     log(f"📊 Total rows: {total_rows} | Already Executed: {already_done} | Pending: {total_rows - already_done}")
-    log(f"🚀 Starting creation of farmers...")
+    log(f"🚀 Starting farmer creation...")
 
     headers = {
         "Authorization": f"Bearer {token}"
-        # ❌ Do NOT manually set Content-Type. The requests library sets the multipart boundary automatically.
+        # ❌ Do NOT set Content-Type manually. requests sets the multipart boundary automatically.
     }
 
-    # 3. Processing Row-by-Row
+    # 5. Process Row-by-Row
     for index, row in df.iterrows():
-        name_val = str(row.get(name_col, "")).strip()
 
-        # Skip already successfully executed rows
+        # Skip already successfully executed rows (resume support)
         current_status = str(row.get('Status', '')).strip().lower()
         if current_status == 'success':
             processed_count += 1
-            skipped_count += 1
             continue
 
-        if not name_val or name_val.lower() in ["nan", "none"]:
+        name_val = str(row.get(name_col, "")).strip()
+
+        if not name_val or name_val.lower() in ["nan", "none", ""]:
             log(f"⚠️ Row {index+2} skipped: Farmer Name is empty.")
             df.at[index, 'Status'] = "Skipped"
             df.at[index, 'Response'] = "Empty Farmer Name"
@@ -97,10 +96,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.to_excel(output_excel_file, index=False)
             continue
 
-        pending = total_rows - processed_count - 1
-        log(f"🔄 Creating Farmer: {name_val} | Row {index+2}/{total_rows+1} | Executed: {processed_count} | Pending: {pending}")
+        pending_rows = total_rows - processed_count
+        log(f"🔄 Creating Farmer: {name_val} | Row {index+2}/{total_rows+1} | Processed: {processed_count} | Pending: {pending_rows}")
 
-        # Construct the payload
+        # 6. Build Payload
         farmer_payload = {
             "status": "DISABLE",
             "data": {},
@@ -231,11 +230,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             resp = requests.post(api_url, headers=headers, files=multipart_data)
 
             if resp.status_code in [200, 201]:
-                resp_text = resp.text
-                df.at[index, 'Status'] = "Success"
-                df.at[index, 'Response'] = resp_text
-
-                # Parse farmer ID from the response JSON
+                # Parse Farmer ID from response
                 farmer_id = "N/A"
                 try:
                     resp_json = resp.json()
@@ -246,13 +241,16 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                 except Exception:
                     pass
 
+                df.at[index, 'Status'] = "Success"
+                df.at[index, 'Response'] = resp.text[:500]
                 df.at[index, 'Farmer ID'] = str(farmer_id)
                 log(f"✅ Success: Created farmer '{name_val}' with ID: {farmer_id}")
             else:
-                log(f"❌ Failed: Row {index+2} - HTTP {resp.status_code}: {resp.text}")
+                log(f"❌ Failed: Row {index+2} - HTTP {resp.status_code}: {resp.text[:300]}")
                 df.at[index, 'Status'] = f"Failed: {resp.status_code}"
                 df.at[index, 'Response'] = resp.text
                 df.at[index, 'Farmer ID'] = "N/A"
+
         except Exception as e:
             log(f"❌ Error: Row {index+2} - {e}")
             df.at[index, 'Status'] = "Error"
@@ -260,15 +258,14 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
             df.at[index, 'Farmer ID'] = "N/A"
 
         processed_count += 1
-        # Live save after every row
+        # Live save after every row so progress is never lost
         df.to_excel(output_excel_file, index=False)
         time.sleep(delay_time)
 
-    # 4. Final Save
+    # 7. Final Save & Summary
     try:
         df.to_excel(output_excel_file, index=False)
-        executed = processed_count - skipped_count
-        log(f"\n🎯 Process completed. Executed: {executed} | Skipped (already done): {skipped_count}")
-        log(f"💾 Results saved to: {output_excel_file}")
+        log(f"\n🎯 Process completed. Processed: {processed_count} | Total: {total_rows}")
+        log(f"💾 Output saved to: {output_excel_file}")
     except Exception as e:
-        log(f"❌ Error writing output file: {e}")
+        log(f"❌ Error saving output file: {e}")
