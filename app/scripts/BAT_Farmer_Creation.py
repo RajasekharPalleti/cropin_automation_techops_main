@@ -19,7 +19,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
         if log_callback:
             log_callback(msg)
-        print(msg)
+        try:
+            print(msg)
+        except UnicodeEncodeError:
+            print(msg.encode("ascii", errors="replace").decode("ascii"))
 
     # ================= CONFIG ================= #
     token = config.get("token")
