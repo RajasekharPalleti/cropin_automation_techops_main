@@ -20,6 +20,7 @@ outputs/
 !sample_templates/*.xlsx
 ~$*.xlsx
 *.log
+server.log.*
 
 # Scheduled Tasks Persistence
 scheduled_jobs.json
