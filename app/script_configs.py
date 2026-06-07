@@ -37,6 +37,11 @@ SCRIPT_CONFIGS = {
         "label": "Post Api Url",
         "requires_input": True,
     },
+    "BAT_Farmer_Creation.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",
+        "label": "Base Api Url",
+        "requires_input": True,
+    },
     "Update_Farmer_Details.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",
         "label": "Base Api Url",
