@@ -92,13 +92,44 @@ def execute_force_restart():
         subprocess.call(["taskkill", "/IM", "ngrok.exe", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # Kill old CMD windows by title (only OLD ones — new ones haven't been created yet)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # We query for PIDs of cmd windows containing any batch script title keywords
+        try:
+            ps_command = (
+                "Get-Process -Name cmd -ErrorAction SilentlyContinue | "
+                "Where-Object { $_.MainWindowTitle -like '*cropin*' -or "
+                "$_.MainWindowTitle -like '*restart_server*' -or "
+                "$_.MainWindowTitle -like '*restart_ngrok*' -or "
+                "$_.MainWindowTitle -like '*stop_server*' -or "
+                "$_.MainWindowTitle -like '*stop_ngrok*' } | "
+                "Select-Object -ExpandProperty Id"
+            )
+            output = subprocess.check_output(["powershell", "-Command", ps_command]).decode("utf-8").strip()
+            if output:
+                pids = [p.strip() for p in output.split("\n") if p.strip()]
+                for pid in pids:
+                    if pid:
+                        subprocess.call(["taskkill", "/F", "/PID", pid, "/T"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as ps_err:
+            safe_log_print(f"PowerShell cleanup warning: {ps_err}. Falling back to standard taskkill...")
+            # Fallback
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',   '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq STOP_SERVER*',    '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq STOP_NGROK*',     '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # Kill any old auto_update.py background process to hand over the baton
-        subprocess.call('wmic process where "commandline like \'%auto_update.py%\'" delete', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        current_pid = os.getpid()
+        try:
+            ps_update_cmd = (
+                f"Get-CimInstance Win32_Process -Filter \"Name = 'python.exe' and CommandLine like '%auto_update.py%'\" | "
+                f"Where-Object {{ $_.ProcessId -ne {current_pid} }} | "
+                f"Invoke-CimMethod -MethodName Terminate"
+            )
+            subprocess.call(["powershell", "-Command", ps_update_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            subprocess.call('wmic process where "commandline like \'%auto_update.py%\' and processid != ' + str(current_pid) + '" delete', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         safe_log_print("All old server/ngrok processes and terminal windows killed.")
     except Exception as e:
@@ -113,8 +144,7 @@ def execute_force_restart():
     try:
         start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
         if os.path.exists(start_bat):
-            # 'start cmd /k' keeps the window open even if the process exits
-            subprocess.Popen(f'start cmd /c "{start_bat}" --no-pause', shell=True)
+            subprocess.Popen(f'"{start_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             safe_log_print("run_server.bat launched in new window.")
         else:
             safe_log_print(f"ERROR: Could not find {start_bat}")
@@ -131,7 +161,7 @@ def execute_force_restart():
     try:
         ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
         if os.path.exists(ngrok_bat):
-            subprocess.Popen(f'start cmd /c "{ngrok_bat}" --no-pause', shell=True)
+            subprocess.Popen(f'"{ngrok_bat}" --no-pause', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             safe_log_print("Ngrok restarted in new window.")
         else:
             safe_log_print(f"ERROR: Could not find {ngrok_bat}")
