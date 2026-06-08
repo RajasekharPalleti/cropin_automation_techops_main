@@ -319,6 +319,14 @@ SCRIPT_CONFIGS = {
         "label": "Update Declared Area API",
         "requires_input": True,
     },
+    "Add_CA_to_Project.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/projects",
+        "label": "Base Api Url",
+        "requires_input": True,
+        "show_threading": True,
+        "show_batch_config": True,
+        "show_time_delay": True
+    },
 }
 
 # Fallback config used when a script is not listed in SCRIPT_CONFIGS above.
