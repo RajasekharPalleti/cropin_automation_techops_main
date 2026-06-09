@@ -138,134 +138,144 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     total_rows = len(df)
     processed_count = 0
-    log(f"\n[INFO] Starting to process {total_rows} rows")
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    processed_lock = threading.Lock()
+    
+    MAX_WORKERS = int(config.get("worker_count", 1))
+    log(f"\n[INFO] Starting to process {total_rows} rows with {MAX_WORKERS} workers")
 
-    for index, row in df.iterrows():
-        # Try to use named columns if they exist, else fallback to indices as per original script
-        # Original: 0=CA_id, 1=CA_Name, 2=area_Audit_DTO, 3=Latitude, 4=Longitude, 5=audited_count
-        
-        try:
-             # Flexible column retrieval
-            if "CA_id" in row: CA_id = row["CA_id"]
-            else: CA_id = row.iloc[0]
+    # Split DataFrame into chunks
+    chunk_size = (total_rows + MAX_WORKERS - 1) // MAX_WORKERS if MAX_WORKERS > 0 else total_rows
+    chunks = [df.iloc[i:i + chunk_size].copy() for i in range(0, total_rows, chunk_size)]
+    actual_workers = min(len(chunks), MAX_WORKERS) if MAX_WORKERS > 0 else 1
 
-            if "CA_Name" in row: CA_Name = row["CA_Name"]
-            else: CA_Name = row.iloc[1]
+    def process_chunk(df_chunk, thread_id):
+        nonlocal processed_count
+        results = []
 
-            if "area_Audit_DTO" in row: area_Audit_DTO = row["area_Audit_DTO"]
-            else: area_Audit_DTO = row.iloc[2]
-            
-            if "Latitude" in row: Latitude = row["Latitude"]
-            else: Latitude = row.iloc[3]
-
-            if "Longitude" in row: Longitude = row["Longitude"]
-            else: Longitude = row.iloc[4]
-
-            if "audited_count" in row: audited_count = row["audited_count"]
-            else: audited_count = row.iloc[5]
-
-            # Convert types if necessary (pandas might infer float for count)
-            # CA_id might be UUID string
-            
-            # Basic validation
-            if pd.isna(CA_id) or pd.isna(area_Audit_DTO) or str(CA_id).strip() == "":
-                df.at[index, "Status"] = "Skipped: Missing Data"
-                continue
-
-            # Normalize geoInfo
+        for index, row in df_chunk.iterrows():
             try:
-                # Ensure area_Audit_DTO is string
-                geo_info_str = str(area_Audit_DTO) if not isinstance(area_Audit_DTO, (dict, list)) else json.dumps(area_Audit_DTO)
-                geo_info = normalize_geo_info(geo_info_str)
+                if "CA_id" in row: CA_id = row["CA_id"]
+                else: CA_id = row.iloc[0]
+
+                if "CA_Name" in row: CA_Name = row["CA_Name"]
+                else: CA_Name = row.iloc[1]
+
+                if "area_Audit_DTO" in row: area_Audit_DTO = row["area_Audit_DTO"]
+                else: area_Audit_DTO = row.iloc[2]
+                
+                if "Latitude" in row: Latitude = row["Latitude"]
+                else: Latitude = row.iloc[3]
+
+                if "Longitude" in row: Longitude = row["Longitude"]
+                else: Longitude = row.iloc[4]
+
+                if "audited_count" in row: audited_count = row["audited_count"]
+                else: audited_count = row.iloc[5]
+
+                if pd.isna(CA_id) or pd.isna(area_Audit_DTO) or str(CA_id).strip() == "":
+                    results.append((index, "Skipped: Missing Data", ""))
+                    continue
+
+                try:
+                    geo_info_str = str(area_Audit_DTO) if not isinstance(area_Audit_DTO, (dict, list)) else json.dumps(area_Audit_DTO)
+                    geo_info = normalize_geo_info(geo_info_str)
+                except Exception as e:
+                    results.append((index, f"Invalid GeoInfo: {e}", ""))
+                    continue
+
+                with processed_lock:
+                    pending_rows = total_rows - processed_count
+
+                log(f"[Thread {thread_id}] 🔄 Processing CA_ID: {CA_id} ({CA_Name}) | Row {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows}")
+
+                get_endpoint = f"{api_url}/{CA_id}"
+                get_response = requests.get(get_endpoint, headers=headers)
+
+                if get_response.status_code != 200:
+                    results.append((index, f"GET Failed: {get_response.status_code}", get_response.text[:30000]))
+                    log(f"[Thread {thread_id}] ❌ GET Failed for {CA_Name}")
+                    continue
+                
+                log(f"[Thread {thread_id}] ✅ Fetched CA data for {CA_Name}")
+                CA_data = get_response.json()
+
+                try:
+                    audit_count_val = float(audited_count)
+                except:
+                    audit_count_val = 0.0
+
+                unit_val = config.get("unit", "Hectare")
+
+                areaAudit = {
+                    "id": None,
+                    "geoInfo": geo_info,
+                    "latitude": Latitude,
+                    "longitude": Longitude,
+                    "altitude": None
+                }
+
+                auditedArea = {
+                    "count": audit_count_val,
+                    "unit": unit_val
+                }
+
+                CA_data["areaAudit"] = areaAudit
+                CA_data["auditedArea"] = auditedArea
+                CA_data["latitude"] = None
+                CA_data["longitude"] = None
+                
+                force_crop_audited = config.get("force_crop_audited", "true")
+                
+                if force_crop_audited == "true":
+                    CA_data["cropAudited"] = True
+                elif force_crop_audited == "false":
+                    CA_data["cropAudited"] = False
+
+                put_endpoint = f"{api_url}/area-audit"
+                
+                put_response = requests.put(
+                    put_endpoint,
+                    headers=headers,
+                    data=json.dumps(CA_data)
+                )
+
+                if put_response.status_code != 200:
+                    results.append((index, f"PUT Failed: {put_response.status_code}", put_response.text[:30000]))
+                    log(f"[Thread {thread_id}] ❌ PUT Failed: {put_response.status_code}")
+                    continue
+
+                results.append((index, "Success", put_response.text[:30000]))
+                log(f"[Thread {thread_id}] ✅ Updated area audit for {CA_Name}")
+
+            except requests.exceptions.RequestException as e:
+                results.append((index, f"Request Failed: {e}", str(e)))
+                log(f"[Thread {thread_id}] ❌ Request Exception: {e}")
             except Exception as e:
-                df.at[index, "Status"] = f"Invalid GeoInfo: {e}"
-                continue
+                results.append((index, f"Error: {e}", ""))
+                log(f"[Thread {thread_id}] ❌ Error: {e}")
 
-            pending_rows = total_rows - processed_count
-            log(f"🔄 Processing CA_ID: {CA_id} ({CA_Name}) | Row {index + 1}/{total_rows} | Processed: {processed_count} | Pending: {pending_rows}")
+            with processed_lock:
+                processed_count += 1
+            time.sleep(delay_time)
 
-            # ---------------- GET CA ----------------
-            get_endpoint = f"{api_url}/{CA_id}"
-            # log(f"GET {get_endpoint}")
-            get_response = requests.get(get_endpoint, headers=headers)
+        return results
 
-            if get_response.status_code != 200:
-                df.at[index, "Status"] = f"GET Failed: {get_response.status_code}"
-                # Handle truncated response text in Excel
-                df.at[index, "CA_Response"] = get_response.text[:30000] 
-                log(f"❌ GET Failed for {CA_Name}")
-                continue
-            
-            log(f"✅ Fetched CA data for {CA_Name}")
-            CA_data = get_response.json()
+    with ThreadPoolExecutor(max_workers=actual_workers) as executor:
+        futures = [
+            executor.submit(process_chunk, chunk, thread_id + 1)
+            for thread_id, chunk in enumerate(chunks)
+        ]
+        chunk_results = []
+        for future in futures:
+            chunk_results.extend(future.result())
 
-            # ---------------- PREPARE PAYLOAD ----------------
-            try:
-                audit_count_val = float(audited_count)
-            except:
-                audit_count_val = 0.0
-
-            # Get unit from config (default to Hectare)
-            unit_val = config.get("unit", "Hectare")
-
-            areaAudit = {
-                "id": None,
-                "geoInfo": geo_info,
-                "latitude": Latitude,
-                "longitude": Longitude,
-                "altitude": None
-            }
-
-            auditedArea = {
-                "count": audit_count_val,
-                "unit": unit_val
-            }
-
-            CA_data["areaAudit"] = areaAudit
-            CA_data["auditedArea"] = auditedArea
-            # Resetting lat/long at root level as per user script
-            CA_data["latitude"] = None
-            CA_data["longitude"] = None
-            
-            # CA_data["cropAudited"] = True  # Logic moved to config
-            force_crop_audited = config.get("force_crop_audited", "true")
-            
-            if force_crop_audited == "true":
-                CA_data["cropAudited"] = True
-            elif force_crop_audited == "false":
-                CA_data["cropAudited"] = False
-            # if "none", do nothing (don't send/don't override)
-
-            # ---------------- PUT UPDATE ----------------
-            put_endpoint = f"{api_url}/area-audit"
-            # log(f"PUT {put_endpoint}")
-            
-            put_response = requests.put(
-                put_endpoint,
-                headers=headers,
-                data=json.dumps(CA_data)
-            )
-
-            if put_response.status_code != 200:
-                df.at[index, "Status"] = f"PUT Failed: {put_response.status_code}"
-                df.at[index, "CA_Response"] = put_response.text[:30000]
-                log(f"❌ PUT Failed: {put_response.status_code}")
-                continue
-
-            df.at[index, "Status"] = "Success"
-            df.at[index, "CA_Response"] = put_response.text[:30000]
-            log(f"✅ Updated area audit for {CA_Name}")
-
-        except requests.exceptions.RequestException as e:
-            df.at[index, "Status"] = f"Request Failed: {e}"
-            df.at[index, "CA_Response"] = str(e)
-            log(f"❌ Request Exception: {e}")
-        except Exception as e:
-            df.at[index, "Status"] = f"Error: {e}"
-            log(f"❌ Error: {e}")
-
-        processed_count += 1
-        time.sleep(delay_time)
+    log("💾 Aggregating results...")
+    for idx, status, response in chunk_results:
+        if idx in df.index:
+            df.at[idx, "Status"] = status
+            df.at[idx, "CA_Response"] = str(response)
 
     # Save output
     log(f"\n💾 Saving output to: {output_excel_file}")

@@ -155,6 +155,7 @@ SCRIPT_CONFIGS = {
         "label": "Croppable Area API URL",
         "requires_input": True,
         "show_area_audit": True,
+        "show_threading": True,
     },
     "Add_Cropstages_to_Variety.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/varieties",
