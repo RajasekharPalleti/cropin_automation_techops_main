@@ -887,6 +887,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                     <div style="font-size:0.82em;color:#666;">
                                         User <strong>${job.user}</strong> · Tenant <strong>${job.tenant}</strong>
+                                        ${job.started_at ? ` · Started <strong>${new Date(job.started_at).toLocaleString()}</strong>` : ''}
                                     </div>
                                     <div style="font-size:0.72em;color:#aaa;margin-top:2px;">ID: ${job.client_id}</div>
                                 </div>

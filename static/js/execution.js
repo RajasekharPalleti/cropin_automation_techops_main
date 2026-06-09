@@ -847,6 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span class="spinner" style="border-top-color:#17a2b8;"></span>
                             <strong style="color:#00838f; font-size:1.1rem;">${j.script_name}</strong>
+                            ${j.started_at ? `<span style="margin-left:10px; font-size:0.85rem; color:#006064; background-color:#b2ebf2; padding:2px 8px; border-radius:12px;">Started At: ${new Date(j.started_at).toLocaleString()}</span>` : ''}
                         </div>
                         <button onclick="window.stopScheduledJob('${j.job_id}', this)" class="btn-primary" 
                                 style="background-color:#dc3545; border-color:#dc3545; color:white; padding:6px 12px; font-size:0.9rem;">

@@ -8,7 +8,7 @@ import logging
 
 from app.script_configs import SCRIPTS_DIR, OUTPUT_DIR
 from app.core.auth import get_access_token
-from app.state import backup_manager, manager
+from app.state import backup_manager, manager, JobStoppedException
 
 SCHEDULES_FILE = "scheduled_jobs.json"
 logger = logging.getLogger(__name__)
@@ -139,6 +139,7 @@ async def process_scheduled_script(job_id: str, job_data: dict):
     jobs = load_jobs()
     if job_id in jobs:
         jobs[job_id]["status"] = "running"
+        jobs[job_id]["started_at"] = datetime.now().isoformat()
         save_jobs(jobs)
 
     try:
@@ -163,7 +164,8 @@ async def process_scheduled_script(job_id: str, job_data: dict):
         # We do NOT log these because the scripts themselves already call `print()` natively,
         # which is captured into server.log by main.py! Logging here causes duplicate lines.
         def silent_log_callback(message):
-            pass
+            if manager.is_cancelled(job_id):
+                raise JobStoppedException("Job Stopped by User")
 
         # --- Load Script ---
         if not os.path.exists(script_path):
@@ -218,6 +220,8 @@ async def process_scheduled_script(job_id: str, job_data: dict):
             # Queue next occurrence AFTER saving, so load_jobs gets a fresh copy
             _schedule_next_occurrence(job_id, job_data)
 
+    except JobStoppedException:
+        logger.warning(f"[{script_name}] Scheduled Job {job_id} was forcefully terminated by the user.")
     except Exception as e:
         logger.error(f"[{script_name}] Execution failed: {e}")
         logger.error(traceback.format_exc())

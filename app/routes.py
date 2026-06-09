@@ -266,7 +266,8 @@ async def get_active_jobs():
                 "user": cfg.get("username", "unknown"),
                 "machine_id": "Server Background",
                 "type": "Scheduled",
-                "is_stopping": is_stopping
+                "is_stopping": is_stopping,
+                "started_at": job.get("started_at")
             })
         
     return {"jobs": jobs}
