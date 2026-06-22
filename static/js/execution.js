@@ -664,10 +664,6 @@ document.addEventListener('DOMContentLoaded', () => {
             tooltip.style.visibility = 'hidden';
         };
 
-        if (parent) {
-            parent.addEventListener('mouseenter', updateTooltip);
-            parent.addEventListener('mouseleave', hideTooltip);
-        }
         openScheduleModalBtn.addEventListener('mouseenter', updateTooltip);
         openScheduleModalBtn.addEventListener('mouseleave', hideTooltip);
     }
@@ -1292,6 +1288,275 @@ document.addEventListener('DOMContentLoaded', () => {
             deforestStatusBtn.disabled = false;
             deforestStatusBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">refresh</span> Check Status';
         }
+    });
+
+    // API 6: Publish Deforestation — reads SR Plot IDs from Excel, posts each
+    const deforestPublishFile     = document.getElementById('deforestation-publish-file');
+    const deforestPublishBtn      = document.getElementById('deforestation-publish-btn');
+    const deforestPublishFilename = document.getElementById('deforestation-publish-filename');
+    const deforestPublishTerminal = document.getElementById('deforestation-publish-terminal');
+
+    let deforestPublishExcelData = null;
+    let deforestPublishStopped = false;
+    const deforestPublishStopBtn = document.getElementById('deforestation-publish-stop-btn');
+
+    deforestPublishStopBtn.addEventListener('click', () => {
+        deforestPublishStopped = true;
+        deforestPublishStopBtn.disabled = true;
+    });
+
+    function publishLog(msg, color) {
+        const line = document.createElement('span');
+        line.style.color = color || '#d4d4d4';
+        line.textContent = msg + '\n';
+        deforestPublishTerminal.appendChild(line);
+        deforestPublishTerminal.scrollTop = deforestPublishTerminal.scrollHeight;
+    }
+
+    deforestPublishFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        deforestPublishFilename.textContent = file.name;
+        deforestPublishBtn.disabled = true;
+        deforestPublishTerminal.style.display = 'block';
+        deforestPublishTerminal.innerHTML = '';
+        publishLog(`📂 Reading file: ${file.name}`, '#9cdcfe');
+        try {
+            const data = await file.arrayBuffer();
+            // Use SheetJS if available, else fall back to CSV text parse
+            let rows = [];
+            if (window.XLSX) {
+                const wb = XLSX.read(data, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                if (json.length < 2) throw new Error('Excel has no data rows');
+                const headers = json[0].map(h => String(h).trim());
+                // Find SR Plot ID column — look for header containing "SR Plot ID" (case-insensitive) else use index 1
+                const srIdx = headers.findIndex(h => /sr\s*plot\s*id/i.test(h));
+                const colIdx = srIdx >= 0 ? srIdx : 1;
+                publishLog(`✅ Detected column: "${headers[colIdx] || 'column ' + (colIdx+1)}" (index ${colIdx})`, '#4ec9b0');
+                rows = json.slice(1).map(r => String(r[colIdx] || '').trim()).filter(v => v);
+            } else {
+                // CSV fallback
+                const text = new TextDecoder().decode(data);
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                if (lines.length < 2) throw new Error('File has no data rows');
+                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const srIdx = headers.findIndex(h => /sr\s*plot\s*id/i.test(h));
+                const colIdx = srIdx >= 0 ? srIdx : 1;
+                publishLog(`✅ Detected column: "${headers[colIdx] || 'column ' + (colIdx+1)}" (index ${colIdx})`, '#4ec9b0');
+                rows = lines.slice(1).map(l => {
+                    const parts = l.split(',');
+                    return String(parts[colIdx] || '').trim().replace(/^"|"$/g, '');
+                }).filter(v => v);
+            }
+            deforestPublishExcelData = rows;
+            publishLog(`📋 Found ${rows.length} SR Plot ID(s) to process`, '#ce9178');
+            deforestPublishBtn.disabled = false;
+        } catch (err) {
+            publishLog(`❌ Error reading file: ${err.message}`, '#f44747');
+            deforestPublishExcelData = null;
+        }
+    });
+
+    deforestPublishBtn.addEventListener('click', async () => {
+        if (!deforestPublishExcelData || !deforestPublishExcelData.length) return;
+        if (!deforestToken || !deforestBaseUrl) {
+            publishLog('❌ Missing token or base URL. Please complete authentication first.', '#f44747');
+            return;
+        }
+        deforestPublishStopped = false;
+        deforestPublishBtn.disabled = true;
+        deforestPublishBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Publishing…';
+        deforestPublishStopBtn.style.display = '';
+        deforestPublishStopBtn.disabled = false;
+        publishLog(`\n🚀 Starting publish for ${deforestPublishExcelData.length} record(s)…`, '#569cd6');
+        publishLog('─'.repeat(50), '#555');
+
+        let success = 0, failed = 0;
+        for (let i = 0; i < deforestPublishExcelData.length; i++) {
+            if (deforestPublishStopped) {
+                publishLog(`⛔ Stopped by user after ${i} record(s).`, '#f4a742');
+                break;
+            }
+            const srPlotId = deforestPublishExcelData[i];
+            publishLog(`[${i+1}/${deforestPublishExcelData.length}] Publishing SR Plot ID: ${srPlotId} …`, '#d4d4d4');
+            try {
+                const url = `${deforestBaseUrl}/services/farm/api/deforestation/publish-status?srPlotId=${encodeURIComponent(srPlotId)}`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${deforestToken}`
+                    },
+                    body: '{}'
+                });
+                if (res.status === 200) {
+                    publishLog(`   ✅ Success (200)`, '#4ec9b0');
+                    success++;
+                } else {
+                    publishLog(`   ❌ Failed (${res.status}: ${res.statusText})`, '#f44747');
+                    failed++;
+                }
+            } catch (err) {
+                publishLog(`   ❌ Error: ${err.message}`, '#f44747');
+                failed++;
+            }
+            if (i < deforestPublishExcelData.length - 1) {
+                publishLog(`   ⏳ Waiting 2 seconds…`, '#808080');
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        publishLog('─'.repeat(50), '#555');
+        publishLog(`✔ Done — ${success} succeeded, ${failed} failed`, success > 0 && failed === 0 ? '#4ec9b0' : '#ce9178');
+        deforestPublishBtn.disabled = false;
+        deforestPublishBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">publish</span> Publish Deforestation';
+        deforestPublishStopBtn.style.display = 'none';
+    });
+
+    // API 7: Croppable Areas Sustainability Batch
+    const caBatchFile     = document.getElementById('ca-batch-file');
+    const caBatchRunBtn   = document.getElementById('ca-batch-run-btn');
+    const caBatchStopBtn  = document.getElementById('ca-batch-stop-btn');
+    const caBatchFilename = document.getElementById('ca-batch-filename');
+    const caBatchTerminal = document.getElementById('ca-batch-terminal');
+
+    let caBatchIds      = null;
+    let caBatchStopped  = false;
+
+    function caBatchLog(msg, color) {
+        const line = document.createElement('span');
+        line.style.color = color || '#d4d4d4';
+        line.textContent = msg + '\n';
+        caBatchTerminal.appendChild(line);
+        caBatchTerminal.scrollTop = caBatchTerminal.scrollHeight;
+    }
+
+    caBatchStopBtn.addEventListener('click', () => {
+        caBatchStopped = true;
+        caBatchStopBtn.disabled = true;
+    });
+
+    caBatchFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        caBatchFilename.textContent = file.name;
+        caBatchRunBtn.disabled = true;
+        caBatchTerminal.style.display = 'block';
+        caBatchTerminal.innerHTML = '';
+        caBatchLog(`📂 Reading file: ${file.name}`, '#9cdcfe');
+        try {
+            const data = await file.arrayBuffer();
+            let ids = [];
+            if (window.XLSX) {
+                const wb = XLSX.read(data, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                if (json.length < 2) throw new Error('Excel has no data rows');
+                const headers = json[0].map(h => String(h).trim());
+                const caIdx = headers.findIndex(h => /ca\s*id/i.test(h));
+                const colIdx = caIdx >= 0 ? caIdx : 0;
+                caBatchLog(`✅ Detected column: "${headers[colIdx] || 'column ' + (colIdx+1)}" (index ${colIdx})`, '#4ec9b0');
+                ids = json.slice(1).map(r => String(r[colIdx] || '').trim()).filter(v => v);
+            } else {
+                const text = new TextDecoder().decode(data);
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                if (lines.length < 2) throw new Error('File has no data rows');
+                const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                const caIdx = headers.findIndex(h => /ca\s*id/i.test(h));
+                const colIdx = caIdx >= 0 ? caIdx : 0;
+                caBatchLog(`✅ Detected column: "${headers[colIdx] || 'column ' + (colIdx+1)}" (index ${colIdx})`, '#4ec9b0');
+                ids = lines.slice(1).map(l => {
+                    const parts = l.split(',');
+                    return String(parts[colIdx] || '').trim().replace(/^"|"$/g, '');
+                }).filter(v => v);
+            }
+            caBatchIds = ids;
+            caBatchLog(`📋 Found ${ids.length} CA ID(s)`, '#ce9178');
+            caBatchRunBtn.disabled = false;
+        } catch (err) {
+            caBatchLog(`❌ Error reading file: ${err.message}`, '#f44747');
+            caBatchIds = null;
+        }
+    });
+
+    caBatchRunBtn.addEventListener('click', async () => {
+        if (!caBatchIds || !caBatchIds.length) return;
+        if (!deforestToken || !deforestBaseUrl) {
+            caBatchTerminal.style.display = 'block';
+            caBatchLog('❌ Missing token or base URL. Please complete authentication first.', '#f44747');
+            return;
+        }
+        const startDate = document.getElementById('ca-batch-start-date').value;
+        const endDate   = document.getElementById('ca-batch-end-date').value;
+        if (!startDate || !endDate) {
+            caBatchTerminal.style.display = 'block';
+            caBatchLog('❌ Please select both Start Date and End Date.', '#f44747');
+            return;
+        }
+
+        caBatchStopped = false;
+        caBatchRunBtn.disabled = true;
+        caBatchRunBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Running…';
+        caBatchStopBtn.style.display = '';
+        caBatchStopBtn.disabled = false;
+        caBatchTerminal.style.display = 'block';
+        caBatchTerminal.innerHTML = '';
+
+        // Send all IDs in a single POST
+        caBatchLog(`🚀 Sending batch of ${caBatchIds.length} CA ID(s)…`, '#569cd6');
+        caBatchLog(`   Start Date : ${startDate}`, '#9cdcfe');
+        caBatchLog(`   End Date   : ${endDate}`, '#9cdcfe');
+        caBatchLog('─'.repeat(50), '#555');
+
+        const CHUNK = 10;
+        let success = 0, failed = 0;
+        for (let i = 0; i < caBatchIds.length; i += CHUNK) {
+            if (caBatchStopped) {
+                caBatchLog(`⛔ Stopped by user after ${i} record(s).`, '#f4a742');
+                break;
+            }
+            const chunk = caBatchIds.slice(i, i + CHUNK);
+            caBatchLog(`[${i+1}–${Math.min(i+CHUNK, caBatchIds.length)}/${caBatchIds.length}] Posting chunk of ${chunk.length} ID(s)…`, '#d4d4d4');
+            try {
+                const url = `${deforestBaseUrl}/services/farm/api/croppable-areas/sustainability/v2/batch?features=SUSTAINABILITY`;
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${deforestToken}`
+                    },
+                    body: JSON.stringify({ croppableAreaIds: chunk, startDate, endDate })
+                });
+                if (res.status === 200) {
+                    let statusText = 'OK';
+                    try {
+                        const body = await res.json();
+                        statusText = body.status || 'OK';
+                    } catch {}
+                    const isSuccess = statusText === 'SUCCESS';
+                    caBatchLog(`   ✅ (200) Status: ${statusText}`, isSuccess ? '#4ec9b0' : '#f4a742');
+                    success += chunk.length;
+                } else {
+                    caBatchLog(`   ❌ Failed (${res.status}: ${res.statusText})`, '#f44747');
+                    failed += chunk.length;
+                }
+            } catch (err) {
+                caBatchLog(`   ❌ Error: ${err.message}`, '#f44747');
+                failed += chunk.length;
+            }
+            if (i + CHUNK < caBatchIds.length && !caBatchStopped) {
+                caBatchLog(`   ⏳ Waiting 2 seconds…`, '#808080');
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        caBatchLog('─'.repeat(50), '#555');
+        caBatchLog(`✔ Done — ${success} succeeded, ${failed} failed`, success > 0 && failed === 0 ? '#4ec9b0' : '#ce9178');
+        caBatchRunBtn.disabled = false;
+        caBatchRunBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">eco</span> Run Batch';
+        caBatchStopBtn.style.display = 'none';
     });
 
     // ----------------------------------------------------------------

@@ -34,12 +34,15 @@ def get_access_token(tenant_code, username, password, environment):
         }
 
         # Determine the authentication URL based on the environment
-        if environment == "prod1":
-            auth_token_url = f"https://sso.sg.cropin.in/auth/realms/{tenant_code}/protocol/openid-connect/token"
-        elif environment == "prod2":
-            auth_token_url = f"https://sso.africa.cropin.com/auth/realms/{tenant_code}/protocol/openid-connect/token"
-        else:
-            raise ValueError("Invalid environment specified. Use 'prod1' or 'prod2'.")
+        SSO_BASES = {
+            "prod1": "https://sso.sg.cropin.in",
+            "prod2": "https://sso.africa.cropin.com",
+            "qa":    "https://v2sso-gcp.cropin.co.in",
+            "uat":   "https://v2sso-uat-gcp.cropin.co.in",
+        }
+        if environment not in SSO_BASES:
+            raise ValueError(f"Invalid environment '{environment}'. Use one of: {', '.join(SSO_BASES)}.")
+        auth_token_url = f"{SSO_BASES[environment]}/auth/realms/{tenant_code}/protocol/openid-connect/token"
 
         # Send the POST request with x-www-form-urlencoded data
         response = requests.post(auth_token_url, data=payload)

@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="icon" href="/static/images/logo.png" type="image/png">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -50,6 +51,8 @@
                     <select id="environment" style="display: none;">
                         <option value="prod1" selected>prod1</option>
                         <option value="prod2">prod2</option>
+                        <option value="qa">qa</option>
+                        <option value="uat">uat</option>
                     </select>
 
                     <!-- Custom Environment Dropdown -->
@@ -62,6 +65,8 @@
                             <ul class="dropdown-list" id="env-list">
                                 <li data-value="prod1">prod1</li>
                                 <li data-value="prod2">prod2</li>
+                                <li data-value="qa">qa</li>
+                                <li data-value="uat">uat</li>
                             </ul>
                         </div>
                     </div>
@@ -655,6 +660,84 @@
                             <pre id="deforestation-status-json" style="background:#f4f4f4;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:0.78rem;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;margin:0;"></pre>
                         </div>
                         <div id="deforestation-status-error" style="margin-top:8px;font-size:0.82rem;color:#c0392b;display:none;"></div>
+                    </div>
+
+                    <!-- API 6: Publish Deforestation -->
+                    <div style="border:1px solid #b0bec5;border-radius:8px;padding:16px;background:#f8f9fa;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#37474f;font-size:0.95rem;">Publish Deforestation</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            POST /services/farm/api/deforestation/publish-status?srPlotId={srPlotId}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Upload Excel:</label>
+                            <input type="file" id="deforestation-publish-file" accept=".xlsx,.xls,.csv" style="display:none;">
+                            <button class="btn-primary" id="deforestation-publish-upload-btn" style="background:#455a64;border-color:#455a64;padding:6px 14px;font-size:0.82rem;" onclick="document.getElementById('deforestation-publish-file').click()">
+                                <span class="material-icons" style="font-size:0.95rem;vertical-align:middle;margin-right:4px;">table_chart</span>
+                                Choose Excel
+                            </button>
+                            <span id="deforestation-publish-filename" style="font-size:0.8rem;color:#555;font-style:italic;">No file chosen</span>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button class="btn-primary" id="deforestation-publish-btn" style="background:#37474f;border-color:#37474f;" disabled>
+                                <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">publish</span>
+                                Publish Deforestation
+                            </button>
+                            <button class="btn-primary" id="deforestation-publish-stop-btn" style="background:#c0392b;border-color:#c0392b;display:none;">
+                                <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">stop_circle</span>
+                                Stop
+                            </button>
+                        </div>
+                        <!-- Inline Terminal -->
+                        <div id="deforestation-publish-terminal" style="display:none;margin-top:12px;background:#1e1e1e;border-radius:6px;padding:12px;font-family:monospace;font-size:0.78rem;color:#d4d4d4;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #333;"></div>
+                    </div>
+
+                    <!-- API 7: Croppable Areas Sustainability Batch -->
+                    <div style="border:1px solid #c5cae9;border-radius:8px;padding:16px;background:#f8f9ff;">
+                        <div style="font-weight:700;margin-bottom:4px;color:#283593;font-size:0.95rem;">
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">eco</span>
+                            Enable Sustainability
+                        </div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:14px;line-height:1.5;">
+                            POST /services/farm/api/croppable-areas/sustainability/v2/batch?features=SUSTAINABILITY
+                        </div>
+
+                        <!-- Date range -->
+                        <div style="display:flex;gap:10px;margin-bottom:12px;">
+                            <div style="flex:1;">
+                                <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Start Date <span style="color:#c0392b;">*</span></label>
+                                <input type="date" id="ca-batch-start-date" class="form-input" style="width:100%;box-sizing:border-box;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">End Date <span style="color:#c0392b;">*</span></label>
+                                <input type="date" id="ca-batch-end-date" class="form-input" style="width:100%;box-sizing:border-box;">
+                            </div>
+                        </div>
+
+                        <!-- Excel upload row -->
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Upload Excel:</label>
+                            <input type="file" id="ca-batch-file" accept=".xlsx,.xls,.csv" style="display:none;">
+                            <button class="btn-primary" id="ca-batch-upload-btn" style="background:#3949ab;border-color:#3949ab;padding:6px 14px;font-size:0.82rem;" onclick="document.getElementById('ca-batch-file').click()">
+                                <span class="material-icons" style="font-size:0.95rem;vertical-align:middle;margin-right:4px;">table_chart</span>
+                                Choose Excel
+                            </button>
+                            <span id="ca-batch-filename" style="font-size:0.8rem;color:#555;font-style:italic;">No file chosen</span>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button class="btn-primary" id="ca-batch-run-btn" style="background:#283593;border-color:#283593;" disabled>
+                                <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">eco</span>
+                                Run Batch
+                            </button>
+                            <button class="btn-primary" id="ca-batch-stop-btn" style="background:#c0392b;border-color:#c0392b;display:none;">
+                                <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">stop_circle</span>
+                                Stop
+                            </button>
+                        </div>
+
+                        <!-- Inline terminal -->
+                        <div id="ca-batch-terminal" style="display:none;margin-top:12px;background:#1e1e1e;border-radius:6px;padding:12px;font-family:monospace;font-size:0.78rem;color:#d4d4d4;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #333;"></div>
                     </div>
 
                     <div id="deforestation-error-3" style="color:#c0392b;font-size:0.85rem;display:none;"></div>
