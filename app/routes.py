@@ -10,6 +10,7 @@ import ast
 import json
 import shutil
 import asyncio
+import requests as ext_requests
 import importlib.util
 from datetime import datetime
 
@@ -947,6 +948,53 @@ async def stream_server_logs(request: Request):
         }
     )
 
+
+
+# ---------------------------------------------------------------------------
+# Deforestation proxy endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/api/deforestation/generate-template")
+async def deforestation_generate_template(body: dict = Body(...)):
+    base_url = body.get("baseUrl", "").rstrip("/")
+    token    = body.get("token", "")
+    url = f"{base_url}/services/fileupload-service/api/bulk-downloads/template?feature=ONBOARD_FARMER_ASSET_FORM"
+    try:
+        resp = ext_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        resp.raise_for_status()
+        return JSONResponse(content=resp.json(), status_code=resp.status_code)
+    except ext_requests.exceptions.HTTPError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/deforestation/download-template")
+async def deforestation_download_template(body: dict = Body(...)):
+    base_url  = body.get("baseUrl", "").rstrip("/")
+    token     = body.get("token", "")
+    template_id   = body.get("id", "")
+    template_name = body.get("name", "template")
+    url = f"{base_url}/services/fileupload-service/api/bulk-downloads/mass-upload-template/{template_id}"
+    try:
+        resp = ext_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60, stream=True)
+        resp.raise_for_status()
+
+        def iter_content():
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+
+        filename = f"{template_name}.xlsx"
+        return StreamingResponse(
+            iter_content(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except ext_requests.exceptions.HTTPError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------

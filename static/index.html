@@ -431,11 +431,17 @@
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h2 style="margin: 0;"><span class="material-icons"
                                 style="vertical-align: middle;">cloud_upload</span> Upload & Run</h2>
-                        <button id="open-schedule-modal-btn" class="btn-schedule" disabled>
-                            <span class="material-icons"
-                                style="font-size: 1rem; vertical-align: middle; margin-right: 4px;">schedule</span>
-                            Schedule Run
-                        </button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <button id="open-deforestation-modal-btn" class="btn-schedule btn-deforestation">
+                                <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">forest</span>
+                                Deforestation
+                            </button>
+                            <button id="open-schedule-modal-btn" class="btn-schedule" disabled>
+                                <span class="material-icons"
+                                    style="font-size: 1rem; vertical-align: middle; margin-right: 4px;">schedule</span>
+                                Schedule Run
+                            </button>
+                        </div>
                     </div>
                     <label style="display:block; margin-bottom:10px; font-weight:500; color:#666;">Upload filled
                         Excel</label>
@@ -476,6 +482,184 @@
                 <div class="console-content" id="console-content"></div>
             </div>
 
+
+        </div>
+    </div>
+
+    <!-- Deforestation Modal -->
+    <div id="deforestation-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:600px;width:90%;margin:5% auto;">
+            <div class="modal-header">
+                <h2 style="margin:0;font-size:1.2rem;display:flex;align-items:center;gap:6px;">
+                    <span class="material-icons" style="color:#2e7d32;font-size:1.3rem;">forest</span>
+                    Generate Deforestation Data
+                </h2>
+                <span class="close" id="deforestation-modal-close">&times;</span>
+            </div>
+
+            <!-- Screen 1: Auth -->
+            <div id="deforestation-screen-1">
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:4px;">Environment <span style="color:#c0392b;">*</span></label>
+                        <select id="deforestation-env" class="form-input" style="width:100%;box-sizing:border-box;">
+                            <option value="QA">QA</option>
+                            <option value="UAT">UAT</option>
+                            <option value="PROD">PROD</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:4px;">Tenant Name <span style="color:#c0392b;">*</span></label>
+                        <input type="text" id="deforestation-tenant" class="form-input" placeholder="Enter tenant name" style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:4px;">Username <span style="color:#c0392b;">*</span></label>
+                        <input type="text" id="deforestation-username" class="form-input" placeholder="Enter username" style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:4px;">Password <span style="color:#c0392b;">*</span></label>
+                        <input type="password" id="deforestation-password" class="form-input" placeholder="Enter password" style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div id="deforestation-error-1" style="color:#c0392b;font-size:0.85rem;display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="deforestation-proceed-btn">
+                        <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">lock_open</span>
+                        Authenticate & Proceed
+                    </button>
+                </div>
+            </div>
+
+            <!-- Screen 2: Base URL -->
+            <div id="deforestation-screen-2" style="display:none;">
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div style="background:#f0f7ff;border:1px solid #bbdefb;border-radius:6px;padding:10px;font-size:0.83rem;color:#1565c0;">
+                        <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">check_circle</span>
+                        Authentication successful. Token saved.
+                    </div>
+                    <div>
+                        <label style="font-weight:600;display:block;margin-bottom:4px;">Base URL <span style="color:#c0392b;">*</span></label>
+                        <input type="text" id="deforestation-base-url" class="form-input" placeholder="https://your-base-url.com" style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div id="deforestation-error-2" style="color:#c0392b;font-size:0.85rem;display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="deforestation-baseurl-proceed-btn">
+                        <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">arrow_forward</span>
+                        Proceed
+                    </button>
+                </div>
+            </div>
+
+            <!-- Screen 3: API actions -->
+            <div id="deforestation-screen-3" style="display:none;flex:1;overflow-y:auto;">
+                <div style="display:flex;flex-direction:column;gap:16px;padding:4px 2px;">
+
+                    <!-- API 1: Generate Template -->
+                    <div style="border:1px solid #c8e6c9;border-radius:8px;padding:16px;background:#f9fff9;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#2e7d32;font-size:0.95rem;">Generate Template</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            GET /services/fileupload-service/api/bulk-downloads/template?feature=ONBOARD_FARMER_ASSET_FORM
+                        </div>
+                        <button class="btn-primary" id="deforestation-generate-btn">
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">description</span>
+                            Generate Template
+                        </button>
+                        <div id="deforestation-generate-status" style="margin-top:8px;font-size:0.82rem;color:#555;word-break:break-word;"></div>
+                    </div>
+
+                    <!-- API 2: Download Template -->
+                    <div style="border:1px solid #bbdefb;border-radius:8px;padding:16px;background:#f5f9ff;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#1565c0;font-size:0.95rem;">Download Template</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            GET /services/fileupload-service/api/bulk-downloads/mass-upload-template/{id}
+                        </div>
+                        <button class="btn-schedule" id="deforestation-dl-btn" disabled>
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">cloud_download</span>
+                            Download Template
+                        </button>
+                        <div id="deforestation-dl-status" style="margin-top:8px;font-size:0.82rem;color:#555;word-break:break-word;"></div>
+                    </div>
+
+                    <!-- API 3: Upload Template -->
+                    <div style="border:1px solid #ffe0b2;border-radius:8px;padding:16px;background:#fffaf5;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#e65100;font-size:0.95rem;">Upload Template</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            POST /services/fileupload-service/api/bulk-uploads/template
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px;">
+
+                            <!-- File picker -->
+                            <div>
+                                <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">File <span style="color:#c0392b;">*</span></label>
+                                <input type="file" id="deforestation-upload-file" accept=".xlsx,.xls,.csv" style="font-size:0.85rem;width:100%;">
+                            </div>
+
+                            <!-- Project ID -->
+                            <div>
+                                <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Project ID <span style="color:#c0392b;">*</span></label>
+                                <input type="text" id="deforestation-project-id" class="form-input" placeholder="Enter project ID" style="width:100%;box-sizing:border-box;">
+                            </div>
+
+                            <!-- Start & End Date -->
+                            <div style="display:flex;gap:10px;">
+                                <div style="flex:1;">
+                                    <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">Start Date <span id="deforestation-start-required" style="color:#c0392b;display:none;">*</span></label>
+                                    <input type="date" id="deforestation-start-date" class="form-input" style="width:100%;box-sizing:border-box;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:4px;">End Date <span id="deforestation-end-required" style="color:#c0392b;display:none;">*</span></label>
+                                    <input type="date" id="deforestation-end-date" class="form-input" style="width:100%;box-sizing:border-box;">
+                                </div>
+                            </div>
+
+                            <!-- Enable SUSTAINABILITY feature -->
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="checkbox" id="deforestation-sustainability" style="width:16px;height:16px;cursor:pointer;">
+                                <label for="deforestation-sustainability" style="font-size:0.85rem;font-weight:600;cursor:pointer;">Enable SUSTAINABILITY feature</label>
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" id="deforestation-upload-btn" style="background:#e65100;border-color:#e65100;">
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">upload_file</span>
+                            Upload Template
+                        </button>
+                        <div id="deforestation-upload-status" style="margin-top:8px;font-size:0.82rem;color:#555;word-break:break-word;"></div>
+                    </div>
+
+                    <!-- API 4: Process Template -->
+                    <div style="border:1px solid #e1bee7;border-radius:8px;padding:16px;background:#fdf5ff;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#6a1b9a;font-size:0.95rem;">Process Template</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            POST /services/fileupload-service/api/process-uploads/{uploadId}
+                        </div>
+                        <button class="btn-primary" id="deforestation-process-btn" style="background:#6a1b9a;border-color:#6a1b9a;" disabled>
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">play_circle</span>
+                            Proceed
+                        </button>
+                        <div id="deforestation-process-status" style="margin-top:8px;font-size:0.82rem;color:#555;word-break:break-word;"></div>
+                    </div>
+
+                    <!-- API 5: Upload Template Status -->
+                    <div style="border:1px solid #b2dfdb;border-radius:8px;padding:16px;background:#f5fffe;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#00695c;font-size:0.95rem;">Upload Template Status</div>
+                        <div style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            GET /services/fileupload-service/api/bulk-uploads/{uploadId}
+                        </div>
+                        <button class="btn-primary" id="deforestation-status-btn" style="background:#00695c;border-color:#00695c;" disabled>
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">refresh</span>
+                            Check Status
+                        </button>
+                        <div id="deforestation-status-response" style="display:none;margin-top:12px;">
+                            <div style="font-weight:600;font-size:0.82rem;color:#333;margin-bottom:6px;">Response:</div>
+                            <pre id="deforestation-status-json" style="background:#f4f4f4;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:0.78rem;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;margin:0;"></pre>
+                        </div>
+                        <div id="deforestation-status-error" style="margin-top:8px;font-size:0.82rem;color:#c0392b;display:none;"></div>
+                    </div>
+
+                    <div id="deforestation-error-3" style="color:#c0392b;font-size:0.85rem;display:none;"></div>
+                </div>
+            </div>
 
         </div>
     </div>

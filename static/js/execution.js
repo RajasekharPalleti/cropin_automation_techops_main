@@ -1003,6 +1003,298 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ----------------------------------------------------------------
+    // Deforestation modal — three-screen flow
+    // Screen 1: Auth (env + tenant + username + password → token fetched silently)
+    // Screen 2: Base URL
+    // Screen 3: API actions
+    // ----------------------------------------------------------------
+    let deforestToken        = null;
+    let deforestBaseUrl      = null;
+    let deforestTemplateId   = null;
+    let deforestTemplateName = null;
+    let deforestUploadId     = null;
+
+    const deforestBtn      = document.getElementById('open-deforestation-modal-btn');
+    const deforestModal    = document.getElementById('deforestation-modal');
+    const deforestClose    = document.getElementById('deforestation-modal-close');
+    const deforestScreen1  = document.getElementById('deforestation-screen-1');
+    const deforestScreen2  = document.getElementById('deforestation-screen-2');
+    const deforestScreen3  = document.getElementById('deforestation-screen-3');
+    const deforestError1   = document.getElementById('deforestation-error-1');
+    const deforestError2   = document.getElementById('deforestation-error-2');
+    const deforestError3   = document.getElementById('deforestation-error-3');
+    const deforestGenBtn   = document.getElementById('deforestation-generate-btn');
+    const deforestGenStatus = document.getElementById('deforestation-generate-status');
+    const deforestDlBtn    = document.getElementById('deforestation-dl-btn');
+    const deforestDlStatus = document.getElementById('deforestation-dl-status');
+    const deforestProcessBtn    = document.getElementById('deforestation-process-btn');
+    const deforestProcessStatus = document.getElementById('deforestation-process-status');
+    const deforestStatusBtn      = document.getElementById('deforestation-status-btn');
+    const deforestStatusResponse = document.getElementById('deforestation-status-response');
+    const deforestStatusJson     = document.getElementById('deforestation-status-json');
+    const deforestStatusError    = document.getElementById('deforestation-status-error');
+    const deforestUploadBtn    = document.getElementById('deforestation-upload-btn');
+    const deforestUploadStatus = document.getElementById('deforestation-upload-status');
+
+    function showDeforestScreen(n) {
+        deforestScreen1.style.display = n === 1 ? '' : 'none';
+        deforestScreen2.style.display = n === 2 ? '' : 'none';
+        deforestScreen3.style.display = n === 3 ? 'flex' : 'none';
+    }
+
+    function resetDeforestModal() {
+        showDeforestScreen(1);
+        deforestToken        = null;
+        deforestBaseUrl      = null;
+        deforestTemplateId   = null;
+        deforestTemplateName = null;
+        deforestUploadId     = null;
+        deforestError1.style.display = 'none';
+        deforestError2.style.display = 'none';
+        deforestError3.style.display = 'none';
+        deforestGenStatus.textContent    = '';
+        deforestDlStatus.textContent     = '';
+        deforestUploadStatus.textContent = '';
+        deforestProcessStatus.textContent = '';
+        deforestDlBtn.disabled      = true;
+        deforestProcessBtn.disabled = true;
+        deforestStatusBtn.disabled  = true;
+        deforestStatusResponse.style.display = 'none';
+        document.getElementById('deforestation-tenant').value   = '';
+        document.getElementById('deforestation-username').value = '';
+        document.getElementById('deforestation-password').value = '';
+        document.getElementById('deforestation-base-url').value = '';
+    }
+
+    deforestBtn.addEventListener('click', () => {
+        resetDeforestModal();
+        deforestModal.style.display = 'block';
+    });
+
+    deforestClose.addEventListener('click', () => {
+        deforestModal.style.display = 'none';
+    });
+
+    // Screen 1 → Auth API → Screen 2
+    const SSO_CONFIG = {
+        QA:   { base: 'https://v2sso-gcp.cropin.co.in',     extraParams: {} },
+        UAT:  { base: 'https://v2sso-uat-gcp.cropin.co.in', extraParams: {} },
+        PROD: { base: 'https://sso.sg.cropin.in',            extraParams: {} }
+    };
+
+    document.getElementById('deforestation-proceed-btn').addEventListener('click', async () => {
+        const env      = document.getElementById('deforestation-env').value;
+        const tenant   = document.getElementById('deforestation-tenant').value.trim();
+        const username = document.getElementById('deforestation-username').value.trim();
+        const password = document.getElementById('deforestation-password').value.trim();
+
+        deforestError1.style.display = 'none';
+        if (!tenant || !username || !password) {
+            deforestError1.textContent = 'Tenant Name, Username and Password are required.';
+            deforestError1.style.display = 'block';
+            return;
+        }
+
+        const proceedBtn = document.getElementById('deforestation-proceed-btn');
+        proceedBtn.disabled = true;
+        proceedBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Authenticating…';
+
+        try {
+            const { base: ssoBase, extraParams } = SSO_CONFIG[env];
+            const body = new URLSearchParams({
+                username,
+                password,
+                grant_type:    'password',
+                client_id:     'resource_server',
+                client_secret: 'resource_server',
+                ...extraParams
+            });
+            const res = await fetch(
+                `${ssoBase}/auth/realms/${encodeURIComponent(tenant)}/protocol/openid-connect/token`,
+                { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }
+            );
+            if (!res.ok) throw new Error(`Auth failed: ${res.status} ${res.statusText}`);
+            const data = await res.json();
+            if (!data.access_token) throw new Error('No access_token in response.');
+            deforestToken = data.access_token;
+            showDeforestScreen(2);
+        } catch (err) {
+            deforestError1.textContent = err.message;
+            deforestError1.style.display = 'block';
+        } finally {
+            proceedBtn.disabled = false;
+            proceedBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">lock_open</span> Authenticate & Proceed';
+        }
+    });
+
+    // Screen 2 → Screen 3
+    document.getElementById('deforestation-baseurl-proceed-btn').addEventListener('click', () => {
+        const url = document.getElementById('deforestation-base-url').value.trim().replace(/\/$/, '');
+        deforestError2.style.display = 'none';
+        if (!url) {
+            deforestError2.textContent = 'Base URL is required.';
+            deforestError2.style.display = 'block';
+            return;
+        }
+        deforestBaseUrl = url;
+        showDeforestScreen(3);
+    });
+
+    // Generate Template
+    deforestGenBtn.addEventListener('click', async () => {
+        deforestError3.style.display = 'none';
+        deforestGenBtn.disabled = true;
+        deforestGenStatus.textContent = 'Generating…';
+        try {
+            const res = await fetch(
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-downloads/template?feature=ONBOARD_FARMER_ASSET_FORM`,
+                { headers: { 'Authorization': `Bearer ${deforestToken}` } }
+            );
+            if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+            const data = await res.json();
+            deforestTemplateId   = data.id   ?? data.templateId   ?? data.data?.id;
+            deforestTemplateName = data.name  ?? data.templateName ?? data.data?.name;
+            if (!deforestTemplateId || !deforestTemplateName) throw new Error('Could not find id or name in the response.');
+            deforestGenStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; ID: <strong>${deforestTemplateId}</strong> &nbsp;|&nbsp; Name: <strong>${deforestTemplateName}</strong> saved.</span>`;
+            deforestDlBtn.disabled = false;
+            deforestDlStatus.textContent = '';
+        } catch (err) {
+            deforestGenStatus.textContent = '';
+            deforestError3.textContent = 'Generate Template: ' + err.message;
+            deforestError3.style.display = 'block';
+        } finally {
+            deforestGenBtn.disabled = false;
+        }
+    });
+
+    // Download Template
+    deforestDlBtn.addEventListener('click', async () => {
+        deforestError3.style.display = 'none';
+        deforestDlBtn.disabled = true;
+        deforestDlStatus.textContent = 'Downloading…';
+        try {
+            const res = await fetch(
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-downloads/mass-upload-template/${deforestTemplateId}`,
+                { headers: { 'Authorization': `Bearer ${deforestToken}` } }
+            );
+            if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+            const blob = await res.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = `${deforestTemplateName}.xlsx`; a.click();
+            URL.revokeObjectURL(url);
+            deforestDlStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Downloaded as <strong>${deforestTemplateName}.xlsx</strong></span>`;
+        } catch (err) {
+            deforestDlStatus.textContent = '';
+            deforestError3.textContent = 'Download Template: ' + err.message;
+            deforestError3.style.display = 'block';
+        } finally {
+            deforestDlBtn.disabled = false;
+        }
+    });
+
+    // Sustainability checkbox — toggle required markers on dates
+    document.getElementById('deforestation-sustainability').addEventListener('change', function () {
+        const show = this.checked ? 'inline' : 'none';
+        document.getElementById('deforestation-start-required').style.display = show;
+        document.getElementById('deforestation-end-required').style.display   = show;
+    });
+
+    // Upload Template
+    deforestUploadBtn.addEventListener('click', async () => {
+        const file           = document.getElementById('deforestation-upload-file').files[0];
+        const projectId      = document.getElementById('deforestation-project-id').value.trim();
+        const startDate      = document.getElementById('deforestation-start-date').value;
+        const endDate        = document.getElementById('deforestation-end-date').value;
+        const sustainability = document.getElementById('deforestation-sustainability').checked;
+
+        deforestError3.style.display = 'none';
+        if (!file)      { deforestError3.textContent = 'Please select a file.';   deforestError3.style.display = 'block'; return; }
+        if (!projectId) { deforestError3.textContent = 'Project ID is required.'; deforestError3.style.display = 'block'; return; }
+        if (sustainability && !startDate) { deforestError3.textContent = 'Start Date is required when SUSTAINABILITY is enabled.'; deforestError3.style.display = 'block'; return; }
+        if (sustainability && !endDate)   { deforestError3.textContent = 'End Date is required when SUSTAINABILITY is enabled.';   deforestError3.style.display = 'block'; return; }
+
+        const requestDto = {
+            projectId,
+            ...(sustainability && startDate && { startDate }),
+            ...(sustainability && endDate   && { endDate }),
+            ...(sustainability && { enableFeatures: ['SUSTAINABILITY'] })
+        };
+
+        const formData = new FormData();
+        formData.append('feature', 'ONBOARD_FARMER_ASSET_FORM');
+        formData.append('file', file);
+        formData.append('bulkUploadRequestDto', new Blob([JSON.stringify(requestDto)], { type: 'application/json' }));
+
+        deforestUploadBtn.disabled = true;
+        deforestUploadStatus.textContent = 'Uploading…';
+        try {
+            const res = await fetch(
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-uploads/template`,
+                { method: 'POST', headers: { 'Authorization': `Bearer ${deforestToken}` }, body: formData }
+            );
+            if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+            const data = await res.json();
+            deforestUploadId = data.id ?? data.uploadId ?? data.data?.id;
+            if (!deforestUploadId) throw new Error('Could not find id in the upload response.');
+            deforestUploadStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Upload ID: <strong>${deforestUploadId}</strong> saved.</span>`;
+            deforestProcessBtn.disabled = false;
+        } catch (err) {
+            deforestUploadStatus.textContent = '';
+            deforestError3.textContent = 'Upload Template: ' + err.message;
+            deforestError3.style.display = 'block';
+        } finally {
+            deforestUploadBtn.disabled = false;
+        }
+    });
+
+    // Process Template
+    deforestProcessBtn.addEventListener('click', async () => {
+        deforestError3.style.display = 'none';
+        deforestProcessBtn.disabled = true;
+        deforestProcessStatus.textContent = 'Processing…';
+        try {
+            const res = await fetch(
+                `${deforestBaseUrl}/services/fileupload-service/api/process-uploads/${deforestUploadId}`,
+                { method: 'POST', headers: { 'Authorization': `Bearer ${deforestToken}` } }
+            );
+            if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+            deforestProcessStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Process started successfully for Upload ID: <strong>${deforestUploadId}</strong></span>`;
+            deforestStatusBtn.disabled = false;
+        } catch (err) {
+            deforestProcessStatus.textContent = '';
+            deforestError3.textContent = 'Process Template: ' + err.message;
+            deforestError3.style.display = 'block';
+        } finally {
+            deforestProcessBtn.disabled = false;
+        }
+    });
+
+    // Upload Template Status
+    deforestStatusBtn.addEventListener('click', async () => {
+        deforestStatusError.style.display = 'none';
+        deforestStatusResponse.style.display = 'none';
+        deforestStatusBtn.disabled = true;
+        deforestStatusBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Checking…';
+        try {
+            const res = await fetch(
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-uploads/${deforestUploadId}`,
+                { headers: { 'Authorization': `Bearer ${deforestToken}` } }
+            );
+            if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+            const data = await res.json();
+            deforestStatusJson.textContent = JSON.stringify(data, null, 2);
+            deforestStatusResponse.style.display = 'block';
+        } catch (err) {
+            deforestStatusError.textContent = 'Upload Template Status: ' + err.message;
+            deforestStatusError.style.display = 'block';
+        } finally {
+            deforestStatusBtn.disabled = false;
+            deforestStatusBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">refresh</span> Check Status';
+        }
+    });
+
+    // ----------------------------------------------------------------
     // Expose to other modules
     // ----------------------------------------------------------------
     window.handleFile = handleFile;

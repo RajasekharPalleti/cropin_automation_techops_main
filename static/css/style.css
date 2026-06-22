@@ -383,6 +383,17 @@ body {
     border: 1px solid #6a1b9a;
 }
 
+.btn-deforestation {
+    border-color: #2e7d32;
+    color: #2e7d32;
+}
+
+.btn-deforestation:hover {
+    background: #2e7d32;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(46, 125, 50, 0.2);
+}
+
 .info-box {
     background: #f1f8e9;
     border: 1px solid #c5e1a5;
