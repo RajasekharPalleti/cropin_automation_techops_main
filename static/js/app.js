@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle('threading-config', selectedScript.show_threading);
             toggle('ca-close-delete-config', selectedScript.show_ca_close_delete);
             toggle('common-batch-config', selectedScript.show_batch_config);
+            toggle('valid-types-config', selectedScript.show_valid_types);
             // Update label/placeholder to reflect limit (actual enforcement is in execution.js)
             const batchSizeInput = document.getElementById('common-batch-size');
             const batchSizeLabel = document.querySelector('label[for="common-batch-size"]');

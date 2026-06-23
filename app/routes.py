@@ -450,7 +450,8 @@ async def list_scripts():
                 "show_coordinate_order": config.get("show_coordinate_order", False),
                 "show_batch_config": config.get("show_batch_config", False),
                 "unlimited_batch_size": config.get("unlimited_batch_size", False),
-                "show_time_delay": config.get("show_time_delay", True)
+                "show_time_delay": config.get("show_time_delay", True),
+                "show_valid_types": config.get("show_valid_types", False)
             })
 
     scripts.sort(key=lambda x: x["name"])

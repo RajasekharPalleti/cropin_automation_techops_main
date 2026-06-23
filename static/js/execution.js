@@ -499,6 +499,13 @@ document.addEventListener('DOMContentLoaded', () => {
             config.delay_time = isNaN(delayVal) || delayVal < 0 ? 1 : delayVal;
         }
 
+        // 13. Valid Types Config
+        const validTypesConfig = document.getElementById('valid-types-config');
+        if (validTypesConfig && validTypesConfig.style.display !== 'none') {
+            const vtVal = document.getElementById('valid-types-input')?.value;
+            if (vtVal) config.valid_types = vtVal;
+        }
+
         return config;
     }
 
