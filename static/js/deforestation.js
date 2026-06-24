@@ -29,7 +29,7 @@ let caBatchStopped   = false;
 
 // ── screen helpers ──
 function showScreen(id) {
-    ['screen-login', 'screen-baseurl', 'screen-ops'].forEach(s => {
+    ['screen-login', 'screen-ops'].forEach(s => {
         document.getElementById(s).classList.toggle('active', s === id);
     });
 }
@@ -75,9 +75,6 @@ function updateSessionBanner() {
         baseUrl = savedBaseUrl;
         updateSessionBanner();
         showScreen('screen-ops');
-    } else if (savedToken) {
-        token = savedToken;
-        showScreen('screen-baseurl');
     } else {
         showScreen('screen-login');
     }
@@ -160,9 +157,8 @@ async function doLogin() {
         const CONFIG_HOST = { QA: 'https://intl-v2.cropin.co.in', UAT: 'https://intl-v2uat.cropin.co.in' };
         try {
             if (env === 'PROD') {
-                const prodHost = 'https://cloud.cropin.in';
-                document.getElementById('base-url').value = prodHost;
-                localStorage.setItem(LS_BASEURL, prodHost);
+                baseUrl = 'https://cloud.cropin.in';
+                localStorage.setItem(LS_BASEURL, baseUrl);
             } else {
                 const cfgBase = CONFIG_HOST[env];
                 if (!cfgBase) throw new Error('no config host for env');
@@ -172,17 +168,17 @@ async function doLogin() {
                 if (cfgRes.ok) {
                     const cfg = await cfgRes.json();
                     if (cfg.appHost) {
-                        const appHost = cfg.appHost.replace(/\/$/, '');
-                        document.getElementById('base-url').value = appHost;
-                        localStorage.setItem(LS_BASEURL, appHost);
+                        baseUrl = cfg.appHost.replace(/\/$/, '');
+                        localStorage.setItem(LS_BASEURL, baseUrl);
                     }
                 }
             }
         } catch (_) {
-            // silently ignore — user can still enter base URL manually
+            // silently ignore
         }
 
-        showScreen('screen-baseurl');
+        updateSessionBanner();
+        showScreen('screen-ops');
     } catch (err) {
         errEl.textContent = err.message;
         errEl.style.display = 'block';
@@ -192,17 +188,6 @@ async function doLogin() {
     }
 }
 
-// ── BASE URL ──
-function doBaseUrl() {
-    const url   = document.getElementById('base-url').value.trim().replace(/\/$/, '');
-    const errEl = document.getElementById('baseurl-error');
-    errEl.style.display = 'none';
-    if (!url) { errEl.textContent = 'Base URL is required.'; errEl.style.display = 'block'; return; }
-    baseUrl = url;
-    localStorage.setItem(LS_BASEURL, baseUrl);
-    updateSessionBanner();
-    showScreen('screen-ops');
-}
 
 // ── LOGOUT ──
 function doLogout() {
