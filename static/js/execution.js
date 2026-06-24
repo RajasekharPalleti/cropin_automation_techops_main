@@ -1036,6 +1036,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deforestStatusResponse = document.getElementById('deforestation-status-response');
     const deforestStatusJson     = document.getElementById('deforestation-status-json');
     const deforestStatusError    = document.getElementById('deforestation-status-error');
+    const deforestFallbackBtn    = document.getElementById('deforestation-fallback-btn');
+    const deforestFallbackError  = document.getElementById('deforestation-fallback-error');
+    const deforestManualTemplateId      = document.getElementById('deforestation-manual-template-id');
+    const deforestManualUploadIdProcess = document.getElementById('deforestation-manual-upload-id-process');
+    const deforestManualUploadIdStatus  = document.getElementById('deforestation-manual-upload-id-status');
+    const deforestManualUploadIdFallback= document.getElementById('deforestation-manual-upload-id-fallback');
     const deforestUploadBtn    = document.getElementById('deforestation-upload-btn');
     const deforestUploadStatus = document.getElementById('deforestation-upload-status');
 
@@ -1061,13 +1067,32 @@ document.addEventListener('DOMContentLoaded', () => {
         deforestProcessStatus.textContent = '';
         deforestDlBtn.disabled      = true;
         deforestProcessBtn.disabled = true;
-        deforestStatusBtn.disabled  = true;
+        deforestStatusBtn.disabled    = true;
+        deforestFallbackBtn.disabled  = true;
         deforestStatusResponse.style.display = 'none';
         document.getElementById('deforestation-tenant').value   = '';
         document.getElementById('deforestation-username').value = '';
         document.getElementById('deforestation-password').value = '';
         document.getElementById('deforestation-base-url').value = '';
+        deforestManualTemplateId.value       = '';
+        deforestManualUploadIdProcess.value  = '';
+        deforestManualUploadIdStatus.value   = '';
+        deforestManualUploadIdFallback.value = '';
     }
+
+    // Enable buttons independently when a manual ID is typed
+    deforestManualTemplateId.addEventListener('input', () => {
+        if (deforestManualTemplateId.value.trim()) deforestDlBtn.disabled = false;
+    });
+    deforestManualUploadIdProcess.addEventListener('input', () => {
+        if (deforestManualUploadIdProcess.value.trim()) deforestProcessBtn.disabled = false;
+    });
+    deforestManualUploadIdStatus.addEventListener('input', () => {
+        if (deforestManualUploadIdStatus.value.trim()) deforestStatusBtn.disabled = false;
+    });
+    deforestManualUploadIdFallback.addEventListener('input', () => {
+        if (deforestManualUploadIdFallback.value.trim()) deforestFallbackBtn.disabled = false;
+    });
 
     deforestBtn.addEventListener('click', () => {
         resetDeforestModal();
@@ -1158,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deforestTemplateId   = data.id   ?? data.templateId   ?? data.data?.id;
             deforestTemplateName = data.name  ?? data.templateName ?? data.data?.name;
             if (!deforestTemplateId || !deforestTemplateName) throw new Error('Could not find id or name in the response.');
+            deforestManualTemplateId.value = deforestTemplateId;
             deforestGenStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; ID: <strong>${deforestTemplateId}</strong> &nbsp;|&nbsp; Name: <strong>${deforestTemplateName}</strong> saved.</span>`;
             deforestDlBtn.disabled = false;
             deforestDlStatus.textContent = '';
@@ -1172,21 +1198,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Download Template
     deforestDlBtn.addEventListener('click', async () => {
+        const templateId   = deforestManualTemplateId.value.trim() || deforestTemplateId;
+        const templateName = deforestTemplateName || templateId || 'template';
         deforestError3.style.display = 'none';
+        if (!templateId) { deforestError3.textContent = 'No Template ID available. Run Generate Template or enter one manually.'; deforestError3.style.display = 'block'; return; }
         deforestDlBtn.disabled = true;
         deforestDlStatus.textContent = 'Downloading…';
         try {
             const res = await fetch(
-                `${deforestBaseUrl}/services/fileupload-service/api/bulk-downloads/mass-upload-template/${deforestTemplateId}`,
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-downloads/mass-upload-template/${templateId}`,
                 { headers: { 'Authorization': `Bearer ${deforestToken}` } }
             );
             if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
             const blob = await res.blob();
             const url  = URL.createObjectURL(blob);
             const a    = document.createElement('a');
-            a.href = url; a.download = `${deforestTemplateName}.xlsx`; a.click();
+            a.href = url; a.download = `${templateName}.xlsx`; a.click();
             URL.revokeObjectURL(url);
-            deforestDlStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Downloaded as <strong>${deforestTemplateName}.xlsx</strong></span>`;
+            deforestDlStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Downloaded as <strong>${templateName}.xlsx</strong></span>`;
         } catch (err) {
             deforestDlStatus.textContent = '';
             deforestError3.textContent = 'Download Template: ' + err.message;
@@ -1240,6 +1269,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             deforestUploadId = data.id ?? data.uploadId ?? data.data?.id;
             if (!deforestUploadId) throw new Error('Could not find id in the upload response.');
+            deforestManualUploadIdProcess.value  = deforestUploadId;
+            deforestManualUploadIdStatus.value   = deforestUploadId;
+            deforestManualUploadIdFallback.value = deforestUploadId;
             deforestUploadStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Upload ID: <strong>${deforestUploadId}</strong> saved.</span>`;
             deforestProcessBtn.disabled = false;
         } catch (err) {
@@ -1253,16 +1285,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Process Template
     deforestProcessBtn.addEventListener('click', async () => {
+        const uploadId = deforestManualUploadIdProcess.value.trim() || deforestUploadId;
         deforestError3.style.display = 'none';
+        if (!uploadId) { deforestError3.textContent = 'No Upload ID available. Run Upload Template or enter one manually.'; deforestError3.style.display = 'block'; return; }
         deforestProcessBtn.disabled = true;
         deforestProcessStatus.textContent = 'Processing…';
         try {
             const res = await fetch(
-                `${deforestBaseUrl}/services/fileupload-service/api/process-uploads/${deforestUploadId}`,
+                `${deforestBaseUrl}/services/fileupload-service/api/process-uploads/${uploadId}`,
                 { method: 'POST', headers: { 'Authorization': `Bearer ${deforestToken}` } }
             );
             if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
-            deforestProcessStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Process started successfully for Upload ID: <strong>${deforestUploadId}</strong></span>`;
+            deforestProcessStatus.innerHTML = `<span style="color:#2e7d32;">&#10003; Process started successfully for Upload ID: <strong>${uploadId}</strong></span>`;
             deforestStatusBtn.disabled = false;
         } catch (err) {
             deforestProcessStatus.textContent = '';
@@ -1275,25 +1309,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Upload Template Status
     deforestStatusBtn.addEventListener('click', async () => {
+        const uploadId = deforestManualUploadIdStatus.value.trim() || deforestUploadId;
         deforestStatusError.style.display = 'none';
         deforestStatusResponse.style.display = 'none';
+        if (!uploadId) { deforestStatusError.textContent = 'No Upload ID available. Run Upload Template or enter one manually.'; deforestStatusError.style.display = 'block'; return; }
         deforestStatusBtn.disabled = true;
         deforestStatusBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Checking…';
         try {
             const res = await fetch(
-                `${deforestBaseUrl}/services/fileupload-service/api/bulk-uploads/${deforestUploadId}`,
+                `${deforestBaseUrl}/services/fileupload-service/api/bulk-uploads/${uploadId}`,
                 { headers: { 'Authorization': `Bearer ${deforestToken}` } }
             );
             if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
             const data = await res.json();
             deforestStatusJson.textContent = JSON.stringify(data, null, 2);
             deforestStatusResponse.style.display = 'block';
+            deforestFallbackBtn.disabled = false;
         } catch (err) {
             deforestStatusError.textContent = 'Upload Template Status: ' + err.message;
             deforestStatusError.style.display = 'block';
         } finally {
             deforestStatusBtn.disabled = false;
             deforestStatusBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">refresh</span> Check Status';
+        }
+    });
+
+    // Download Fallback Template
+    deforestFallbackBtn.addEventListener('click', async () => {
+        const uploadId = deforestManualUploadIdFallback.value.trim() || deforestUploadId;
+        deforestFallbackError.style.display = 'none';
+        if (!uploadId) { deforestFallbackError.textContent = 'No Upload ID available. Run Upload Template or enter one manually.'; deforestFallbackError.style.display = 'block'; return; }
+        deforestFallbackBtn.disabled = true;
+        deforestFallbackBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">hourglass_top</span> Downloading…';
+        try {
+            const res = await fetch('/api/deforestation/download-fallback-template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ baseUrl: deforestBaseUrl, token: deforestToken, uploadId })
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`API error: ${res.status} ${res.statusText} — ${errText}`);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fallback_OnboardFarmerAssetTemplate${uploadId}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            deforestFallbackError.textContent = 'Download Fallback Template: ' + err.message;
+            deforestFallbackError.style.display = 'block';
+        } finally {
+            deforestFallbackBtn.disabled = false;
+            deforestFallbackBtn.innerHTML = '<span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">download</span> Download Fallback Template';
         }
     });
 

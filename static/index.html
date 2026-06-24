@@ -384,9 +384,51 @@
                     <img src="/static/images/cropin_text.png" alt="Cropin"
                         style="height: 35px; vertical-align: middle; margin-right: 10px;">
                     <h1 style="display: inline; vertical-align: middle; color: #009ade;">TechOps Automation Console</h1>
-                    <button class="backup-btn" id="scheduled-list-btn"
-                        style="margin-right: 10px; background-color: #6a1b9a;">Scheduled List</button>
-                    <button class="backup-btn" id="backup-btn">Backup files</button>
+                    <!-- Operations dropdown -->
+                    <div id="tools-dropdown-wrapper" style="position:relative;margin-left:auto;">
+                        <button id="tools-dropdown-btn" onclick="toggleToolsMenu(event)" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#76be28;color:#fff;border:none;border-radius:7px;font-size:0.88rem;font-weight:600;cursor:pointer;transition:background .15s;box-shadow:0 2px 6px rgba(118,190,40,.35);">
+                            <span class="material-icons" style="font-size:1.1rem;">apps</span>
+                            Operations
+                            <span class="material-icons" style="font-size:1rem;margin-left:2px;" id="tools-chevron">expand_more</span>
+                        </button>
+                        <div id="tools-dropdown-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid #dde3ec;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.13);min-width:200px;z-index:9999;overflow:hidden;">
+                            <a href="/deforestation" style="display:flex;align-items:center;gap:10px;padding:11px 16px;text-decoration:none;color:#1a1a2e;font-size:0.88rem;font-weight:500;transition:background .12s;" onmouseover="this.style.background='#f0faf0'" onmouseout="this.style.background=''">
+                                <span class="material-icons" style="font-size:1.1rem;color:#2e7d32;">forest</span>
+                                Deforestation
+                            </a>
+                            <div style="height:1px;background:#eee;margin:0 12px;"></div>
+                            <button id="scheduled-list-btn" onclick="closeToolsMenu()" style="display:flex;align-items:center;gap:10px;padding:11px 16px;width:100%;background:none;border:none;color:#1a1a2e;font-size:0.88rem;font-weight:500;cursor:pointer;text-align:left;transition:background .12s;" onmouseover="this.style.background='#f5f0ff'" onmouseout="this.style.background=''">
+                                <span class="material-icons" style="font-size:1.1rem;color:#6a1b9a;">schedule</span>
+                                Scheduled List
+                            </button>
+                            <div style="height:1px;background:#eee;margin:0 12px;"></div>
+                            <button id="backup-btn" onclick="closeToolsMenu()" style="display:flex;align-items:center;gap:10px;padding:11px 16px;width:100%;background:none;border:none;color:#1a1a2e;font-size:0.88rem;font-weight:500;cursor:pointer;text-align:left;transition:background .12s;" onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''">
+                                <span class="material-icons" style="font-size:1.1rem;color:#1565c0;">backup</span>
+                                Backup Files
+                            </button>
+                        </div>
+                    </div>
+                    <script>
+                        function toggleToolsMenu(e) {
+                            e.stopPropagation();
+                            const menu = document.getElementById('tools-dropdown-menu');
+                            const btn  = document.getElementById('tools-dropdown-btn');
+                            const chevron = document.getElementById('tools-chevron');
+                            const open = menu.style.display === 'block';
+                            menu.style.display = open ? 'none' : 'block';
+                            chevron.textContent = open ? 'expand_more' : 'expand_less';
+                            btn.style.background = open ? '#76be28' : '#5da01e';
+                        }
+                        function closeToolsMenu() {
+                            document.getElementById('tools-dropdown-menu').style.display = 'none';
+                            document.getElementById('tools-chevron').textContent = 'expand_more';
+                        }
+                        document.addEventListener('click', function(e) {
+                            if (!document.getElementById('tools-dropdown-wrapper').contains(e.target)) {
+                                closeToolsMenu();
+                            }
+                        });
+                    </script>
                 </div>
             </div>
 
@@ -447,18 +489,11 @@
                         style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h2 style="margin: 0;"><span class="material-icons"
                                 style="vertical-align: middle;">cloud_upload</span> Upload & Run</h2>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <button id="open-deforestation-modal-btn" class="btn-schedule btn-deforestation">
-                                <span class="material-icons"
-                                    style="font-size:1rem;vertical-align:middle;margin-right:4px;">forest</span>
-                                Deforestation
-                            </button>
-                            <button id="open-schedule-modal-btn" class="btn-schedule" disabled>
-                                <span class="material-icons"
-                                    style="font-size: 1rem; vertical-align: middle; margin-right: 4px;">schedule</span>
-                                Schedule Run
-                            </button>
-                        </div>
+                        <button id="open-schedule-modal-btn" class="btn-schedule" disabled>
+                            <span class="material-icons"
+                                style="font-size: 1rem; vertical-align: middle; margin-right: 4px;">schedule</span>
+                            Schedule Run
+                        </button>
                     </div>
                     <label style="display:block; margin-bottom:10px; font-weight:500; color:#666;">Upload filled
                         Excel</label>
@@ -611,6 +646,12 @@
                             style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
                             GET /services/fileupload-service/api/bulk-downloads/mass-upload-template/{id}
                         </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Template ID:</label>
+                            <input type="text" id="deforestation-manual-template-id" class="form-input"
+                                placeholder="auto-filled · or enter manually"
+                                style="flex:1;font-size:0.83rem;box-sizing:border-box;">
+                        </div>
                         <button class="btn-schedule" id="deforestation-dl-btn" disabled>
                             <span class="material-icons"
                                 style="font-size:1rem;vertical-align:middle;margin-right:4px;">cloud_download</span>
@@ -695,6 +736,12 @@
                             style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
                             POST /services/fileupload-service/api/process-uploads/{uploadId}
                         </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Upload ID:</label>
+                            <input type="text" id="deforestation-manual-upload-id-process" class="form-input"
+                                placeholder="auto-filled · or enter manually"
+                                style="flex:1;font-size:0.83rem;box-sizing:border-box;">
+                        </div>
                         <button class="btn-primary" id="deforestation-process-btn"
                             style="background:#6a1b9a;border-color:#6a1b9a;" disabled>
                             <span class="material-icons"
@@ -713,6 +760,12 @@
                             style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
                             GET /services/fileupload-service/api/bulk-uploads/{uploadId}
                         </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Upload ID:</label>
+                            <input type="text" id="deforestation-manual-upload-id-status" class="form-input"
+                                placeholder="auto-filled · or enter manually"
+                                style="flex:1;font-size:0.83rem;box-sizing:border-box;">
+                        </div>
                         <button class="btn-primary" id="deforestation-status-btn"
                             style="background:#00695c;border-color:#00695c;" disabled>
                             <span class="material-icons"
@@ -725,6 +778,30 @@
                                 style="background:#f4f4f4;border:1px solid #ddd;border-radius:6px;padding:10px;font-size:0.78rem;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;margin:0;"></pre>
                         </div>
                         <div id="deforestation-status-error"
+                            style="margin-top:8px;font-size:0.82rem;color:#c0392b;display:none;"></div>
+                    </div>
+
+                    <!-- API 5b: Download Fallback Template -->
+                    <div style="border:1px solid #00695c;border-radius:8px;padding:16px;background:#e8f5e9;">
+                        <div style="font-weight:700;margin-bottom:6px;color:#00695c;font-size:0.95rem;">Download
+                            Fallback Template</div>
+                        <div
+                            style="font-size:0.75rem;color:#777;font-family:monospace;word-break:break-all;margin-bottom:12px;line-height:1.5;">
+                            GET /services/fileupload-service/api/bulk-downloads/mass-upload-fallback-template/{uploadId}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <label style="font-weight:600;font-size:0.85rem;white-space:nowrap;">Upload ID:</label>
+                            <input type="text" id="deforestation-manual-upload-id-fallback" class="form-input"
+                                placeholder="auto-filled · or enter manually"
+                                style="flex:1;font-size:0.83rem;box-sizing:border-box;">
+                        </div>
+                        <button class="btn-primary" id="deforestation-fallback-btn"
+                            style="background:#00695c;border-color:#00695c;" disabled>
+                            <span class="material-icons"
+                                style="font-size:1rem;vertical-align:middle;margin-right:4px;">download</span>
+                            Download Fallback Template
+                        </button>
+                        <div id="deforestation-fallback-error"
                             style="margin-top:8px;font-size:0.82rem;color:#c0392b;display:none;"></div>
                     </div>
 

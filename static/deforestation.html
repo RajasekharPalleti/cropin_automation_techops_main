@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deforestation — TechOps Automation Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="icon" href="/static/images/logo.png" type="image/png">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --primary-hover: #1b5e20;
+            --bg: #f4f6f9;
+            --surface: #ffffff;
+            --border: #dde3ec;
+            --text: #1a1a2e;
+            --muted: #6b7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* ── Top bar ── */
+        .topbar {
+            background: #1b2a3b;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            height: 54px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,.25);
+        }
+        .topbar-left { display: flex; align-items: center; gap: 10px; }
+        .topbar-title { font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .back-btn {
+            background: none; border: 1px solid rgba(255,255,255,.35); color: #fff;
+            border-radius: 6px; padding: 5px 12px; font-size: 0.83rem; cursor: pointer;
+            display: flex; align-items: center; gap: 4px; transition: background .15s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,.12); }
+        .logout-btn {
+            background: #c0392b; border: none; color: #fff;
+            border-radius: 6px; padding: 6px 14px; font-size: 0.83rem; cursor: pointer;
+            display: flex; align-items: center; gap: 4px; transition: background .15s;
+        }
+        .logout-btn:hover { background: #a93226; }
+
+        /* ── Session banner ── */
+        .session-banner {
+            background: #e8f5e9; border-bottom: 1px solid #c8e6c9;
+            padding: 8px 20px; font-size: 0.82rem; color: #2e7d32;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        /* ── Page wrapper ── */
+        .page { max-width: 860px; margin: 0 auto; padding: 28px 18px 60px; }
+
+        /* ── Cards / screens ── */
+        .card {
+            background: var(--surface); border-radius: 12px;
+            border: 1px solid var(--border); padding: 28px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        .card-title {
+            font-size: 1.05rem; font-weight: 700; margin-bottom: 20px;
+            display: flex; align-items: center; gap: 8px; color: #1b2a3b;
+        }
+
+        /* ── Form helpers ── */
+        label.field-label { font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 5px; }
+        .field-group { display: flex; flex-direction: column; gap: 14px; }
+        .field-row { display: flex; gap: 12px; }
+        .field-row > div { flex: 1; }
+        .form-input {
+            width: 100%; padding: 9px 12px; border: 1px solid #ccc; border-radius: 6px;
+            font-size: 0.88rem; font-family: inherit; background: #fff; color: #222;
+            transition: border-color .2s;
+        }
+        .form-input:focus { outline: none; border-color: #2e7d32; box-shadow: 0 0 0 2px rgba(46,125,50,.15); }
+        .form-input:disabled { background: #f5f5f5; color: #999; }
+        .req { color: #c0392b; }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; border-radius: 6px; border: none;
+            font-size: 0.88rem; font-weight: 500; cursor: pointer;
+            font-family: inherit; transition: background .15s, transform .1s, box-shadow .15s;
+        }
+        .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+        .btn-green  { background: #2e7d32; color: #fff; }
+        .btn-green:hover:not(:disabled)  { background: #1b5e20; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(46,125,50,.25); }
+        .btn-blue   { background: #1565c0; color: #fff; }
+        .btn-blue:hover:not(:disabled)   { background: #0d47a1; transform: translateY(-1px); }
+        .btn-outline-blue { background: #fff; border: 1px solid #1565c0; color: #1565c0; }
+        .btn-outline-blue:hover:not(:disabled) { background: #1565c0; color: #fff; transform: translateY(-1px); }
+        .btn-orange { background: #e65100; color: #fff; }
+        .btn-orange:hover:not(:disabled) { background: #bf360c; transform: translateY(-1px); }
+        .btn-purple { background: #6a1b9a; color: #fff; }
+        .btn-purple:hover:not(:disabled) { background: #4a148c; transform: translateY(-1px); }
+        .btn-teal   { background: #00695c; color: #fff; }
+        .btn-teal:hover:not(:disabled)   { background: #004d40; transform: translateY(-1px); }
+        .btn-slate  { background: #37474f; color: #fff; }
+        .btn-slate:hover:not(:disabled)  { background: #263238; transform: translateY(-1px); }
+        .btn-indigo { background: #283593; color: #fff; }
+        .btn-indigo:hover:not(:disabled) { background: #1a237e; transform: translateY(-1px); }
+        .btn-red    { background: #c0392b; color: #fff; }
+        .btn-red:hover:not(:disabled)    { background: #a93226; transform: translateY(-1px); }
+
+        /* ── API section cards ── */
+        .api-section {
+            border-radius: 8px; padding: 16px; margin-bottom: 0;
+        }
+        .api-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+        .api-path  { font-size: 0.73rem; color: #888; font-family: monospace; word-break: break-all; margin-bottom: 12px; line-height: 1.5; }
+        .api-grid  { display: flex; flex-direction: column; gap: 14px; }
+
+        /* ── inline id row ── */
+        .id-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .id-row label { font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
+        .id-row .form-input { flex: 1; font-size: 0.83rem; }
+
+        /* ── status / error ── */
+        .status-msg { margin-top: 8px; font-size: 0.82rem; color: #555; word-break: break-word; }
+        .error-msg  { margin-top: 8px; font-size: 0.82rem; color: #c0392b; }
+        .success-banner {
+            background: #f0f7ff; border: 1px solid #bbdefb; border-radius: 6px;
+            padding: 10px 14px; font-size: 0.83rem; color: #1565c0;
+            display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+        }
+
+        /* ── JSON response box ── */
+        .json-box {
+            background: #f4f4f4; border: 1px solid #ddd; border-radius: 6px;
+            padding: 10px; font-size: 0.78rem; overflow-x: auto;
+            white-space: pre-wrap; word-break: break-word;
+            max-height: 220px; overflow-y: auto; margin: 10px 0 0; font-family: monospace;
+        }
+
+        /* ── terminal ── */
+        .terminal {
+            background: #1e1e1e; border-radius: 6px; padding: 12px;
+            font-family: monospace; font-size: 0.78rem; color: #d4d4d4;
+            max-height: 280px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-word;
+            border: 1px solid #333; margin-top: 12px;
+        }
+
+        /* ── divider ── */
+        .api-divider { border: none; border-top: 1px solid #e8ecf1; margin: 4px 0; }
+
+        /* ── section wrapper ── */
+        .ops-grid { display: flex; flex-direction: column; gap: 20px; }
+
+        /* ── Parent section (e.g. Onboarding Bulk Data, Deforestation APIs) ── */
+        .parent-section {
+            border: 2px solid #1565c0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--surface);
+            box-shadow: 0 3px 12px rgba(0,0,0,.08);
+        }
+        .parent-section-header {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+            color: #fff;
+            padding: 13px 20px;
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: .01em;
+        }
+        .parent-section-body {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        /* ── Sub-section (Download / Upload) ── */
+        .sub-section {
+            border: 1px solid #dde3ec;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fafbfc;
+        }
+        .sub-section-header {
+            background: #eceff1;
+            color: #37474f;
+            padding: 9px 16px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #dde3ec;
+        }
+        .sub-section-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 14px;
+        }
+
+        /* ── API card inside a section ── */
+        .api-section {
+            background: #fff;
+            border-radius: 7px;
+            padding: 14px 16px;
+            border: 1px solid #e8ecf1;
+        }
+
+        /* screen visibility */
+        .screen { display: none; }
+        .screen.active { display: block; }
+    </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="back-btn" onclick="window.location.href='/'">
+            <span class="material-icons" style="font-size:1rem;">arrow_back</span> Back
+        </button>
+        <div class="topbar-title">
+            <span class="material-icons" style="color:#4caf50;">forest</span>
+            Deforestation
+        </div>
+    </div>
+    <button class="logout-btn" id="logout-btn" style="display:none;" onclick="doLogout()">
+        <span class="material-icons" style="font-size:1rem;">logout</span> Logout
+    </button>
+</div>
+
+<!-- Session banner (shown when logged in) -->
+<div class="session-banner" id="session-banner" style="display:none;">
+    <span class="material-icons" style="font-size:1rem;">verified_user</span>
+    <span id="session-info-text">Session active</span>
+</div>
+
+<div class="page">
+
+    <!-- ── SCREEN 1: Login ── -->
+    <div class="screen active" id="screen-login">
+        <div class="card" style="max-width:480px;margin:0 auto;">
+            <div class="card-title">
+                <span class="material-icons" style="color:#2e7d32;">lock_open</span>
+                Login
+            </div>
+            <div class="field-group">
+                <div>
+                    <label class="field-label">Environment <span class="req">*</span></label>
+                    <select id="env" class="form-input">
+                        <option value="QA">QA</option>
+                        <option value="UAT">UAT</option>
+                        <option value="PROD">PROD</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label">Tenant Name <span class="req">*</span></label>
+                    <input type="text" id="tenant" class="form-input" placeholder="Enter tenant name">
+                </div>
+                <div>
+                    <label class="field-label">Username <span class="req">*</span></label>
+                    <input type="text" id="username" class="form-input" placeholder="Enter username">
+                </div>
+                <div>
+                    <label class="field-label">Password <span class="req">*</span></label>
+                    <input type="password" id="password" class="form-input" placeholder="Enter password">
+                </div>
+                <div id="login-error" class="error-msg" style="display:none;"></div>
+                <button class="btn btn-green" id="login-btn" onclick="doLogin()" style="margin-top:4px;">
+                    <span class="material-icons" style="font-size:1rem;">lock_open</span>
+                    Authenticate & Proceed
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SCREEN 2: Base URL ── -->
+    <div class="screen" id="screen-baseurl">
+        <div class="card" style="max-width:480px;margin:0 auto;">
+            <div class="card-title">
+                <span class="material-icons" style="color:#1565c0;">link</span>
+                Base URL
+            </div>
+            <div class="success-banner">
+                <span class="material-icons" style="font-size:1rem;">check_circle</span>
+                Authentication successful. Token saved.
+            </div>
+            <div class="field-group" style="margin-top:14px;">
+                <div>
+                    <label class="field-label">Base URL <span class="req">*</span></label>
+                    <input type="text" id="base-url" class="form-input" placeholder="https://your-base-url.com">
+                </div>
+                <div id="baseurl-error" class="error-msg" style="display:none;"></div>
+                <button class="btn btn-blue" id="baseurl-btn" onclick="doBaseUrl()">
+                    <span class="material-icons" style="font-size:1rem;">arrow_forward</span>
+                    Proceed
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SCREEN 3: Operations ── -->
+    <div class="screen" id="screen-ops">
+        <div class="ops-grid">
+
+            <!-- ════════════════════════════════════════════════════
+                 PARENT: Onboarding Bulk Data
+                 ════════════════════════════════════════════════════ -->
+            <div class="parent-section">
+                <div class="parent-section-header">
+                    <span class="material-icons" style="font-size:1.2rem;">group_add</span>
+                    Onboarding Bulk Data
+                </div>
+                <div class="parent-section-body">
+
+                    <!-- ── Download sub-section ── -->
+                    <div class="sub-section">
+                        <div class="sub-section-header">
+                            <span class="material-icons" style="font-size:1rem;">cloud_download</span>
+                            Download
+                        </div>
+                        <div class="sub-section-body">
+
+                            <!-- API 1: Generate Template -->
+                            <div class="api-section" style="border-left:4px solid #2e7d32;">
+                                <div class="api-title" style="color:#2e7d32;">Generate Template</div>
+                                <div class="api-path">GET /services/fileupload-service/api/bulk-downloads/template?feature=ONBOARD_FARMER_ASSET_FORM</div>
+                                <button class="btn btn-green" id="gen-btn" onclick="doGenerate()">
+                                    <span class="material-icons" style="font-size:1rem;">description</span>
+                                    Generate Template
+                                </button>
+                                <div id="gen-status" class="status-msg"></div>
+                                <div id="gen-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                            <!-- API 2: Download Template -->
+                            <div class="api-section" style="border-left:4px solid #1565c0;">
+                                <div class="api-title" style="color:#1565c0;">Download Template</div>
+                                <div class="api-path">GET /services/fileupload-service/api/bulk-downloads/mass-upload-template/{id}</div>
+                                <div class="id-row">
+                                    <label>Template ID:</label>
+                                    <input type="text" id="manual-template-id" class="form-input" placeholder="auto-filled · or enter manually">
+                                </div>
+                                <button class="btn btn-outline-blue" id="dl-btn" onclick="doDownloadTemplate()" disabled>
+                                    <span class="material-icons" style="font-size:1rem;">cloud_download</span>
+                                    Download Template
+                                </button>
+                                <div id="dl-status" class="status-msg"></div>
+                                <div id="dl-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                        </div><!-- /sub-section-body Download -->
+                    </div><!-- /sub-section Download -->
+
+                    <!-- ── Upload sub-section ── -->
+                    <div class="sub-section">
+                        <div class="sub-section-header">
+                            <span class="material-icons" style="font-size:1rem;">upload_file</span>
+                            Upload
+                        </div>
+                        <div class="sub-section-body">
+
+                            <!-- API 3: Upload Template -->
+                            <div class="api-section" style="border-left:4px solid #e65100;">
+                                <div class="api-title" style="color:#e65100;">Upload Template</div>
+                                <div class="api-path">POST /services/fileupload-service/api/bulk-uploads/template</div>
+                                <div class="api-grid">
+                                    <div>
+                                        <label class="field-label">File <span class="req">*</span></label>
+                                        <input type="file" id="upload-file" accept=".xlsx,.xls,.csv" style="font-size:0.85rem;width:100%;">
+                                    </div>
+                                    <div>
+                                        <label class="field-label">Project <span class="req">*</span></label>
+                                        <input type="hidden" id="project-id">
+                                        <div id="project-dropdown-wrapper" style="position:relative;">
+                                            <!-- display trigger -->
+                                            <div id="project-display" onclick="toggleProjectDropdown()" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:0.88rem;min-height:38px;transition:border-color .2s;user-select:none;">
+                                                <span id="project-display-text" style="color:#999;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Select a project…</span>
+                                                <span class="material-icons" id="project-chevron" style="font-size:1.1rem;color:#666;flex-shrink:0;margin-left:6px;">expand_more</span>
+                                            </div>
+                                            <!-- dropdown panel -->
+                                            <div id="project-dropdown-panel" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.13);z-index:999;">
+                                                <!-- search -->
+                                                <div style="padding:10px 10px 6px;">
+                                                    <div style="display:flex;align-items:center;gap:6px;border:1px solid #ddd;border-radius:6px;padding:6px 10px;background:#f9f9f9;">
+                                                        <span class="material-icons" style="font-size:1rem;color:#888;">search</span>
+                                                        <input type="text" id="project-search" placeholder="Search by name…" oninput="filterProjects(this.value)" style="border:none;outline:none;background:transparent;font-size:0.85rem;width:100%;font-family:inherit;">
+                                                    </div>
+                                                </div>
+                                                <!-- list -->
+                                                <div id="project-list" style="max-height:220px;overflow-y:auto;padding:4px 0;"></div>
+                                                <!-- pagination -->
+                                                <div id="project-pagination" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid #eee;font-size:0.82rem;color:#555;">
+                                                    <button id="proj-prev-btn" onclick="projectPrevPage()" style="display:flex;align-items:center;gap:3px;padding:4px 10px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-size:0.8rem;" disabled>
+                                                        <span class="material-icons" style="font-size:0.9rem;">chevron_left</span> Prev
+                                                    </button>
+                                                    <span id="proj-page-info" style="font-weight:500;">Page 1</span>
+                                                    <button id="proj-next-btn" onclick="projectNextPage()" style="display:flex;align-items:center;gap:3px;padding:4px 10px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-size:0.8rem;">
+                                                        Next <span class="material-icons" style="font-size:0.9rem;">chevron_right</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="field-row">
+                                        <div>
+                                            <label class="field-label">Start Date <span id="start-req" style="color:#c0392b;display:none;">*</span></label>
+                                            <input type="date" id="start-date" class="form-input">
+                                        </div>
+                                        <div>
+                                            <label class="field-label">End Date <span id="end-req" style="color:#c0392b;display:none;">*</span></label>
+                                            <input type="date" id="end-date" class="form-input">
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <input type="checkbox" id="sustainability" style="width:16px;height:16px;cursor:pointer;">
+                                        <label for="sustainability" style="font-size:0.85rem;font-weight:600;cursor:pointer;">Enable SUSTAINABILITY feature</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-orange" id="upload-btn" onclick="doUpload()" style="margin-top:14px;">
+                                    <span class="material-icons" style="font-size:1rem;">upload_file</span>
+                                    Upload Template
+                                </button>
+                                <div id="upload-status" class="status-msg"></div>
+                                <div id="upload-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                            <!-- API 4: Process Template -->
+                            <div class="api-section" style="border-left:4px solid #6a1b9a;">
+                                <div class="api-title" style="color:#6a1b9a;">Process Template</div>
+                                <div class="api-path">POST /services/fileupload-service/api/process-uploads/{uploadId}</div>
+                                <div class="id-row">
+                                    <label>Upload ID:</label>
+                                    <input type="text" id="manual-upload-id-process" class="form-input" placeholder="auto-filled · or enter manually">
+                                </div>
+                                <button class="btn btn-purple" id="process-btn" onclick="doProcess()" disabled>
+                                    <span class="material-icons" style="font-size:1rem;">play_circle</span>
+                                    Proceed
+                                </button>
+                                <div id="process-status" class="status-msg"></div>
+                                <div id="process-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                            <!-- API 5: Upload Template Status -->
+                            <div class="api-section" style="border-left:4px solid #00695c;">
+                                <div class="api-title" style="color:#00695c;">Upload Template Status</div>
+                                <div class="api-path">GET /services/fileupload-service/api/bulk-uploads/{uploadId}</div>
+                                <div class="id-row">
+                                    <label>Upload ID:</label>
+                                    <input type="text" id="manual-upload-id-status" class="form-input" placeholder="auto-filled · or enter manually">
+                                </div>
+                                <button class="btn btn-teal" id="status-btn" onclick="doStatus()" disabled>
+                                    <span class="material-icons" style="font-size:1rem;">refresh</span>
+                                    Check Status
+                                </button>
+                                <div id="status-response" style="display:none;">
+                                    <div style="font-weight:600;font-size:0.82rem;color:#333;margin-top:10px;margin-bottom:4px;">Response:</div>
+                                    <pre id="status-json" class="json-box"></pre>
+                                </div>
+                                <div id="status-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                            <!-- API 5b: Download Fallback Template -->
+                            <div class="api-section" style="border-left:4px solid #00796b;background:#e8f5e9;">
+                                <div class="api-title" style="color:#00695c;">Download Fallback Template</div>
+                                <div class="api-path">GET /services/fileupload-service/api/bulk-downloads/mass-upload-fallback-template/{uploadId}</div>
+                                <div class="id-row">
+                                    <label>Upload ID:</label>
+                                    <input type="text" id="manual-upload-id-fallback" class="form-input" placeholder="auto-filled · or enter manually">
+                                </div>
+                                <button class="btn btn-teal" id="fallback-btn" onclick="doFallback()" disabled>
+                                    <span class="material-icons" style="font-size:1rem;">download</span>
+                                    Download Fallback Template
+                                </button>
+                                <div id="fallback-error" class="error-msg" style="display:none;"></div>
+                            </div>
+
+                        </div><!-- /sub-section-body Upload -->
+                    </div><!-- /sub-section Upload -->
+
+                </div><!-- /parent-section-body -->
+            </div><!-- /parent Onboarding Bulk Data -->
+
+            <!-- ════════════════════════════════════════════════════
+                 PARENT: Deforestation APIs
+                 ════════════════════════════════════════════════════ -->
+            <div class="parent-section">
+                <div class="parent-section-header" style="background:linear-gradient(135deg,#37474f,#263238);border-color:#37474f;">
+                    <span class="material-icons" style="font-size:1.2rem;color:#80cbc4;">forest</span>
+                    Deforestation APIs
+                </div>
+                <div class="parent-section-body">
+
+                    <!-- API 6: Publish Deforestation -->
+                    <div class="api-section" style="border-left:4px solid #546e7a;">
+                        <div class="api-title" style="color:#37474f;">Publish Deforestation</div>
+                        <div class="api-path">POST /services/farm/api/deforestation/publish-status?srPlotId={srPlotId}</div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <label class="field-label" style="white-space:nowrap;margin-bottom:0;">Upload Excel:</label>
+                            <input type="file" id="publish-file" accept=".xlsx,.xls,.csv" style="display:none;">
+                            <button class="btn btn-slate" style="padding:6px 14px;font-size:0.82rem;" onclick="document.getElementById('publish-file').click()">
+                                <span class="material-icons" style="font-size:0.95rem;">table_chart</span>
+                                Choose Excel
+                            </button>
+                            <span id="publish-filename" style="font-size:0.8rem;color:#555;font-style:italic;">No file chosen</span>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button class="btn btn-slate" id="publish-btn" onclick="doPublish()" disabled>
+                                <span class="material-icons" style="font-size:1rem;">publish</span>
+                                Publish Deforestation
+                            </button>
+                            <button class="btn btn-red" id="publish-stop-btn" onclick="publishStop()" style="display:none;">
+                                <span class="material-icons" style="font-size:1rem;">stop_circle</span>
+                                Stop
+                            </button>
+                        </div>
+                        <div id="publish-terminal" class="terminal" style="display:none;"></div>
+                    </div>
+
+                    <!-- API 7: Enable Sustainability -->
+                    <div class="api-section" style="border-left:4px solid #283593;">
+                        <div class="api-title" style="color:#283593;">
+                            <span class="material-icons" style="font-size:1rem;vertical-align:middle;margin-right:4px;">eco</span>
+                            Enable Sustainability
+                        </div>
+                        <div class="api-path">POST /services/farm/api/croppable-areas/sustainability/v2/batch?features=SUSTAINABILITY</div>
+                        <div class="field-row" style="margin-bottom:12px;">
+                            <div>
+                                <label class="field-label">Start Date <span class="req">*</span></label>
+                                <input type="date" id="ca-start-date" class="form-input">
+                            </div>
+                            <div>
+                                <label class="field-label">End Date <span class="req">*</span></label>
+                                <input type="date" id="ca-end-date" class="form-input">
+                            </div>
+                        </div>
+                        <div class="field-row" style="margin-bottom:12px;">
+                            <div>
+                                <label class="field-label">Batch Size <span class="req">*</span></label>
+                                <input type="number" id="ca-batch-size" class="form-input" value="10" min="1" max="500" placeholder="e.g. 10">
+                            </div>
+                            <div>
+                                <label class="field-label">Sleep Between Batches (seconds) <span class="req">*</span></label>
+                                <input type="number" id="ca-sleep-secs" class="form-input" value="2" min="0" max="300" step="0.5" placeholder="e.g. 2">
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                            <label class="field-label" style="white-space:nowrap;margin-bottom:0;">Upload Excel:</label>
+                            <input type="file" id="ca-file" accept=".xlsx,.xls,.csv" style="display:none;">
+                            <button class="btn btn-indigo" style="padding:6px 14px;font-size:0.82rem;" onclick="document.getElementById('ca-file').click()">
+                                <span class="material-icons" style="font-size:0.95rem;">table_chart</span>
+                                Choose Excel
+                            </button>
+                            <span id="ca-filename" style="font-size:0.8rem;color:#555;font-style:italic;">No file chosen</span>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <button class="btn btn-indigo" id="ca-run-btn" onclick="doCaBatch()" disabled>
+                                <span class="material-icons" style="font-size:1rem;">eco</span>
+                                Run Batch
+                            </button>
+                            <button class="btn btn-red" id="ca-stop-btn" onclick="caStop()" style="display:none;">
+                                <span class="material-icons" style="font-size:1rem;">stop_circle</span>
+                                Stop
+                            </button>
+                        </div>
+                        <div id="ca-terminal" class="terminal" style="display:none;"></div>
+                    </div>
+
+                </div><!-- /parent-section-body Deforestation -->
+            </div><!-- /parent Deforestation APIs -->
+
+        </div><!-- /ops-grid -->
+    </div><!-- /screen-ops -->
+
+</div><!-- /page -->
+
+<script src="/static/js/deforestation.js"></script>
+</body>
+</html>

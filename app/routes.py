@@ -970,6 +970,33 @@ async def deforestation_generate_template(body: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/api/deforestation/download-fallback-template")
+async def deforestation_download_fallback_template(body: dict = Body(...)):
+    base_url  = body.get("baseUrl", "").rstrip("/")
+    token     = body.get("token", "")
+    upload_id = body.get("uploadId", "")
+    url = f"{base_url}/services/fileupload-service/api/bulk-downloads/mass-upload-fallback-template/{upload_id}"
+    try:
+        resp = ext_requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60, stream=True)
+        resp.raise_for_status()
+
+        def iter_content():
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    yield chunk
+
+        filename = f"fallback_OnboardFarmerAssetTemplate{upload_id}.xlsx"
+        return StreamingResponse(
+            iter_content(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except ext_requests.exceptions.HTTPError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/deforestation/download-template")
 async def deforestation_download_template(body: dict = Body(...)):
     base_url  = body.get("baseUrl", "").rstrip("/")
@@ -1001,6 +1028,12 @@ async def deforestation_download_template(body: dict = Body(...)):
 # ---------------------------------------------------------------------------
 # Static / root
 # ---------------------------------------------------------------------------
+
+@router.get("/deforestation")
+async def deforestation_page():
+    """Serve the standalone deforestation page."""
+    return FileResponse("static/deforestation.html")
+
 
 @router.get("/")
 async def read_root():
