@@ -458,7 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (selectedScript && selectedScript.requires_input !== false) {
                 if (!window.currentUploadedFilename) {
-                    window.showToast('No file uploaded', 'error');
+                    window.showToast('No file uploaded. Debug: ' + JSON.stringify({
+                        val: window.currentUploadedFilename,
+                        hasProp: window.hasOwnProperty('currentUploadedFilename')
+                    }), 'error');
                     return;
                 }
             }

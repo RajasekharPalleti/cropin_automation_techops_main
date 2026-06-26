@@ -214,12 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(r => r.json())
             .then(data => {
                 currentUploadedFilename = data.filename;
+                window.currentUploadedFilename = data.filename; // Force global
                 statusArea.innerHTML = '<div style="color: green;">Uploaded: ' + file.name + '</div>';
                 if (runContainer) runContainer.style.display = 'flex';
                 if (dropText) dropText.innerHTML = `<strong>${file.name}</strong><p style="color: green;">✅ Uploaded Successfully</p>`;
                 checkScheduleEligibility();
             })
             .catch(err => {
+                currentUploadedFilename = null;
+                window.currentUploadedFilename = null;
                 statusArea.innerHTML = '<div style="color: red;">Upload Failed: ' + err.message + '</div>';
                 if (dropText) dropText.innerHTML = `<strong>${file.name}</strong><p style="color: red;">❌ Upload Failed</p>`;
                 checkScheduleEligibility();
@@ -232,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const openScheduleModalBtn = document.getElementById('open-schedule-modal-btn');
 
     function checkScheduleEligibility() {
-        const tenant = document.getElementById('tenant-code')?.value;
+        const tenant = document.getElementById('tenant')?.value;
         const username = document.getElementById('username')?.value;
         const password = document.getElementById('password')?.value;
         const scriptSelected = document.getElementById('script-select')?.value;

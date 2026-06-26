@@ -320,13 +320,17 @@ SCRIPT_CONFIGS = {
         "label": "Update Declared Area API",
         "requires_input": True,
     },
+    "Update_Farmer_Declared_Area.py": {
+        "base_api_url": "https://cloud.cropin.in/services/farm/api/farmers",
+        "label": "Update Declared Area API",
+        "requires_input": True,
+    },
     "Add_Crop_Application_Master_data.py": {
         "base_api_url": "https://cloud.cropin.in/services/farm/api/cropApplicationMaster",
         "label": "Post API URL",
         "second_base_api_url": "https://cloud.cropin.in/services/master/api/cropApplicationMaster/list",
         "label2": "List API URL",
         "requires_input": True,
-        "show_time_delay": True,
         "show_valid_types": True
     },
     "Add_CA_to_Project.py": {
@@ -334,8 +338,7 @@ SCRIPT_CONFIGS = {
         "label": "Base Api Url",
         "requires_input": True,
         "show_threading": True,
-        "show_batch_config": True,
-        "show_time_delay": True
+        "show_batch_config": True
     },
 }
 

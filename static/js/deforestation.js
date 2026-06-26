@@ -27,6 +27,12 @@ let publishStopped   = false;
 let caBatchIds       = null;
 let caBatchStopped   = false;
 
+let projectPage      = 0;
+let projectLastPage  = false;
+let projectAllItems  = [];
+let projectFiltered  = [];
+let projectDropOpen  = false;
+
 // ── screen helpers ──
 function showScreen(id) {
     ['screen-login', 'screen-ops'].forEach(s => {
@@ -58,10 +64,9 @@ function updateSessionBanner() {
     const savedTenant  = localStorage.getItem(LS_TENANT);
     const savedEnv     = localStorage.getItem(LS_ENV);
 
-    // Pre-fill login fields from cache regardless of session state
+    // Pre-fill login fields from cache
     if (savedTenant) document.getElementById('tenant').value = savedTenant;
     if (savedEnv)    document.getElementById('env').value    = savedEnv;
-    if (savedBaseUrl) document.getElementById('base-url').value = savedBaseUrl;
     const savedProjectId = localStorage.getItem(LS_PROJECT_ID);
     if (savedProjectId) {
         document.getElementById('project-id').value = savedProjectId;
@@ -70,9 +75,10 @@ function updateSessionBanner() {
         document.getElementById('project-display').style.borderColor = '#2e7d32';
     }
 
-    if (savedToken && savedBaseUrl) {
+    // Restore session if token exists — only a 401 from an API should force re-login
+    if (savedToken) {
         token   = savedToken;
-        baseUrl = savedBaseUrl;
+        baseUrl = savedBaseUrl || '';
         updateSessionBanner();
         showScreen('screen-ops');
     } else {
@@ -155,10 +161,10 @@ async function doLogin() {
 
         // Auto-fetch/set appHost from tenant config
         const CONFIG_HOST = { QA: 'https://intl-v2.cropin.co.in', UAT: 'https://intl-v2uat.cropin.co.in' };
+        const FALLBACK_HOST = { QA: 'https://au-v2-gcp.cropin.co.in', UAT: 'https://au-v2uat-gcp.cropin.co.in', PROD: 'https://cloud.cropin.in' };
         try {
             if (env === 'PROD') {
                 baseUrl = 'https://cloud.cropin.in';
-                localStorage.setItem(LS_BASEURL, baseUrl);
             } else {
                 const cfgBase = CONFIG_HOST[env];
                 if (!cfgBase) throw new Error('no config host for env');
@@ -169,13 +175,15 @@ async function doLogin() {
                     const cfg = await cfgRes.json();
                     if (cfg.appHost) {
                         baseUrl = cfg.appHost.replace(/\/$/, '');
-                        localStorage.setItem(LS_BASEURL, baseUrl);
                     }
                 }
             }
         } catch (_) {
             // silently ignore
         }
+        // Always ensure baseUrl is set — fall back to a sensible default if auto-fetch failed
+        if (!baseUrl) baseUrl = FALLBACK_HOST[env] || FALLBACK_HOST.QA;
+        localStorage.setItem(LS_BASEURL, baseUrl);
 
         updateSessionBanner();
         showScreen('screen-ops');
@@ -273,12 +281,6 @@ async function doDownloadTemplate() {
 }
 
 // ── Project dropdown ──────────────────────────────────────────────────────
-let projectPage      = 0;
-let projectLastPage  = false;
-let projectAllItems  = [];   // current page full list
-let projectFiltered  = [];   // after search filter
-let projectDropOpen  = false;
-
 async function fetchProjects(page) {
     const list    = document.getElementById('project-list');
     const pageInfo= document.getElementById('proj-page-info');

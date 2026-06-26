@@ -1,18 +1,17 @@
 """
-Updates farmer details (e.g., firstName, farmerCode, email etc..) based on configured keys.
+Updates the declared area of a farmer.
 
 Inputs:
-Excel file with 'farmer_id'.
-Columns for updates should be named 'value_1', 'value_2', etc., corresponding
-to the order of keys configured in the UI.
-FarmerData[key_1]
+Excel file with 'farmer_id' and 'declaredArea' (which represents the count of the declared area).
 """
 import pandas as pd
 import requests
 import json
 import time
-
 from concurrent.futures import ThreadPoolExecutor
+import threading
+
+# Author: Rajasekhar Palleti
 
 def run(input_excel_file, output_excel_file, config, log_callback=None):
     def log(msg):
@@ -34,17 +33,7 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     api_url = api_url.rstrip('/')
 
     delay_time = float(config.get("delay_time", 0.2))  # seconds, configurable via UI
-
-    # Attribute Keys (Dynamic)
-    # Reusing 'attr_keys' from config which is populated by the generic attribute UI
-    attr_keys = config.get("attr_keys", [])
-    valid_keys_map = {} # {index: key_name}
-    for i, key in enumerate(attr_keys):
-        if key and key.strip():
-            valid_keys_map[i] = key.strip()
-
-    if not valid_keys_map:
-        log("⚠️ No Keys configured! Please enter at least one field key (e.g., firstName) in the UI.")
+    log(f"Using time delay: {delay_time} seconds per API call")
 
     log(f"📘 Loading Excel file: {input_excel_file}")
     
@@ -59,17 +48,20 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
     # Check for farmer_id
     id_col = 'farmer_id'
     if id_col not in df.columns:
-        # Try finding case-insensitive or 'farmerID'
         possible = [c for c in df.columns if c.lower().replace('_','') in ['farmerid', 'farmer_id', 'id']]
         if possible:
              id_col = possible[0]
              log(f"ℹ️ Found ID column: {id_col}")
         else:
-             # Fallback to col 0
              id_col = df.columns[0]
              log(f"⚠️ 'farmer_id' column not found. Using first column: {id_col}")
 
-    # Ensure Status columns exist and are explicitly cast to string to avoid TypeError
+    # Ensure required columns
+    if "declaredArea" not in df.columns:
+        log("❌ 'declaredArea' column not found in the Excel file.")
+        return
+
+    # Ensure Status columns exist and are explicitly cast to string to prevent TypeError
     if "Status" not in df.columns:
         df["Status"] = ""
     df["Status"] = df["Status"].fillna("").astype(str)
@@ -85,18 +77,17 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
 
     total_rows = len(df)
     processed_count = 0
-    import threading
     processed_lock = threading.Lock()
-    log(f"🔄 Starting processing {total_rows} farmers with 2 threads. Updating Keys: {list(valid_keys_map.values())}")
+    log(f"🔄 Starting processing {total_rows} farmers with 2 threads.")
     
-    # Thread Function
     def process_chunk(df_chunk, thread_id):
         nonlocal processed_count
         headers = {"Authorization": f"Bearer {token}"}
-        results = [] # List of (index, status, response)
+        results = [] 
 
         for index, row in df_chunk.iterrows():
             farmer_id = str(row.get(id_col, "")).strip()
+            declared_area_val = row.get("declaredArea")
             
             status = ""
             response_str = ""
@@ -107,50 +98,37 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     results.append((index, "Skipped: Empty ID", ""))
                     continue
 
+                if pd.isna(declared_area_val) or str(declared_area_val).strip() == '':
+                    log(f"[Thread {thread_id}] Skipping {farmer_id}: declaredArea is empty")
+                    results.append((index, "Skipped: Empty declaredArea", ""))
+                    continue
+
+                try:
+                    declared_area_count = float(declared_area_val)
+                except ValueError:
+                    log(f"[Thread {thread_id}] Skipping {farmer_id}: invalid declaredArea value {declared_area_val}")
+                    results.append((index, "Skipped: Invalid declaredArea", ""))
+                    continue
+
                 try:
                     log(f"[Thread {thread_id}] Fetching: {farmer_id}")
                     get_resp = requests.get(f"{api_url}/{farmer_id}", headers=headers)
                     get_resp.raise_for_status()
                     farmer_data = get_resp.json()
 
-                    updates_made = False
+                    # current_declared = farmer_data.get("declaredArea")
+                    # current_count = current_declared.get("count") if current_declared else None
 
-                    # Dynamic Update Logic
-                    for key_idx, key_name in valid_keys_map.items():
-                        col_name = None
-                        if key_name in df.columns:
-                            col_name = key_name
-                        elif f"value_{key_idx + 1}" in df.columns:
-                            col_name = f"value_{key_idx + 1}"
-                        elif (key_idx + 1) < len(df.columns):
-                            pos_col = df.columns[key_idx + 1]
-                            if pos_col not in ["Status", "Response"]:
-                                col_name = pos_col
-                        
-                        if col_name and col_name in df.columns:
-                            new_value = row[col_name]
-                            if pd.isna(new_value):
-                                new_value = "" # or None? Empty string for text fields usually safe.
-                            else:
-                                new_value = str(new_value).strip()
-                            
-                            # Compare with existing
-                            current_value = farmer_data.get(key_name)
-                            if current_value is None: current_value = ""
-                            
-                            if str(current_value).strip() != new_value:
-                                farmer_data[key_name] = new_value
-                                updates_made = True
-                        else:
-                            # Column not found for this key
-                            pass
-
-                    if not updates_made:
-                        log(f"[Thread {thread_id}] No changes for {farmer_id}")
-                        results.append((index, "Skipped: No changes", ""))
-                        continue
+                    # if current_count == declared_area_count:
+                    #     log(f"[Thread {thread_id}] No changes for {farmer_id}")
+                    #     results.append((index, "Skipped: No changes", ""))
+                    #     continue
                     
-                    # PUT - Use Multipart/DTO as requested
+                    # Update the declaredArea
+                    if not farmer_data.get("declaredArea"):
+                        farmer_data["declaredArea"] = {}
+                    farmer_data["declaredArea"]["count"] = declared_area_count
+
                     time.sleep(delay_time)
                     
                     multipart_data = {
@@ -158,11 +136,10 @@ def run(input_excel_file, output_excel_file, config, log_callback=None):
                     }
                     
                     put_resp = requests.put(api_url, headers=headers, files=multipart_data)
-                    
                     put_resp.raise_for_status()
 
                     status = "Success"
-                    response_str = put_resp.text[:300]
+                    response_str = put_resp.text[:600]
                     log(f"[Thread {thread_id}] ✅ Success: {farmer_id}")
 
                 except Exception as e:
