@@ -64,6 +64,12 @@ def execute_force_restart():
             shutil.copy2("scheduled_jobs.json", backup_file)
             safe_log_print("scheduled_jobs.json backed up.")
             
+        config_file = "json_config/weekly_report_config.json"
+        config_backup = "weekly_report_config.json.bak"
+        if os.path.exists(config_file):
+            shutil.copy2(config_file, config_backup)
+            safe_log_print(f"{config_file} backed up.")
+            
         # Hard reset to pull everything (ignoring deployment.config for manual force)
         safe_log_print("Pulling latest code (reset --hard)...")
         subprocess.check_call(["git", "reset", "--hard", "origin/main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -72,6 +78,13 @@ def execute_force_restart():
             shutil.copy2(backup_file, "scheduled_jobs.json")
             os.remove(backup_file)
             safe_log_print("scheduled_jobs.json restored.")
+            
+        if os.path.exists(config_backup):
+            if not os.path.exists("json_config"):
+                os.makedirs("json_config")
+            shutil.copy2(config_backup, config_file)
+            os.remove(config_backup)
+            safe_log_print(f"{config_file} restored.")
             
         safe_log_print("Git update successful.")
         

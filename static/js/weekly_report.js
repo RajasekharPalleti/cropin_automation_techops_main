@@ -21,6 +21,81 @@ document.addEventListener('DOMContentLoaded', () => {
         consoleArea.scrollTop = consoleArea.scrollHeight;
     }
 
+
+    // --- Config UI Logic ---
+    const configToggle = document.getElementById('weekly-report-config-toggle');
+    const configBody = document.getElementById('weekly-report-config-body');
+    const configIcon = document.getElementById('weekly-report-config-icon');
+    const configText = document.getElementById('weekly-report-config-text');
+    const configSaveBtn = document.getElementById('weekly-report-save-config-btn');
+    const configStatus = document.getElementById('weekly-report-config-status');
+
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/weekly-report/config');
+            const data = await res.json();
+            if (data.error) {
+                configText.value = "{\n  // Error loading config or example: " + data.error + "\n}";
+            } else {
+                configText.value = JSON.stringify(data, null, 2);
+            }
+        } catch (e) {
+            configText.value = "{\n  // Failed to fetch config: " + e.message + "\n}";
+        }
+    }
+
+    if (configToggle) {
+        configToggle.addEventListener('click', () => {
+            if (configBody.style.display === 'none') {
+                configBody.style.display = 'block';
+                configIcon.textContent = '▲';
+                loadConfig(); // Load config when opening
+            } else {
+                configBody.style.display = 'none';
+                configIcon.textContent = '▼';
+            }
+        });
+    }
+
+    if (configSaveBtn) {
+        configSaveBtn.addEventListener('click', async () => {
+            configStatus.style.display = 'block';
+            configStatus.textContent = 'Saving...';
+            configStatus.style.color = '#334155';
+            configSaveBtn.disabled = true;
+
+            try {
+                let parsedJson;
+                try {
+                    parsedJson = JSON.parse(configText.value);
+                } catch (e) {
+                    throw new Error("Invalid JSON format.");
+                }
+
+                const res = await fetch('/api/weekly-report/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(parsedJson)
+                });
+                
+                const data = await res.json();
+                if (data.status === 'success') {
+                    configStatus.textContent = 'Configuration saved successfully!';
+                    configStatus.style.color = '#00C851';
+                    setTimeout(() => { configStatus.style.display = 'none'; }, 3000);
+                } else {
+                    throw new Error(data.error || 'Failed to save configuration');
+                }
+            } catch (err) {
+                configStatus.textContent = err.message;
+                configStatus.style.color = '#ff4444';
+            } finally {
+                configSaveBtn.disabled = false;
+            }
+        });
+    }
+    // -----------------------
+
     if (navBtn) {
         navBtn.addEventListener('click', () => {
             if (modal) modal.style.display = 'block';

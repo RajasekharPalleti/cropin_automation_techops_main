@@ -129,12 +129,25 @@ def execute_update_process():
             shutil.copy2("scheduled_jobs.json", backup_file)
             print("scheduled_jobs.json backed up.")
             
+        config_file = "json_config/weekly_report_config.json"
+        config_backup = "weekly_report_config.json.bak"
+        if os.path.exists(config_file):
+            shutil.copy2(config_file, config_backup)
+            print(f"{config_file} backed up.")
+            
         subprocess.check_call(["git", "reset", "--hard", "origin/main"])
         
         if os.path.exists(backup_file):
             shutil.copy2(backup_file, "scheduled_jobs.json")
             os.remove(backup_file)
             print("scheduled_jobs.json restored.")
+            
+        if os.path.exists(config_backup):
+            if not os.path.exists("json_config"):
+                os.makedirs("json_config")
+            shutil.copy2(config_backup, config_file)
+            os.remove(config_backup)
+            print(f"{config_file} restored.")
             
         print("Git pull successful!")
     except subprocess.CalledProcessError as e:

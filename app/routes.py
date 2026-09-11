@@ -970,7 +970,36 @@ async def stream_server_logs(request: Request):
 # Weekly Report standalone endpoint
 # ---------------------------------------------------------------------------
 
+
+@router.get("/api/weekly-report/config")
+async def get_weekly_report_config():
+    config_path = os.path.join("json_config", "weekly_report_config.json")
+    example_path = os.path.join("json_config", "weekly_report_config.json.example")
+    
+    path_to_read = config_path if os.path.exists(config_path) else example_path
+    if not os.path.exists(path_to_read):
+        return {"error": "No configuration file found."}
+        
+    try:
+        with open(path_to_read, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.post("/api/weekly-report/config")
+async def save_weekly_report_config(request: Request):
+    try:
+        data = await request.json()
+        config_path = os.path.join("json_config", "weekly_report_config.json")
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(data, f, indent=2)
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}
+
 @router.post("/api/weekly-report/run")
+
 async def run_weekly_report(action: str = "send"):
     import queue
     import threading
