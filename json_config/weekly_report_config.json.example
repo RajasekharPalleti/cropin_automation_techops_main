@@ -1,0 +1,12 @@
+{
+  "jira_base_url": "https://cropin.atlassian.net",
+  "jira_email": "your.email@cropin.com",
+  "jira_api_token": "YOUR_JIRA_API_TOKEN_HERE",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 465,
+  "smtp_user": "your.email@cropin.com",
+  "smtp_password": "YOUR_SMTP_APP_PASSWORD_HERE",
+  "mail_from": "your.email@cropin.com",
+  "mail_to": "backend-team@cropin.com, sfplus.backend@cropin.com",
+  "mail_cc": "sfplusqa@cropin.com, navneet.gupta@cropin.com, ganesh.shanbhag@cropin.com, prakhyath.hegde@cropin.com, raghunandan@cropin.com"
+}
