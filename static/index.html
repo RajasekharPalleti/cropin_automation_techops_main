@@ -1121,50 +1121,52 @@
 
     <!-- Weekly Report Modal -->
     <div id="weekly-report-modal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width:600px; padding:20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div class="modal-content" style="max-width:600px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; padding:0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 15px 20px; border-bottom: 1px solid #eee;">
                 <h2 style="margin:0;">Weekly Report</h2>
-                <span class="close" id="weekly-report-close">&times;</span>
+                <span class="close" id="weekly-report-close" style="font-size: 24px;">&times;</span>
             </div>
             
-            <p style="color:#555; margin-bottom: 20px; font-size: 0.95rem;">
-                This will query Jira for legacy issues (Overall + Last 4 weeks) and email the report.
-            </p>
-            
-            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
-                <div id="weekly-report-config-toggle" style="background: #f8fafc; padding: 10px 15px; cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #334155; display: flex; justify-content: space-between; align-items: center;">
-                    <span>⚙️ Configuration Settings</span>
-                    <span id="weekly-report-config-icon">▼</span>
+            <div class="modal-body" style="padding: 20px; overflow-y: auto; flex-grow: 1;">
+                <p style="color:#555; margin-top: 0; margin-bottom: 20px; font-size: 0.95rem;">
+                    This will query Jira for legacy issues (Overall + Last 4 weeks) and email the report.
+                </p>
+                
+                <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div id="weekly-report-config-toggle" style="background: #f8fafc; padding: 10px 15px; cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #334155; display: flex; justify-content: space-between; align-items: center;">
+                        <span>⚙️ Configuration Settings</span>
+                        <span id="weekly-report-config-icon">▼</span>
+                    </div>
+                    <div id="weekly-report-config-body" style="display: none; padding: 15px; background: #ffffff;">
+                        <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 10px;">
+                            If your config file was wiped out by a server restart, paste the JSON config here and hit Save.
+                        </p>
+                        <textarea id="weekly-report-config-text" rows="5" style="width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.85rem; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 10px; resize: vertical;"></textarea>
+                        <button class="btn-primary" id="weekly-report-save-config-btn" style="width: 100%; font-size: 0.9rem; padding: 8px;">
+                            Save Configuration
+                        </button>
+                        <div id="weekly-report-config-status" style="display:none; margin-top: 10px; font-size: 0.85rem; font-weight: 500;"></div>
+                    </div>
                 </div>
-                <div id="weekly-report-config-body" style="display: none; padding: 15px; background: #ffffff;">
-                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0; margin-bottom: 10px;">
-                        If your config file was wiped out by a server restart, paste the JSON config here and hit Save.
-                    </p>
-                    <textarea id="weekly-report-config-text" rows="8" style="width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.85rem; padding: 10px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 10px;"></textarea>
-                    <button class="btn-primary" id="weekly-report-save-config-btn" style="width: 100%; font-size: 0.9rem; padding: 8px;">
-                        Save Configuration
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <button class="btn-primary" id="weekly-report-fetch-btn" style="flex:1;">
+                        <span class="material-icons" style="font-size:1.1rem; vertical-align: middle; margin-right: 4px;">cloud_download</span> Fetch Data
                     </button>
-                    <div id="weekly-report-config-status" style="display:none; margin-top: 10px; font-size: 0.85rem; font-weight: 500;"></div>
+                    <button class="btn-success" id="weekly-report-send-btn" style="flex:1; display:none; background-color: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                        <span class="material-icons" style="font-size:1.1rem; vertical-align: middle; margin-right: 4px;">send</span> Send Email Report
+                    </button>
                 </div>
-            </div>
-            
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <button class="btn-primary" id="weekly-report-fetch-btn" style="flex:1;">
-                    <span class="material-icons" style="font-size:1.1rem;">cloud_download</span> Fetch Data
-                </button>
-                <button class="btn-success" id="weekly-report-send-btn" style="flex:1; display:none;">
-                    <span class="material-icons" style="font-size:1.1rem;">send</span> Send Email Report
-                </button>
-            </div>
-            
-            <div id="weekly-report-status" style="display:none; margin-bottom:15px; font-weight:500;"></div>
-            
-            <div class="terminal-container" style="max-height:300px; margin-top:0; background: #1a1a2e; border-radius: 6px; overflow: hidden;">
-                <div class="terminal-header" style="background: #2a2a40; color: #fff; padding: 8px 12px; font-size: 12px; font-family: monospace;">
-                    <span>Logs</span>
-                </div>
-                <div id="weekly-report-console" class="terminal-content" style="max-height:250px; overflow-y:auto; font-size:13px; color:#e2e8f0; padding: 12px; font-family: monospace; line-height: 1.5;">
-                    <!-- Logs will appear here -->
+                
+                <div id="weekly-report-status" style="display:none; margin-bottom:15px; font-weight:500;"></div>
+                
+                <div class="terminal-container" style="background: #1a1a2e; border-radius: 6px; overflow: hidden; border: 1px solid #333;">
+                    <div class="terminal-header" style="background: #2a2a40; color: #fff; padding: 8px 12px; font-size: 12px; font-family: monospace; border-bottom: 1px solid #444;">
+                        <span>Logs</span>
+                    </div>
+                    <div id="weekly-report-console" class="terminal-content" style="max-height:220px; overflow-y:auto; font-size:13px; color:#e2e8f0; padding: 12px; font-family: monospace; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">
+                        <!-- Logs will appear here -->
+                    </div>
                 </div>
             </div>
         </div>
