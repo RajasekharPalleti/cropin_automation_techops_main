@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update User Details — TechOps Automation Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="icon" href="/static/images/logo.png" type="image/png">
+    <style>
+        :root {
+            --blue: #0ea5e9;
+            --blue-dark: #0284c7;
+            --blue-deep: #0369a1;
+            --green: #10b981;
+            --green-dark: #059669;
+            --red: #ef4444;
+            --orange: #f97316;
+            --bg: #f0f4f8;
+            --surface: #ffffff;
+            --surface-2: #f8fafc;
+            --border: #e2e8f0;
+            --border-2: #cbd5e1;
+            --text: #0f172a;
+            --text-2: #475569;
+            --text-3: #94a3b8;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+            --shadow-md: 0 4px 16px rgba(0,0,0,.1), 0 2px 6px rgba(0,0,0,.06);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.08);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* ── Topbar ── */
+        .topbar {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            height: 56px;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            box-shadow: 0 2px 12px rgba(0,0,0,.3);
+        }
+        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .topbar-brand { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; }
+        .topbar-brand .icon-wrap {
+            width: 30px; height: 30px; border-radius: 7px;
+            background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .back-btn {
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.2);
+            color: #fff; border-radius: 7px; padding: 6px 12px;
+            font-size: 0.8rem; font-weight: 500; cursor: pointer;
+            display: flex; align-items: center; gap: 5px;
+            font-family: inherit; transition: background .15s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,.18); }
+        .logout-btn {
+            background: rgba(239,68,68,.15);
+            border: 1px solid rgba(239,68,68,.35);
+            color: #fca5a5; border-radius: 7px; padding: 6px 14px;
+            font-size: 0.8rem; font-weight: 500; cursor: pointer;
+            display: flex; align-items: center; gap: 5px;
+            font-family: inherit; transition: all .15s;
+        }
+        .logout-btn:hover { background: rgba(239,68,68,.28); color: #fff; }
+
+        /* ── Session banner ── */
+        .session-banner {
+            background: linear-gradient(90deg, #eff6ff, #f0fdf4);
+            border-bottom: 1px solid #bfdbfe;
+            padding: 7px 24px;
+            font-size: 0.78rem;
+            color: #1d4ed8;
+            display: flex; align-items: center; gap: 7px;
+        }
+        .session-banner .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+        /* ── Page ── */
+        .page { max-width: 1060px; margin: 0 auto; padding: 32px 20px 64px; }
+
+        /* ── Login card ── */
+        .login-wrap {
+            max-width: 440px; margin: 0 auto;
+            animation: fadeUp .35s ease;
+        }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+
+        .login-card {
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        .login-card-header {
+            background: linear-gradient(135deg, #0369a1, #0ea5e9);
+            padding: 28px 28px 24px;
+            color: #fff;
+        }
+        .login-card-header h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+        .login-card-header p { font-size: 0.82rem; opacity: .82; }
+        .login-card-body { padding: 24px 28px 28px; display: flex; flex-direction: column; gap: 16px; }
+
+        /* ── Fields ── */
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { font-size: 0.8rem; font-weight: 600; color: var(--text-2); letter-spacing: .01em; }
+        .field .req { color: var(--red); }
+        .field input, .field select {
+            padding: 10px 13px;
+            border: 1.5px solid var(--border-2);
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            background: var(--surface);
+            color: var(--text);
+            transition: border-color .18s, box-shadow .18s;
+            width: 100%;
+        }
+        .field input:focus, .field select:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+        }
+        .field input::placeholder {
+            color: #94a3b8;
+            font-weight: 300;
+        }
+        .field .hint { font-size: 0.74rem; color: var(--text-3); }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 20px; border-radius: 8px; border: none;
+            font-size: 0.875rem; font-weight: 600; cursor: pointer;
+            font-family: inherit; transition: all .15s;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        .btn-blue { background: linear-gradient(135deg, var(--blue), var(--blue-deep)); color: #fff; box-shadow: 0 2px 8px rgba(14,165,233,.3); }
+        .btn-blue:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(14,165,233,.4); }
+        .btn-green { background: linear-gradient(135deg, var(--green), var(--green-dark)); color: #fff; box-shadow: 0 2px 8px rgba(16,185,129,.3); }
+        .btn-green:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16,185,129,.4); }
+        .btn-full { width: 100%; justify-content: center; padding: 11px 20px; }
+
+        /* ── Error / status ── */
+        .err-box {
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-left: 3px solid var(--red);
+            border-radius: 7px; padding: 10px 14px;
+            font-size: 0.82rem; color: #b91c1c; font-weight: 500;
+        }
+        .ok-box {
+            background: #f0fdf4; border: 1px solid #bbf7d0;
+            border-left: 3px solid var(--green);
+            border-radius: 7px; padding: 10px 14px;
+            font-size: 0.82rem; color: #166534; font-weight: 500;
+            display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+        }
+        .info-box {
+            background: #eff6ff; border: 1px solid #bfdbfe;
+            border-left: 3px solid var(--blue);
+            border-radius: 7px; padding: 10px 14px;
+            font-size: 0.82rem; color: #1e40af;
+        }
+        .status-line { display: flex; align-items: center; gap: 7px; font-size: 0.83rem; font-weight: 500; margin-top: 10px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; display: inline-flex; }
+
+        /* ── Screen ── */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* ── Ops layout ── */
+        .ops-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 720px) { .ops-grid { grid-template-columns: 1fr; } }
+
+        /* ── Step card ── */
+        .step-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+            overflow: hidden;
+            animation: fadeUp .3s ease;
+        }
+        .step-card-header {
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .step-card-header.blue { background: linear-gradient(135deg, #e0f2fe, #bae6fd); }
+        .step-card-header.orange { background: linear-gradient(135deg, #fff7ed, #fed7aa); }
+        .step-num {
+            width: 26px; height: 26px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem; font-weight: 700; flex-shrink: 0;
+        }
+        .step-num.blue { background: var(--blue-deep); color: #fff; }
+        .step-num.orange { background: var(--orange); color: #fff; }
+        .step-title { font-size: 0.9rem; font-weight: 700; }
+        .step-title.blue { color: var(--blue-deep); }
+        .step-title.orange { color: #c2410c; }
+        .step-badge {
+            margin-left: auto; font-size: 0.65rem; font-weight: 700;
+            padding: 2px 8px; border-radius: 4px; letter-spacing: .04em;
+        }
+        .step-badge.get { background: var(--blue-deep); color: #fff; }
+        .step-badge.put { background: var(--orange); color: #fff; }
+
+        .step-card-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+        /* ── API pill ── */
+        .api-pill {
+            font-family: 'Courier New', monospace;
+            font-size: 0.74rem;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: var(--text-2);
+            word-break: break-all;
+        }
+
+        /* ── Response viewer ── */
+        .resp-wrap { display: none; }
+        .resp-wrap.show { display: block; }
+        .resp-header {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.73rem; font-weight: 600; color: var(--text-3);
+            text-transform: uppercase; letter-spacing: .06em;
+            margin-bottom: 5px;
+        }
+        .resp-box {
+            background: #0d1b2a;
+            border: 1px solid #1e3a5f;
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.76rem;
+            color: #7dd3fc;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.55;
+        }
+        .resp-box::-webkit-scrollbar { width: 5px; }
+        .resp-box::-webkit-scrollbar-track { background: #0d1b2a; }
+        .resp-box::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
+
+        /* ── Summary card ── */
+        .summary-card {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-top: 10px;
+        }
+        .summary-card h4 {
+            font-size: 0.82rem; font-weight: 700; color: #166534;
+            display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+        }
+        .summary-row {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.82rem; padding: 5px 0;
+            border-bottom: 1px solid #bbf7d0;
+        }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-key { color: var(--text-2); width: 130px; flex-shrink: 0; font-weight: 500; }
+        .summary-val { color: #166534; font-weight: 700; font-family: monospace; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+    <div class="topbar-left">
+        <button class="back-btn" onclick="window.location.href='/'">
+            <span class="material-icons" style="font-size:0.95rem;">arrow_back</span> Back
+        </button>
+        <div class="topbar-brand">
+            <div class="icon-wrap">
+                <span class="material-icons" style="font-size:1rem;color:#fff;">phone_android</span>
+            </div>
+            Update User Phone Number
+        </div>
+    </div>
+    <button class="logout-btn" id="logout-btn" style="display:none;" onclick="doLogout()">
+        <span class="material-icons" style="font-size:0.95rem;">logout</span> Logout
+    </button>
+</div>
+
+<!-- Session banner -->
+<div class="session-banner" id="session-banner" style="display:none;">
+    <div class="dot"></div>
+    <span id="session-info-text">Session active</span>
+</div>
+
+<div class="page">
+
+    <!-- ── Screen 1: Login ── -->
+    <div class="screen active" id="screen-login">
+        <div class="login-wrap">
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h2>Sign In</h2>
+                    <p>Cloud credentials are used to generate an access token for the User &amp; Country APIs.</p>
+                </div>
+                <div class="login-card-body">
+                    <div class="field">
+                        <label>Environment <span class="req">*</span></label>
+                        <select id="env">
+                            <option value="QA">QA</option>
+                            <option value="UAT">UAT</option>
+                            <option value="PROD" selected>PROD</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Tenant Name <span class="req">*</span></label>
+                        <input type="text" id="tenant" placeholder="Enter tenant name">
+                    </div>
+                    <div class="field">
+                        <label>Username <span class="req">*</span></label>
+                        <input type="text" id="username" placeholder="Enter username">
+                    </div>
+                    <div class="field">
+                        <label>Password <span class="req">*</span></label>
+                        <input type="password" id="password" placeholder="••••••••">
+                    </div>
+                    <div id="login-error" class="err-box" style="display:none;"></div>
+                    <button class="btn btn-blue btn-full" id="login-btn" onclick="doLogin()">
+                        <span class="material-icons" style="font-size:1rem;">lock_open</span>
+                        Authenticate &amp; Proceed
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Screen 2: Operations ── -->
+    <div class="screen" id="screen-ops">
+        <div class="ops-grid">
+
+            <!-- STEP 1 -->
+            <div class="step-card">
+                <div class="step-card-header blue">
+                    <div class="step-num blue">1</div>
+                    <div>
+                        <div class="step-title blue">Fetch User</div>
+                        <div style="font-size:0.72rem;color:#0369a1;margin-top:1px;">Look up user by ID</div>
+                    </div>
+                    <span class="step-badge get">GET</span>
+                </div>
+                <div class="step-card-body">
+
+                    <div class="field">
+                        <label>User ID <span class="req">*</span></label>
+                        <input type="text" id="user-id" placeholder="e.g. 3811102">
+                        <span class="hint">The numeric user ID to look up.</span>
+                    </div>
+
+                    <button class="btn btn-blue" id="fetch-user-btn" onclick="doFetchUser()" style="align-self:flex-start;">
+                        <span class="material-icons" style="font-size:1rem;">search</span>
+                        Fetch User
+                    </button>
+
+                    <div id="fetch-user-status" class="status-line" style="display:none;"></div>
+                    <div id="fetch-user-error" class="err-box" style="display:none;"></div>
+
+                    <div class="resp-wrap" id="fetch-user-result-wrap">
+                        <div class="resp-header">
+                            <span class="material-icons" style="font-size:0.95rem;">data_object</span>
+                            GET Response
+                        </div>
+                        <div class="resp-box" id="fetch-user-response"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2 -->
+            <div class="step-card">
+                <div class="step-card-header orange">
+                    <div class="step-num orange">2</div>
+                    <div>
+                        <div class="step-title orange">Update User Details</div>
+                        <div style="font-size:0.72rem;color:#c2410c;margin-top:1px;">Multipart PUT request</div>
+                    </div>
+                    <span class="step-badge put">PUT</span>
+                </div>
+                <div class="step-card-body">
+
+                    <div class="info-box">
+                        Fetch user first. ISD Code and Contact Number are pre-filled from the response. Edit and click <strong>Update</strong>.
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;">
+                        <div class="field">
+                            <label>ISD Code <span class="req">*</span></label>
+                            <input type="text" id="isd-code" placeholder="+91">
+                        </div>
+                        <div class="field">
+                            <label>Contact Number <span class="req">*</span></label>
+                            <input type="text" id="contact-number" placeholder="9876543210">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Email</label>
+                        <input type="email" id="user-email" placeholder="Pre-filled from user response">
+                        <span class="hint">Pre-filled from response. Edit if needed before updating.</span>
+                    </div>
+
+                    <div id="iso-resolve-wrap" class="ok-box" style="display:none;">
+                        <span class="material-icons" style="font-size:1rem;color:var(--green-dark);">verified</span>
+                        ISO: <strong id="resolved-iso"></strong>
+                        <span id="resolved-country-name" style="color:#4b7280;font-size:0.78rem;"></span>
+                    </div>
+                    <div id="iso-resolve-error" class="err-box" style="display:none;"></div>
+
+                    <!-- Payload preview toggle -->
+                    <button class="btn" id="show-payload-btn" onclick="togglePayload()"
+                        style="background:#1e293b;color:#94a3b8;font-size:0.8rem;padding:7px 14px;border:1px solid #334155;align-self:flex-start;">
+                        <span class="material-icons" style="font-size:0.95rem;">code</span>
+                        Show Payload
+                    </button>
+                    <div class="resp-wrap" id="payload-preview-wrap">
+                        <div class="resp-header">
+                            <span class="material-icons" style="font-size:0.95rem;">integration_instructions</span>
+                            PUT Payload (dto)
+                        </div>
+                        <div class="resp-box" id="payload-preview-box"></div>
+                    </div>
+
+                    <button class="btn btn-green" id="update-phone-btn" onclick="doUpdatePhone()" style="align-self:flex-start;">
+                        <span class="material-icons" style="font-size:1rem;">save</span>
+                        Update User Details
+                    </button>
+
+                    <div id="update-phone-status" class="status-line" style="display:none;"></div>
+                    <div id="update-phone-error" class="err-box" style="display:none;"></div>
+
+                    <div class="resp-wrap" id="update-phone-result-wrap">
+                        <div class="resp-header">
+                            <span class="material-icons" style="font-size:0.95rem;">data_object</span>
+                            PUT Response
+                        </div>
+                        <div class="resp-box" id="update-phone-response"></div>
+
+                        <div class="summary-card" id="update-summary" style="display:none;">
+                            <h4>
+                                <span class="material-icons" style="font-size:1rem;color:var(--green-dark);">task_alt</span>
+                                Updated Successfully
+                            </h4>
+                            <div class="summary-row">
+                                <span class="summary-key">Contact Number</span>
+                                <span class="summary-val" id="sum-contact"></span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-key">ISD Code</span>
+                                <span class="summary-val" id="sum-isd"></span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-key">Country ISO Code</span>
+                                <span class="summary-val" id="sum-iso"></span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-key">Email</span>
+                                <span class="summary-val" id="sum-email"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/js/update_phone.js"></script>
+</body>
+</html>

@@ -1145,6 +1145,12 @@ async def housekeeping_page():
     return FileResponse("static/housekeeping.html")
 
 
+@router.get("/update-phone")
+async def update_phone_page():
+    """Serve the standalone update phone number page."""
+    return FileResponse("static/update_phone.html")
+
+
 @router.head("/")
 @router.get("/")
 async def read_root():
