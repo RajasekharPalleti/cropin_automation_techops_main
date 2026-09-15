@@ -497,6 +497,55 @@
                 </div>
             </div>
 
+
+            <!-- ── STEP 3 ── -->
+            <div class="step-card">
+                <div class="step-card-header" style="background:#fdf4ff; border-bottom:1px solid #f5d0fe; color:#a21caf;">
+                    <div class="step-num" style="background:#f0abfc; color:#701a75;">3</div>
+                    <div>
+                        <div class="step-title" style="color:#86198f;">Update Password (Web Portal)</div>
+                        <div style="font-size:0.72rem;color:#a21caf;margin-top:1px;">Automated Browser Action</div>
+                    </div>
+                    <span class="step-badge" style="background:#e879f9; color:#fff;">AUTO</span>
+                </div>
+                <div class="step-card-body">
+                    <div class="info-box" style="background:#faf5ff; border-color:#e9d5ff; color:#6b21a8;">
+                        <span class="material-icons" style="font-size:1.1rem;">smart_toy</span>
+                        This will launch an automated browser to log in to the admin portal and update the user's password.
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="field">
+                            <label>Admin Username <span class="req">*</span></label>
+                            <input type="text" id="admin-username" placeholder="admin@cropin.com" value="rajasekhar.palleti@cropin.com">
+                        </div>
+                        <div class="field">
+                            <label>Admin Password <span class="req">*</span></label>
+                            <div style="position:relative; display:flex; align-items:center;">
+                                <input type="password" id="admin-password" placeholder="••••••••" value="Raja@0610" style="width:100%; padding-right:40px;">
+                                <span class="material-icons" id="toggle-admin-password" style="position:absolute; right:10px; cursor:pointer; color:#64748b; font-size:1.2rem; user-select:none;" onclick="togglePasswordVisibility('admin-password', 'toggle-admin-password')">visibility</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>New Password for User <span class="req">*</span></label>
+                        <div style="position:relative; display:flex; align-items:center;">
+                            <input type="password" id="new-password" placeholder="New strong password" value="changeme" style="width:100%; padding-right:40px;">
+                            <span class="material-icons" id="toggle-new-password" style="position:absolute; right:10px; cursor:pointer; color:#64748b; font-size:1.2rem; user-select:none;" onclick="togglePasswordVisibility('new-password', 'toggle-new-password')">visibility</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-blue" id="update-password-btn" onclick="doUpdatePassword()" style="align-self:flex-start; background: linear-gradient(135deg, #9333ea, #7e22ce); box-shadow: 0 2px 8px rgba(147, 51, 234, .3);">
+                        <span class="material-icons" style="font-size:1rem;">precision_manufacturing</span>
+                        Run Password Update
+                    </button>
+
+                    <div id="update-password-status" class="status-line" style="display:none;"></div>
+                    <div id="update-password-error" class="err-box" style="display:none;"></div>
+                </div>
+            </div>
+
         </div>
     </div>
 

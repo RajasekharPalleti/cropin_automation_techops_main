@@ -1151,6 +1151,53 @@ async def update_phone_page():
     return FileResponse("static/update_phone.html")
 
 
+class PasswordAutomationRequest(BaseModel):
+    admin_username: str
+    admin_password: str
+    new_password: str
+    tenant: str
+    contact_number: str
+
+@router.post("/api/change-password-automation")
+async def change_password_automation(req: PasswordAutomationRequest):
+    from app.automation import change_password_via_portal
+    from fastapi.responses import StreamingResponse
+    import asyncio
+    import json
+    
+    queue = asyncio.Queue()
+
+    async def on_update(msg):
+        await queue.put({"status": "progress", "message": msg})
+
+    async def run_automation():
+        try:
+            result = await change_password_via_portal(
+                admin_username=req.admin_username,
+                admin_password=req.admin_password,
+                new_password=req.new_password,
+                tenant=req.tenant,
+                contact_number=req.contact_number,
+                update_callback=on_update
+            )
+            await queue.put(result)
+        except Exception as e:
+            await queue.put({"status": "error", "message": str(e)})
+
+    asyncio.create_task(run_automation())
+
+    async def event_generator():
+        while True:
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+            if event.get("status") in ["success", "error"]:
+                break
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+
+
 @router.head("/")
 @router.get("/")
 async def read_root():

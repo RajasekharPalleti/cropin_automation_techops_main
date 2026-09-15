@@ -476,3 +476,101 @@ async function doUpdatePhone() {
         btn.disabled = false;
     }
 }
+
+
+function togglePasswordVisibility(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+    } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+    }
+}
+
+// ── STEP 3: Change Password via Automation ──
+async function doUpdatePassword() {
+    const adminUsername = document.getElementById('admin-username').value.trim();
+    const adminPassword = document.getElementById('admin-password').value.trim();
+    const newPassword   = document.getElementById('new-password').value.trim();
+    const tenant        = document.getElementById('tenant').value.trim().toLowerCase();
+    const contactNumber = document.getElementById('contact-number').value.trim();
+
+    hideErr('update-password-error');
+    setStatus('update-password-status', '');
+
+    if (!adminUsername || !adminPassword || !newPassword) {
+        showErr('update-password-error', 'Admin Username, Admin Password, and New Password are required.');
+        return;
+    }
+    if (!tenant) {
+        showErr('update-password-error', 'Tenant is required. Please fill it in Step 1.');
+        return;
+    }
+    if (!contactNumber) {
+        showErr('update-password-error', 'Contact Number is required. Please fill it in Step 2.');
+        return;
+    }
+
+    const btn = document.getElementById('update-password-btn');
+    btn.disabled = true;
+    setStatus('update-password-status',
+        '<span class="material-icons spinner" style="font-size:1rem;">refresh</span> Automating browser to change password. This may take 15-30 seconds...',
+        '#6b21a8');
+
+    try {
+        const res = await fetch('/api/change-password-automation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                admin_username: adminUsername,
+                admin_password: adminPassword,
+                new_password: newPassword,
+                tenant: tenant,
+                contact_number: contactNumber
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (let line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = JSON.parse(line.substring(6));
+                    
+                    if (data.status === 'progress') {
+                        setStatus('update-password-status',
+                            `<span class="material-icons spinner" style="font-size:1rem;">refresh</span> ${data.message}`,
+                            '#1976d2');
+                    } else if (data.status === 'success') {
+                        setStatus('update-password-status',
+                            `<span class="material-icons" style="font-size:1rem;color:#2e7d32;">check_circle</span> ${data.message}`,
+                            '#2e7d32');
+                    } else if (data.status === 'error') {
+                        showErr('update-password-error', `Automation Error: ${data.message}`);
+                        setStatus('update-password-status', '');
+                    }
+                }
+            }
+        }
+
+    } catch (err) {
+        showErr('update-password-error', `Automation Error: ${err.message}`);
+        setStatus('update-password-status', '');
+    } finally {
+        btn.disabled = false;
+    }
+}
