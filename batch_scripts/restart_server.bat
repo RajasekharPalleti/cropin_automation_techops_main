@@ -26,6 +26,7 @@ source .venv/bin/activate
 
 echo "Installing/Updating requirements..."
 pip3 install -r requirements.txt
+playwright install chromium
 python3 -m app.main
 read -p "Press any key to close..."
 exit 0
@@ -48,6 +49,7 @@ call .venv\Scripts\activate
 
 echo Installing/Updating requirements...
 pip install -r requirements.txt
+playwright install chromium
 python -m app.main
 popd
 if "%~1"=="--no-pause" exit /b

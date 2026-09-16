@@ -18,6 +18,7 @@ source .venv/bin/activate
 
 echo "Installing/Updating requirements..."
 pip3 install -r requirements.txt
+playwright install chromium
 
 echo "Starting Auto-Updater (Runs daily at 12:00 AM)..."
 nohup python3 auto_update.py >/dev/null 2>&1 &
@@ -41,6 +42,7 @@ call .venv\Scripts\activate
 
 echo Installing/Updating requirements...
 pip install -r requirements.txt
+playwright install chromium
 
 echo Starting Auto-Updater (Runs daily at 12:00 AM)...
 start /b python auto_update.py >nul 2>&1
