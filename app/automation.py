@@ -10,8 +10,8 @@ async def change_password_via_portal(admin_username, admin_password, new_passwor
             await update_callback(msg)
 
     async with async_playwright() as p:
-        # Launch browser in headful mode for debugging
-        browser = await p.chromium.launch(headless=False, channel="chrome")
+        # Launch browser. Remove channel="chrome" so Playwright uses its bundled Chromium
+        browser = await p.chromium.launch(headless=False)
         context = await browser.new_context(
             viewport={"width": 1280, "height": 800}
         )
