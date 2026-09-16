@@ -10,8 +10,11 @@ async def change_password_via_portal(admin_username, admin_password, new_passwor
             await update_callback(msg)
 
     async with async_playwright() as p:
-        # Launch browser. Remove channel="chrome" so Playwright uses its bundled Chromium
-        browser = await p.chromium.launch(headless=False)
+        import os
+        # Render cloud servers have no display. We must use headless=True there.
+        # Locally, we can keep headless=False so you can see it pop up.
+        is_server = os.environ.get("RENDER") == "true"
+        browser = await p.chromium.launch(headless=is_server)
         context = await browser.new_context(
             viewport={"width": 1280, "height": 800}
         )

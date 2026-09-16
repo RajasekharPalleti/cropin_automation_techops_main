@@ -10,6 +10,10 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Playwright browsers and dependencies for headless mode
+RUN playwright install chromium
+RUN playwright install-deps
+
 # Copy the rest of the application's code
 COPY . .
 
