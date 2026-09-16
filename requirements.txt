@@ -12,4 +12,5 @@ google-auth-oauthlib
 schedule
 pyproj
 shapely
-matplotlibplaywright
+matplotlib
+playwright
