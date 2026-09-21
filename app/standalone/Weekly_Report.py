@@ -280,34 +280,36 @@ def _fetch_trend_history(base_url, email, api_token, log, num_weeks=26):
 
     # 1. Load existing history from file if available
     existing = {}
+    stored_rows = []
     if os.path.exists(HISTORY_PATH):
         try:
             with open(HISTORY_PATH, "r", encoding="utf-8") as f:
-                for row in json.load(f):
+                stored_rows = json.load(f)
+                for row in stored_rows:
                     existing[row["date"]] = row
         except Exception as e:
             log(f"Warning: could not read {HISTORY_PATH}: {e}")
 
-    # 2. Identify which Fridays are already cached vs missing
+    # 2. Load all cached entries from history file
     cached_entries = []
-    missing_fridays = []
-    for friday in fridays:
-        date_str = friday.strftime("%Y-%m-%d")
-        if date_str in existing and "older_highest" in existing[date_str]:
-            row = existing[date_str]
-            cached_entries.append({
-                "date": friday,
-                "older_highest": row["older_highest"],
-                "older_high": row["older_high"],
-                "recent_highest": row["recent_highest"],
-                "recent_high": row["recent_high"],
-            })
-        else:
-            missing_fridays.append(friday)
+    for row in stored_rows:
+        d = row["date"]
+        if isinstance(d, str):
+            d = datetime.date.fromisoformat(d)
+        cached_entries.append({
+            "date": d,
+            "older_highest": row["older_highest"],
+            "older_high": row["older_high"],
+            "recent_highest": row["recent_highest"],
+            "recent_high": row["recent_high"],
+        })
 
-    # If all Fridays already exist in history file, return them immediately (0 API calls)
+    # Identify which Fridays are missing from stored history
+    missing_fridays = [friday for friday in fridays if friday.strftime("%Y-%m-%d") not in existing]
+
+    # If all Fridays already exist in history file, return cached entries immediately (0 API calls)
     if not missing_fridays:
-        log(f"Loaded all {len(cached_entries)} past Fridays directly from {HISTORY_PATH} (0 Jira API calls needed).")
+        log(f"Loaded all {len(cached_entries)} records directly from {HISTORY_PATH} (0 Jira API calls needed).")
         cached_entries.sort(key=lambda r: r["date"])
         return cached_entries
 
@@ -379,15 +381,16 @@ def _generate_trend_chart(history, highest_key, high_key, title):
     import datetime
 
     # Prepare labels for all dates
+    today_obj = datetime.date.today()
     dates_str = []
     for h in history:
         d = h["date"]
         if isinstance(d, str):
             d = datetime.date.fromisoformat(d)
-        dates_str.append(d.strftime("%d-%b"))
-
-    if len(dates_str) > 0:
-        dates_str[-1] = dates_str[-1] + " (Today)"
+        label = d.strftime("%d-%b")
+        if d == today_obj:
+            label += " (Today)"
+        dates_str.append(label)
 
     highest_vals = [h[highest_key] for h in history]
     high_vals = [h[high_key] for h in history]
@@ -718,23 +721,82 @@ def run(input_excel, output_excel, config, log_callback=None, action="send"):
         trend_history = _fetch_trend_history(base_url, jira_email, jira_api_token, log, num_weeks=26)
 
         # Check the last date in historical trend data:
-        # Only append the current date to trend_history if the last date is more than 3 days ago.
-        # The current date is NEVER stored in weekly_report_history.json.
+        # If triggered on Friday, prune any intermediate non-Friday ("middle date") records so the chart shows pure weekly intervals
+        if today_date.weekday() == 4:
+            trend_history = [
+                r for r in trend_history
+                if (datetime.date.fromisoformat(r["date"]) if isinstance(r["date"], str) else r["date"]).weekday() == 4
+            ]
+
+        # Current date details are always sent along with history on the chart:
         if trend_history:
             last_entry_date = trend_history[-1]["date"]
             if isinstance(last_entry_date, str):
                 last_entry_date = datetime.date.fromisoformat(last_entry_date)
             days_diff = (today_date - last_entry_date).days
-            if days_diff > 3:
+            if days_diff > 0:
                 trend_history.append(today_entry)
-                log(f"Last historical Friday was {last_entry_date} ({days_diff} days ago, > 3 days) — added current date ({today_date}) to trend chart.")
-            elif days_diff == 0:
-                # If today is Friday itself, update the last entry with today's live counts
-                trend_history[-1] = today_entry
+                log(f"Last historical date was {last_entry_date} ({days_diff} days ago) — added triggered date ({today_date}) to trend chart.")
             else:
-                log(f"Last historical Friday was {last_entry_date} ({days_diff} days ago, <= 3 days) — current date not added to trend chart.")
+                trend_history[-1] = today_entry
+                log(f"Updated today's ({today_date}) data on trend chart with live counts.")
         else:
             trend_history.append(today_entry)
+
+        # Save to weekly_report_history.json when it's more than 3 days (>= 3 days) since the last saved record:
+        HISTORY_PATH = os.path.join("json_config", "weekly_report_history.json")
+        try:
+            history_file_data = []
+            if os.path.exists(HISTORY_PATH):
+                with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+                    history_file_data = json.load(f)
+
+            today_str = today_date.strftime("%Y-%m-%d")
+            today_save_entry = {
+                "date": today_str,
+                "older_highest": today_older_highest,
+                "older_high": today_older_high,
+                "recent_highest": today_recent_highest,
+                "recent_high": today_recent_high,
+            }
+
+            # When triggered on Friday (weekday 4), remove any intermediate non-Friday ("middle date") records
+            if today_date.weekday() == 4 and history_file_data:
+                non_fridays = [
+                    r for r in history_file_data
+                    if (datetime.date.fromisoformat(r["date"]) if isinstance(r["date"], str) else r["date"]).weekday() != 4
+                ]
+                if non_fridays:
+                    history_file_data = [
+                        r for r in history_file_data
+                        if (datetime.date.fromisoformat(r["date"]) if isinstance(r["date"], str) else r["date"]).weekday() == 4
+                    ]
+                    log(f"Today is Friday ({today_str}): cleaned up {len(non_fridays)} middle date record(s) ({', '.join(r['date'] for r in non_fridays)}) from history file.")
+
+            if history_file_data:
+                last_saved_date_str = history_file_data[-1]["date"]
+                last_saved_date = datetime.date.fromisoformat(last_saved_date_str) if isinstance(last_saved_date_str, str) else last_saved_date_str
+                save_diff = (today_date - last_saved_date).days
+
+                if save_diff >= 3:
+                    history_file_data.append(today_save_entry)
+                    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+                        json.dump(history_file_data, f, indent=2)
+                    log(f"Last saved history was {last_saved_date} ({save_diff} days ago, >= 3 days) — saved {today_str} record to {HISTORY_PATH}.")
+                elif save_diff == 0:
+                    history_file_data[-1] = today_save_entry
+                    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+                        json.dump(history_file_data, f, indent=2)
+                    log(f"Updated today's ({today_str}) record in {HISTORY_PATH} with live counts.")
+                else:
+                    log(f"Last saved history was {last_saved_date} ({save_diff} days ago, < 3 days) — included in current report, but not saved to {HISTORY_PATH}.")
+            else:
+                history_file_data.append(today_save_entry)
+                with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+                    json.dump(history_file_data, f, indent=2)
+                log(f"Saved initial record {today_str} to {HISTORY_PATH}.")
+        except Exception as e:
+            log(f"Warning: could not update {HISTORY_PATH}: {e}")
 
         # --- Save everything to cache ---
         try:
