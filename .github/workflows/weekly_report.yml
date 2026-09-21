@@ -1,8 +1,6 @@
 name: Weekly Report
 
 on:
-  schedule:
-    - cron: '35 13 * * 5' # Runs at 13:35 UTC (7:05 PM IST) every Friday
   workflow_dispatch:
     inputs:
       action:
