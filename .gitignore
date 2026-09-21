@@ -31,3 +31,6 @@ scheduled_jobs.json
 
 # Local Configuration
 json_config/weekly_report_config.json
+json_config/weekly_report_cache.json
+# Exception: keep history file in git so trend data persists across deploys
+!json_config/weekly_report_history.json

@@ -2,8 +2,15 @@ name: Weekly Report
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '35 13 * * 5' # Runs at 13:35 UTC (7:05 PM IST) every Friday
+    inputs:
+      action:
+        description: 'Action to execute: "send" triggers email, "fetch" tests without sending'
+        required: true
+        default: 'send'
+        type: choice
+        options:
+          - 'send'
+          - 'fetch'
 
 jobs:
   run-report:
@@ -29,4 +36,4 @@ jobs:
           echo '${{ secrets.WEEKLY_REPORT_CONFIG }}' > json_config/weekly_report_config.json
           
       - name: Execute Weekly Report
-        run: python run_weekly_report.py
+        run: python run_weekly_report.py "${{ github.event.inputs.action || 'send' }}"

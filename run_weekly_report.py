@@ -21,11 +21,13 @@ def main():
     def log_callback(msg):
         print(msg)
         
-    print("Starting Weekly Report via GitHub Actions...")
+    # Read action argument ('send' or 'fetch'), default to 'send'
+    action = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].strip() else "send"
+    print(f"Starting Weekly Report via GitHub Actions with action='{action}'...")
     
     try:
-        # Run the report and trigger the email send action
-        Weekly_Report.run(None, output_path, config, log_callback=log_callback, action="send")
+        # Run the report and trigger the specified action ('send' or 'fetch')
+        Weekly_Report.run(None, output_path, config, log_callback=log_callback, action=action)
         print("Weekly Report executed successfully.")
     except Exception as e:
         print(f"Error executing report: {e}")

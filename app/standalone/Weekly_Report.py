@@ -34,18 +34,101 @@ import pandas as pd
 
 CONFIG_PATH = os.path.join("json_config", "weekly_report_config.json")
 
+# ==============================================================================
+# JIRA JQL QUERIES
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. JQL_OVERALL (Current Live State — Older Than 30 Days)
+# ------------------------------------------------------------------------------
+# WHAT IT DOES:
+#   Queries Jira for all currently open, legacy bugs older than 30 days.
+# FILTERS:
+#   - project = "SMFP" AND issuetype in (Bug, Bug-CS): Only SMFP project bugs.
+#   - status NOT IN (Closed, "Ready For Testing"): Excludes resolved/tested/closed issues.
+#   - priority in (High, Highest): Focuses only on critical and high-severity bugs.
+#   - component = Services: Scoped to the Services component.
+#   - created < -30d: Created strictly more than 30 days ago from today.
+# WHERE USED:
+#   - Current "Issues Older Than 30 Days" metric card (Total, Highest, High).
+#   - Today's data point (rightmost) on the "Older Than 30 Days" trend chart.
+#   - Target filter for the "View in Jira" button in the email.
 JQL_OVERALL = (
-    'project = "SMFP" and issuetype in (Bug) '
+    'project = "SMFP" and issuetype in (Bug, Bug-CS) '
     'and status NOT IN (Closed, "Ready For Testing") '
     'and priority in (High, Highest) AND component = Services '
     'and created < -30d order by priority DESC, created DESC'
 )
 
+# ------------------------------------------------------------------------------
+# 2. JQL_LAST_4_WEEKS (Current Live State — Last 30 Days / Recent)
+# ------------------------------------------------------------------------------
+# WHAT IT DOES:
+#   Queries Jira for all currently open bugs created within the last 30 days.
+# FILTERS:
+#   - project = "SMFP" AND issuetype in (Bug, Bug-CS): Only SMFP project bugs.
+#   - status NOT IN (Closed, "Ready For Testing"): Excludes resolved/tested/closed issues.
+#   - priority in (High, Highest): Focuses only on critical and high-severity bugs.
+#   - component = Services: Scoped to the Services component.
+#   - created >= -30d: Created within the last 30 days from today.
+# WHERE USED:
+#   - Current "Issues From Last 30 Days" metric card (Total, Highest, High).
+#   - Today's data point (rightmost) on the "Last 30 Days" trend chart.
+#   - Target filter for the "View in Jira" button in the email.
 JQL_LAST_4_WEEKS = (
-    'project = "SMFP" and issuetype in (Bug) '
+    'project = "SMFP" and issuetype in (Bug, Bug-CS) '
     'and status NOT IN (Closed, "Ready For Testing") '
     'and priority in (High, Highest) AND component = Services '
     'and created >= -30d order by priority DESC, created DESC'
+)
+
+# ------------------------------------------------------------------------------
+# 3. JQL_HISTORY_OLDER (Historical Backfill — Older Than 30 Days As Of Friday {d})
+# ------------------------------------------------------------------------------
+# WHAT IT DOES:
+#   Reconstructs the point-in-time open backlog as it existed on a past Friday {d}.
+#   Because Jira does not store filter counts historically, this uses Jira Cloud's
+#   changelog operators (WAS NOT IN ... ON / WAS IN ... ON) to inspect historical state.
+# FILTERS:
+#   - created <= "{d_minus_30}": Guarantees the issue existed and was > 30 days
+#     old on that target Friday {d} (where d_minus_30 = d - 30 days).
+#   - status WAS NOT IN (Closed, "Ready For Testing") ON "{d}": Checks changelog
+#     at date {d} — issues closed AFTER date {d} are correctly included; issues
+#     closed BEFORE date {d} are excluded.
+#   - priority WAS IN (High, Highest) ON "{d}": Verifies that on that specific
+#     date {d}, the priority was High or Highest.
+# WHERE USED:
+#   - Called for each of the past 26 Fridays (6 months) to plot the historical
+#     points on the "Older Than 30 Days" trend chart.
+JQL_HISTORY_OLDER = (
+    'project = "SMFP" AND issuetype in (Bug, "Bug-CS") AND component = Services '
+    'AND created <= "{d_minus_30}" '
+    'AND status WAS NOT IN (Closed, "Ready For Testing") ON "{d}" '
+    'AND priority WAS IN (High, Highest) ON "{d}"'
+)
+
+# ------------------------------------------------------------------------------
+# 4. JQL_HISTORY_RECENT (Historical Backfill — Last 30 Days As Of Friday {d})
+# ------------------------------------------------------------------------------
+# WHAT IT DOES:
+#   Reconstructs the recent open issues (created in the 30-day window ending on
+#   Friday {d}) that were unresolved as of that Friday.
+# FILTERS:
+#   - created > "{d_minus_30}" AND created <= "{d}": Bounds creation to the
+#     exact 30-day window prior to Friday {d}. Explicit created <= {d} avoids
+#     Jira's historical search boundary bug.
+#   - status WAS NOT IN (Closed, "Ready For Testing") ON "{d}": Confirms the
+#     issue was open/unresolved on date {d}.
+#   - priority WAS IN (High, Highest) ON "{d}": Confirms the priority was
+#     High or Highest on date {d}.
+# WHERE USED:
+#   - Called for each of the past 26 Fridays (6 months) to plot the historical
+#     points on the "Last 30 Days" trend chart.
+JQL_HISTORY_RECENT = (
+    'project = "SMFP" AND issuetype in (Bug, "Bug-CS") AND component = Services '
+    'AND created > "{d_minus_30}" AND created <= "{d}" '
+    'AND status WAS NOT IN (Closed, "Ready For Testing") ON "{d}" '
+    'AND priority WAS IN (High, Highest) ON "{d}"'
 )
 
 FIELDS = ["key", "summary", "priority", "status", "created", "assignee"]
@@ -123,65 +206,271 @@ def _format_issue_line(issue):
     return f"{r['Key']} — {r['Summary']} | Priority: {r['Priority']} | Status: {r['Status']} | Created: {r['Created']} | Assignee: {r['Assignee']}"
 
 
-def _generate_graph(highest_count, high_count):
+def _get_past_fridays(num_weeks=20):
+    """Return a list of the last `num_weeks` Fridays (as date objects), oldest first."""
+    today = datetime.date.today()
+    # 0=Monday ... 4=Friday
+    days_since_friday = (today.weekday() - 4) % 7
+    last_friday = today - datetime.timedelta(days=days_since_friday)
+    fridays = [last_friday - datetime.timedelta(weeks=i) for i in range(num_weeks - 1, -1, -1)]
+    return fridays
+
+
+def _jira_count_by_priority(base_url, email, api_token, jql):
+    """
+    Fetch all issues for a JQL query (only priority field) and return
+    (highest_count, high_count) by counting from the response.
+    Single API call covers both priorities — halves the total requests.
+    """
+    import ssl, base64 as b64
+    auth = b64.b64encode(f"{email}:{api_token}".encode()).decode()
+    context = ssl._create_unverified_context()
+    highest_count = 0
+    high_count = 0
+    next_page_token = None
+
+    while True:
+        payload = {"jql": jql, "maxResults": 100, "fields": ["priority"]}
+        if next_page_token:
+            payload["nextPageToken"] = next_page_token
+        body = json.dumps(payload).encode()
+        req = Request(
+            f"{base_url}/rest/api/3/search/jql",
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Basic {auth}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urlopen(req, context=context) as resp:
+                data = json.loads(resp.read().decode())
+        except Exception:
+            break
+
+        for issue in data.get("issues", []):
+            p = (issue.get("fields") or {}).get("priority") or {}
+            name = p.get("name", "")
+            if name == "Highest":
+                highest_count += 1
+            elif name == "High":
+                high_count += 1
+
+        next_page_token = data.get("nextPageToken")
+        if not next_page_token or not data.get("issues"):
+            break
+
+    return highest_count, high_count
+
+
+def _fetch_trend_history(base_url, email, api_token, log, num_weeks=26):
+    """
+    Returns the trend history for the last `num_weeks` Fridays.
+    Checks weekly_report_history.json first:
+      - Uses existing historical data for dates already present (0 API calls).
+      - Only queries Jira for missing Fridays (e.g. newly completed weeks).
+      - Persists any newly fetched data into weekly_report_history.json.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    fridays = _get_past_fridays(num_weeks)
+    HISTORY_PATH = os.path.join("json_config", "weekly_report_history.json")
+
+    # 1. Load existing history from file if available
+    existing = {}
+    if os.path.exists(HISTORY_PATH):
+        try:
+            with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+                for row in json.load(f):
+                    existing[row["date"]] = row
+        except Exception as e:
+            log(f"Warning: could not read {HISTORY_PATH}: {e}")
+
+    # 2. Identify which Fridays are already cached vs missing
+    cached_entries = []
+    missing_fridays = []
+    for friday in fridays:
+        date_str = friday.strftime("%Y-%m-%d")
+        if date_str in existing and "older_highest" in existing[date_str]:
+            row = existing[date_str]
+            cached_entries.append({
+                "date": friday,
+                "older_highest": row["older_highest"],
+                "older_high": row["older_high"],
+                "recent_highest": row["recent_highest"],
+                "recent_high": row["recent_high"],
+            })
+        else:
+            missing_fridays.append(friday)
+
+    # If all Fridays already exist in history file, return them immediately (0 API calls)
+    if not missing_fridays:
+        log(f"Loaded all {len(cached_entries)} past Fridays directly from {HISTORY_PATH} (0 Jira API calls needed).")
+        cached_entries.sort(key=lambda r: r["date"])
+        return cached_entries
+
+    log(f"Found {len(cached_entries)} cached Friday(s) in {HISTORY_PATH}. Fetching {len(missing_fridays)} missing Friday(s) from Jira ({len(missing_fridays) * 2} API calls, 6 workers)...")
+
+    # 3. Fetch only missing Fridays from Jira in parallel
+    completed = [0]
+
+    def fetch_friday(friday):
+        as_of_str = friday.strftime("%Y-%m-%d")
+        cutoff_str = (friday - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+        older_highest, older_high = _jira_count_by_priority(
+            base_url, email, api_token,
+            JQL_HISTORY_OLDER.format(d_minus_30=cutoff_str, d=as_of_str)
+        )
+        recent_highest, recent_high = _jira_count_by_priority(
+            base_url, email, api_token,
+            JQL_HISTORY_RECENT.format(d_minus_30=cutoff_str, d=as_of_str)
+        )
+        return {
+            "date": friday,
+            "older_highest": older_highest,
+            "older_high": older_high,
+            "recent_highest": recent_highest,
+            "recent_high": recent_high,
+        }
+
+    fetched_entries = []
+    with ThreadPoolExecutor(max_workers=min(6, len(missing_fridays))) as executor:
+        future_to_friday = {executor.submit(fetch_friday, friday): friday for friday in missing_fridays}
+        for future in as_completed(future_to_friday):
+            result = future.result()
+            completed[0] += 1
+            log(f"   [{completed[0]}/{len(missing_fridays)}] {result['date']} — Older: Highest={result['older_highest']}, High={result['older_high']} | Recent: Highest={result['recent_highest']}, High={result['recent_high']}")
+            fetched_entries.append(result)
+
+    # 4. Append newly fetched entries without modifying/disturbing any existing entries
+    try:
+        for entry in fetched_entries:
+            date_str = entry["date"].strftime("%Y-%m-%d")
+            # Strictly append only missing dates; existing entries are never touched
+            if date_str not in existing:
+                existing[date_str] = {
+                    "date": date_str,
+                    "older_highest": entry["older_highest"],
+                    "older_high": entry["older_high"],
+                    "recent_highest": entry["recent_highest"],
+                    "recent_high": entry["recent_high"],
+                }
+        sorted_history = sorted(existing.values(), key=lambda r: r["date"])
+        with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(sorted_history, f, indent=2)
+        log(f"Appended {len(fetched_entries)} new entry/entries to {HISTORY_PATH} ({len(sorted_history)} total stored).")
+    except Exception as e:
+        log(f"Warning: could not update {HISTORY_PATH}: {e}")
+
+    # Combine cached and newly fetched, sort oldest to newest
+    all_history = cached_entries + fetched_entries
+    all_history.sort(key=lambda r: r["date"])
+    return all_history
+
+
+def _generate_trend_chart(history, highest_key, high_key, title):
+    """Generate a trend line chart from history data with all dates shown and consistent colors."""
     import matplotlib
     matplotlib.use('agg')
     import matplotlib.pyplot as plt
     import io
-    
-    # Modern, clean styling for the graph
-    plt.style.use('default')
-    fig, ax = plt.subplots(figsize=(7, 3))
+    import datetime
+
+    # Prepare labels for all dates
+    dates_str = []
+    for h in history:
+        d = h["date"]
+        if isinstance(d, str):
+            d = datetime.date.fromisoformat(d)
+        dates_str.append(d.strftime("%d-%b"))
+
+    if len(dates_str) > 0:
+        dates_str[-1] = dates_str[-1] + " (Today)"
+
+    highest_vals = [h[highest_key] for h in history]
+    high_vals = [h[high_key] for h in history]
+
+    fig, ax = plt.subplots(figsize=(15, 4.2), dpi=150)
     fig.patch.set_facecolor('#ffffff')
-    ax.set_facecolor('#ffffff')
-    
-    categories = ['Highest', 'High']
-    counts = [highest_count, high_count]
-    # Jira modern colors
-    colors = ['#FF5630', '#FFAB00']
-    
-    # Draw bars, thin width for modern look
-    bars = ax.bar(categories, counts, color=colors, width=0.4, edgecolor='none')
-    
-    # Remove all borders (spines)
+    ax.set_facecolor('#fafbfc')
+
+    x = list(range(len(history)))
+
+    c_highest = "#DE350B"  # Jira Crimson Red
+    c_high = "#FF8B00"     # Jira Amber Orange
+
+    # Draw lines
+    ax.plot(x, highest_vals, color=c_highest, linewidth=2.4, marker='o', markersize=6, label='Highest Priority', zorder=4)
+    ax.plot(x, high_vals, color=c_high, linewidth=2.4, marker='s', markersize=6, label='High Priority', zorder=3)
+
+    # Label data points with smart collision avoidance
+    for i in x:
+        hv = highest_vals[i]
+        hi = high_vals[i]
+
+        if abs(hv - hi) <= 1:
+            if hi >= hv:
+                ax.annotate(str(hi), (i, hi), textcoords="offset points", xytext=(0, 7),
+                            ha="center", fontsize=8.5, color=c_high, fontweight="bold")
+                ax.annotate(str(hv), (i, hv), textcoords="offset points", xytext=(0, -14),
+                            ha="center", fontsize=8.5, color=c_highest, fontweight="bold")
+            else:
+                ax.annotate(str(hv), (i, hv), textcoords="offset points", xytext=(0, 7),
+                            ha="center", fontsize=8.5, color=c_highest, fontweight="bold")
+                ax.annotate(str(hi), (i, hi), textcoords="offset points", xytext=(0, -14),
+                            ha="center", fontsize=8.5, color=c_high, fontweight="bold")
+        else:
+            ax.annotate(str(hv), (i, hv), textcoords="offset points", xytext=(0, 7),
+                        ha="center", fontsize=8.5, color=c_highest, fontweight="bold")
+            ax.annotate(str(hi), (i, hi), textcoords="offset points", xytext=(0, 7),
+                        ha="center", fontsize=8.5, color=c_high, fontweight="bold")
+
+    max_y = max(max(highest_vals), max(high_vals)) if highest_vals and high_vals else 10
+    min_y = min(min(highest_vals), min(high_vals)) if highest_vals and high_vals else 0
+    ax.set_ylim(max(-1.5, min_y - 2.5), max_y + 3.5)
+    ax.set_xlim(-0.6, len(x) - 0.4)
+
+    # All dates shown on X axis
+    ax.set_xticks(x)
+    ax.set_xticklabels(dates_str, rotation=55, ha="right", fontsize=8, color="#42526E")
+
+    ax.set_title(title, fontsize=12, fontweight="bold", color="#172B4D", pad=28)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.0, 1.13), ncol=2, frameon=True, facecolor="#ffffff", edgecolor="#DFE1E6", fontsize=9.5)
+
     for spine in ax.spines.values():
-        spine.set_visible(False)
-        
-    # Remove y-axis and ticks completely (since we show values on bars)
-    ax.get_yaxis().set_visible(False)
-    ax.tick_params(axis='x', which='both', bottom=False, top=False, labelsize=12, labelcolor='#42526E')
-    
-    # Add values on top of bars
-    for bar in bars:
-        yval = bar.get_height()
-        if yval > 0:
-            ax.text(bar.get_x() + bar.get_width()/2.0, yval + (max(counts) * 0.05), int(yval), 
-                    va='bottom', ha='center', fontsize=12, fontweight='bold', color='#172B4D')
-        
+        spine.set_color("#DFE1E6")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.yaxis.set_visible(False)
+    ax.grid(axis="y", linestyle="--", alpha=0.5, color="#EBECF0")
+
     plt.tight_layout()
-    
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', transparent=True)
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     plt.close()
     buf.seek(0)
     return buf.read()
 
 
-def _build_email_body(base_url, overall_issues, recent_issues):
+def _build_email_body(base_url, overall_issues, recent_issues, trend_history):
     overall_highest = sum(1 for i in overall_issues if i["fields"].get("priority", {}).get("name") == "Highest")
     overall_high = sum(1 for i in overall_issues if i["fields"].get("priority", {}).get("name") == "High")
+    overall_total = overall_highest + overall_high
 
     recent_highest = sum(1 for i in recent_issues if i["fields"].get("priority", {}).get("name") == "Highest")
     recent_high = sum(1 for i in recent_issues if i["fields"].get("priority", {}).get("name") == "High")
+    recent_total = recent_highest + recent_high
 
     overall_jql_encoded = urllib.parse.quote(JQL_OVERALL)
     recent_jql_encoded = urllib.parse.quote(JQL_LAST_4_WEEKS)
 
     overall_link = f"{base_url}/jira/software/c/projects/SMFP/issues/?filter=allissues&jql={overall_jql_encoded}"
     recent_link = f"{base_url}/jira/software/c/projects/SMFP/issues/?filter=allissues&jql={recent_jql_encoded}"
-    
-    overall_img_data = _generate_graph(overall_highest, overall_high)
-    recent_img_data = _generate_graph(recent_highest, recent_high)
+
+    overall_img_data = _generate_trend_chart(trend_history, "older_highest", "older_high", "Older Than 30 Days — Trend (Last 6 Months)")
+    recent_img_data = _generate_trend_chart(trend_history, "recent_highest", "recent_high", "Last 30 Days — Trend (Last 6 Months)")
 
     html = f"""
     <!DOCTYPE html>
@@ -189,55 +478,66 @@ def _build_email_body(base_url, overall_issues, recent_issues):
     <head>
         <meta charset="utf-8">
         <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #172B4D; background-color: #ffffff; margin: 0; padding: 10px; }}
-            .container {{ width: 100%; max-width: 100%; margin: 0; background: #ffffff; border-radius: 8px; border: 1px solid #DFE1E6; overflow: hidden; }}
-            .header {{ background-color: #0052CC; color: white; padding: 20px 30px; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 0.5px; }}
-            .content {{ padding: 30px; }}
-            .section {{ margin-bottom: 30px; border: 1px solid #DFE1E6; border-radius: 6px; padding: 20px; background: #FAFBFC; }}
-            .section-title {{ font-size: 16px; font-weight: 600; color: #0052CC; margin-top: 0; margin-bottom: 15px; }}
-            .btn {{ background-color: #0052CC; color: #ffffff !important; padding: 6px 14px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; }}
-            .metrics {{ display: flex; gap: 20px; margin-bottom: 20px; }}
-            .metric-box {{ flex: 1; background: #fff; border: 1px solid #DFE1E6; border-radius: 4px; padding: 10px; text-align: center; }}
-            .metric-label {{ font-size: 12px; color: #6B778C; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }}
-            .metric-value.highest {{ font-size: 24px; font-weight: bold; color: #FF5630; }}
-            .metric-value.high {{ font-size: 24px; font-weight: bold; color: #FFAB00; }}
-            .chart-container {{ text-align: center; background: #fff; border-radius: 4px; border: 1px solid #DFE1E6; padding: 15px 0; }}
-            .chart-img {{ max-width: 100%; height: auto; }}
-            .footer {{ border-top: 1px solid #DFE1E6; padding-top: 20px; color: #5E6C84; font-size: 13px; text-align: left; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #172B4D; background-color: #f4f5f7; margin: 0; padding: 20px 10px; }}
+            .container {{ width: 100%; max-width: 980px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #DFE1E6; overflow: hidden; box-shadow: 0 1px 3px rgba(9, 30, 66, 0.08); }}
+            .header {{ background: linear-gradient(135deg, #0052CC 0%, #0747A6 100%); color: white; padding: 24px 30px; text-align: center; }}
+            .header-title {{ font-size: 20px; font-weight: 700; letter-spacing: 0.3px; margin: 0; }}
+            .header-subtitle {{ font-size: 13px; opacity: 0.85; margin-top: 5px; }}
+            .content {{ padding: 28px 30px; }}
+            .section {{ margin-bottom: 28px; border: 1px solid #DFE1E6; border-radius: 8px; padding: 22px; background: #FAFBFC; }}
+            .section-title {{ font-size: 16px; font-weight: 700; color: #0052CC; margin: 0; }}
+            .btn {{ background-color: #0052CC; color: #ffffff !important; padding: 7px 16px; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; transition: background 0.2s; }}
+            .btn:hover {{ background-color: #0747A6; }}
+            .chart-container {{ text-align: center; background: #ffffff; border-radius: 6px; border: 1px solid #DFE1E6; padding: 12px 6px; margin-top: 15px; box-shadow: 0 1px 2px rgba(9, 30, 66, 0.04); }}
+            .chart-img {{ width: 100%; max-width: 100%; height: auto; display: block; }}
+            .footer {{ border-top: 1px solid #DFE1E6; padding-top: 20px; margin-top: 10px; color: #5E6C84; font-size: 13px; text-align: left; }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                Weekly Legacy Issues Report (SMFP / Services)
+                <div class="header-title">Weekly Legacy Issues Report</div>
+                <div class="header-subtitle">SMFP / Services • Quality & Stability Tracking</div>
             </div>
             <div class="content">
-                <p style="margin-top: 0;">Hi Team,</p>
-                <p>Please find the summary of open highest/high issues in Jira related to the service.</p>
+                <p style="margin-top: 0; color: #172B4D; font-size: 14px;">Hi Team,</p>
+                <p style="color: #42526E; font-size: 14px; margin-bottom: 22px;">Please find below the weekly summary of open Highest and High priority issues in Jira for the Services component.</p>
                 
                 <!-- Overall Section -->
                 <div class="section">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 15px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px;">
                         <tr>
-                            <td align="left" style="font-size: 16px; font-weight: 600; color: #0052CC; margin: 0;">
+                            <td align="left" style="font-size: 16px; font-weight: 700; color: #0052CC;">
                                 Issues Older Than 30 Days
                             </td>
                             <td align="right">
-                                <a href="{overall_link}" class="btn">View in Jira</a>
+                                <a href="{overall_link}" class="btn">View in Jira &rarr;</a>
                             </td>
                         </tr>
                     </table>
                     
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px; margin-top: 15px;">
+                    <!-- 3-Card Indicator Layout -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 18px;">
                         <tr>
-                            <td width="48%" align="center" style="background: #fff; border: 1px solid #DFE1E6; border-radius: 4px; padding: 12px;">
-                                <div class="metric-label">Highest</div>
-                                <div class="metric-value highest">{overall_highest}</div>
+                            <!-- Total Card -->
+                            <td width="31%" style="background-color: #F4F5F7; border: 1px solid #DFE1E6; border-left: 5px solid #0052CC; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #5E6C84; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Open Issues</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #172B4D; line-height: 1.1;">{overall_total}</div>
+                                <div style="font-size: 11px; color: #6B778C; margin-top: 4px;">Older than 30 days</div>
                             </td>
-                            <td width="4%"></td>
-                            <td width="48%" align="center" style="background: #fff; border: 1px solid #DFE1E6; border-radius: 4px; padding: 12px;">
-                                <div class="metric-label">High</div>
-                                <div class="metric-value high">{overall_high}</div>
+                            <td width="3.5%"></td>
+                            <!-- Highest Card -->
+                            <td width="31%" style="background-color: #FFF0ED; border: 1px solid #FFBDAD; border-left: 5px solid #DE350B; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #BF2600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">&#9679; Highest Priority</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #DE350B; line-height: 1.1;">{overall_highest}</div>
+                                <div style="font-size: 11px; color: #BF2600; margin-top: 4px;">Immediate attention required</div>
+                            </td>
+                            <td width="3.5%"></td>
+                            <!-- High Card -->
+                            <td width="31%" style="background-color: #FFF9E6; border: 1px solid #FFE380; border-left: 5px solid #FF8B00; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #B76E00; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">&#9679; High Priority</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #D97008; line-height: 1.1;">{overall_high}</div>
+                                <div style="font-size: 11px; color: #B76E00; margin-top: 4px;">Target for sprint resolution</div>
                             </td>
                         </tr>
                     </table>
@@ -249,27 +549,39 @@ def _build_email_body(base_url, overall_issues, recent_issues):
                 
                 <!-- Recent Section -->
                 <div class="section">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 15px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px;">
                         <tr>
-                            <td align="left" style="font-size: 16px; font-weight: 600; color: #0052CC; margin: 0;">
+                            <td align="left" style="font-size: 16px; font-weight: 700; color: #0052CC;">
                                 Issues From Last 30 Days
                             </td>
                             <td align="right">
-                                <a href="{recent_link}" class="btn">View in Jira</a>
+                                <a href="{recent_link}" class="btn">View in Jira &rarr;</a>
                             </td>
                         </tr>
                     </table>
                     
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px; margin-top: 15px;">
+                    <!-- 3-Card Indicator Layout -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 18px;">
                         <tr>
-                            <td width="48%" align="center" style="background: #fff; border: 1px solid #DFE1E6; border-radius: 4px; padding: 12px;">
-                                <div class="metric-label">Highest</div>
-                                <div class="metric-value highest">{recent_highest}</div>
+                            <!-- Total Card -->
+                            <td width="31%" style="background-color: #F4F5F7; border: 1px solid #DFE1E6; border-left: 5px solid #0052CC; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #5E6C84; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Recent Issues</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #172B4D; line-height: 1.1;">{recent_total}</div>
+                                <div style="font-size: 11px; color: #6B778C; margin-top: 4px;">Opened in last 4 weeks</div>
                             </td>
-                            <td width="4%"></td>
-                            <td width="48%" align="center" style="background: #fff; border: 1px solid #DFE1E6; border-radius: 4px; padding: 12px;">
-                                <div class="metric-label">High</div>
-                                <div class="metric-value high">{recent_high}</div>
+                            <td width="3.5%"></td>
+                            <!-- Highest Card -->
+                            <td width="31%" style="background-color: #FFF0ED; border: 1px solid #FFBDAD; border-left: 5px solid #DE350B; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #BF2600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">&#9679; Highest Priority</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #DE350B; line-height: 1.1;">{recent_highest}</div>
+                                <div style="font-size: 11px; color: #BF2600; margin-top: 4px;">Immediate attention required</div>
+                            </td>
+                            <td width="3.5%"></td>
+                            <!-- High Card -->
+                            <td width="31%" style="background-color: #FFF9E6; border: 1px solid #FFE380; border-left: 5px solid #FF8B00; border-radius: 6px; padding: 14px 18px;">
+                                <div style="font-size: 11px; font-weight: 700; color: #B76E00; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">&#9679; High Priority</div>
+                                <div style="font-size: 28px; font-weight: 800; color: #D97008; line-height: 1.1;">{recent_high}</div>
+                                <div style="font-size: 11px; color: #B76E00; margin-top: 4px;">Target for sprint resolution</div>
                             </td>
                         </tr>
                     </table>
@@ -353,20 +665,27 @@ def run(input_excel, output_excel, config, log_callback=None, action="send"):
 
     CACHE_PATH = os.path.join("json_config", "weekly_report_cache.json")
     import time
-    
+
     use_cache = False
     if action == "send" and os.path.exists(CACHE_PATH):
-        if time.time() - os.path.getmtime(CACHE_PATH) < 1800: # 30 mins
+        if time.time() - os.path.getmtime(CACHE_PATH) < 1800:  # 30 mins
             try:
                 with open(CACHE_PATH, "r", encoding="utf-8") as f:
                     cache_data = json.load(f)
                     overall_issues = cache_data.get("overall_issues")
                     recent_issues = cache_data.get("recent_issues")
-                    if overall_issues is not None and recent_issues is not None:
+                    trend_history_raw = cache_data.get("trend_history")
+                    if overall_issues is not None and recent_issues is not None and trend_history_raw is not None:
+                        # Restore date objects from strings
+                        trend_history = [
+                            {**r, "date": datetime.date.fromisoformat(r["date"]) if isinstance(r["date"], str) else r["date"]}
+                            for r in trend_history_raw
+                        ]
                         use_cache = True
                         log("Using cached Jira data from the recent Fetch...")
                         log(f"Found {len(overall_issues)} overall legacy issue(s).")
                         log(f"Found {len(recent_issues)} issue(s) from the last 4 weeks.")
+                        log(f"Loaded {len(trend_history)} trend history data points from cache.")
             except Exception:
                 pass
 
@@ -378,18 +697,66 @@ def run(input_excel, output_excel, config, log_callback=None, action="send"):
         log("Querying Jira: issues opened in LAST 4 WEEKS...")
         recent_issues = _jira_search(base_url, jira_email, jira_api_token, JQL_LAST_4_WEEKS, log)
         log(f"Found {len(recent_issues)} issue(s) from the last 4 weeks.")
-        
+
+        # --- Build today's data point from fetched issues (no extra API calls) ---
+        today_date = datetime.date.today()
+        today_older_highest  = sum(1 for i in overall_issues if (i["fields"].get("priority") or {}).get("name") == "Highest")
+        today_older_high     = sum(1 for i in overall_issues if (i["fields"].get("priority") or {}).get("name") == "High")
+        today_recent_highest = sum(1 for i in recent_issues  if (i["fields"].get("priority") or {}).get("name") == "Highest")
+        today_recent_high    = sum(1 for i in recent_issues  if (i["fields"].get("priority") or {}).get("name") == "High")
+        today_entry = {
+            "date": today_date,
+            "older_highest": today_older_highest,
+            "older_high": today_older_high,
+            "recent_highest": today_recent_highest,
+            "recent_high": today_recent_high,
+        }
+        log(f"Today ({today_date}) — Older: Highest={today_older_highest}, High={today_older_high} | Recent: Highest={today_recent_highest}, High={today_recent_high}")
+
+        # --- Load or fetch past 26 Fridays (6 months) history ---
+        log("Loading historical trend data for past 26 Fridays (6 months)...")
+        trend_history = _fetch_trend_history(base_url, jira_email, jira_api_token, log, num_weeks=26)
+
+        # Check the last date in historical trend data:
+        # Only append the current date to trend_history if the last date is more than 3 days ago.
+        # The current date is NEVER stored in weekly_report_history.json.
+        if trend_history:
+            last_entry_date = trend_history[-1]["date"]
+            if isinstance(last_entry_date, str):
+                last_entry_date = datetime.date.fromisoformat(last_entry_date)
+            days_diff = (today_date - last_entry_date).days
+            if days_diff > 3:
+                trend_history.append(today_entry)
+                log(f"Last historical Friday was {last_entry_date} ({days_diff} days ago, > 3 days) — added current date ({today_date}) to trend chart.")
+            elif days_diff == 0:
+                # If today is Friday itself, update the last entry with today's live counts
+                trend_history[-1] = today_entry
+            else:
+                log(f"Last historical Friday was {last_entry_date} ({days_diff} days ago, <= 3 days) — current date not added to trend chart.")
+        else:
+            trend_history.append(today_entry)
+
+        # --- Save everything to cache ---
         try:
+            cache_payload = {
+                "overall_issues": overall_issues,
+                "recent_issues": recent_issues,
+                "trend_history": [
+                    {**r, "date": r["date"].strftime("%Y-%m-%d") if hasattr(r["date"], "strftime") else r["date"]}
+                    for r in trend_history
+                ],
+            }
             with open(CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump({"overall_issues": overall_issues, "recent_issues": recent_issues}, f)
+                json.dump(cache_payload, f)
+            log(f"Trend history and issue data saved to cache ({len(trend_history)} data points).")
         except Exception as e:
             log(f"Warning: could not save cache: {e}")
 
     if action == "fetch":
-        log("Data fetch complete. Please review the counts before sending the email.")
+        log("Data fetch complete (including trend history). Please review before sending the email.")
         return
 
-    body, overall_img, recent_img = _build_email_body(base_url, overall_issues, recent_issues)
+    body, overall_img, recent_img = _build_email_body(base_url, overall_issues, recent_issues, trend_history)
     today = datetime.date.today().strftime("%d %b %Y")
     subject = f"Weekly Legacy Issues Report — SMFP / Services — {today}"
 
@@ -399,6 +766,6 @@ def run(input_excel, output_excel, config, log_callback=None, action="send"):
         log(f"Sending email to: {mail_to_str} (CC: {mail_cc_str})")
     else:
         log(f"Sending email to: {mail_to_str}")
-        
+
     _send_email(cfg, subject, body, overall_img, recent_img)
     log("Email sent successfully.")

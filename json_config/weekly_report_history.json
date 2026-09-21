@@ -1,0 +1,184 @@
+[
+  {
+    "date": "2026-03-27",
+    "older_highest": 3,
+    "older_high": 13,
+    "recent_highest": 1,
+    "recent_high": 6
+  },
+  {
+    "date": "2026-04-03",
+    "older_highest": 2,
+    "older_high": 13,
+    "recent_highest": 3,
+    "recent_high": 7
+  },
+  {
+    "date": "2026-04-10",
+    "older_highest": 2,
+    "older_high": 14,
+    "recent_highest": 3,
+    "recent_high": 6
+  },
+  {
+    "date": "2026-04-17",
+    "older_highest": 2,
+    "older_high": 14,
+    "recent_highest": 6,
+    "recent_high": 7
+  },
+  {
+    "date": "2026-04-24",
+    "older_highest": 1,
+    "older_high": 17,
+    "recent_highest": 6,
+    "recent_high": 6
+  },
+  {
+    "date": "2026-05-01",
+    "older_highest": 2,
+    "older_high": 17,
+    "recent_highest": 6,
+    "recent_high": 6
+  },
+  {
+    "date": "2026-05-08",
+    "older_highest": 5,
+    "older_high": 19,
+    "recent_highest": 1,
+    "recent_high": 4
+  },
+  {
+    "date": "2026-05-15",
+    "older_highest": 4,
+    "older_high": 20,
+    "recent_highest": 1,
+    "recent_high": 3
+  },
+  {
+    "date": "2026-05-22",
+    "older_highest": 4,
+    "older_high": 22,
+    "recent_highest": 2,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-05-29",
+    "older_highest": 5,
+    "older_high": 23,
+    "recent_highest": 1,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-06-05",
+    "older_highest": 5,
+    "older_high": 23,
+    "recent_highest": 0,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-06-12",
+    "older_highest": 4,
+    "older_high": 23,
+    "recent_highest": 1,
+    "recent_high": 2
+  },
+  {
+    "date": "2026-06-19",
+    "older_highest": 5,
+    "older_high": 23,
+    "recent_highest": 2,
+    "recent_high": 2
+  },
+  {
+    "date": "2026-06-26",
+    "older_highest": 5,
+    "older_high": 24,
+    "recent_highest": 2,
+    "recent_high": 6
+  },
+  {
+    "date": "2026-07-03",
+    "older_highest": 5,
+    "older_high": 24,
+    "recent_highest": 2,
+    "recent_high": 3
+  },
+  {
+    "date": "2026-07-10",
+    "older_highest": 5,
+    "older_high": 25,
+    "recent_highest": 2,
+    "recent_high": 0
+  },
+  {
+    "date": "2026-07-17",
+    "older_highest": 7,
+    "older_high": 25,
+    "recent_highest": 2,
+    "recent_high": 0
+  },
+  {
+    "date": "2026-07-24",
+    "older_highest": 7,
+    "older_high": 25,
+    "recent_highest": 1,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-07-31",
+    "older_highest": 7,
+    "older_high": 24,
+    "recent_highest": 1,
+    "recent_high": 2
+  },
+  {
+    "date": "2026-08-07",
+    "older_highest": 6,
+    "older_high": 25,
+    "recent_highest": 1,
+    "recent_high": 2
+  },
+  {
+    "date": "2026-08-14",
+    "older_highest": 6,
+    "older_high": 25,
+    "recent_highest": 2,
+    "recent_high": 3
+  },
+  {
+    "date": "2026-08-21",
+    "older_highest": 6,
+    "older_high": 25,
+    "recent_highest": 1,
+    "recent_high": 3
+  },
+  {
+    "date": "2026-08-28",
+    "older_highest": 6,
+    "older_high": 26,
+    "recent_highest": 1,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-09-04",
+    "older_highest": 5,
+    "older_high": 24,
+    "recent_highest": 3,
+    "recent_high": 4
+  },
+  {
+    "date": "2026-09-11",
+    "older_highest": 6,
+    "older_high": 24,
+    "recent_highest": 0,
+    "recent_high": 1
+  },
+  {
+    "date": "2026-09-18",
+    "older_highest": 6,
+    "older_high": 24,
+    "recent_highest": 0,
+    "recent_high": 2
+  }
+]
