@@ -309,9 +309,12 @@ def execute_update_process():
         print("Starting Server via run_server.bat...")
         try:
             start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
+            bat_dir = os.path.dirname(start_bat)
+            bat_name = os.path.basename(start_bat)
             if os.path.exists(start_bat):
-                # 0x00000010 is subprocess.CREATE_NEW_CONSOLE on Windows
-                subprocess.Popen(f'"{start_bat}" --no-pause', shell=True, creationflags=0x00000010)
+                # Use 'start /d' to set working directory so the .bat path needs no quoting
+                cmd = f'start "CROPIN_SERVER" /d "{bat_dir}" cmd /c "{bat_name} --no-pause"'
+                subprocess.Popen(cmd, shell=True)
                 print("run_server.bat launched successfully.")
             else:
                 print(f"ERROR: Could not find {start_bat}")
@@ -355,9 +358,11 @@ def execute_update_process():
         print("Starting Ngrok tunnel...")
         try:
             ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
+            bat_dir = os.path.dirname(ngrok_bat)
+            bat_name = os.path.basename(ngrok_bat)
             if os.path.exists(ngrok_bat):
-                # 0x00000010 is subprocess.CREATE_NEW_CONSOLE on Windows
-                subprocess.Popen(f'"{ngrok_bat}" --no-pause', shell=True, creationflags=0x00000010)
+                cmd = f'start "CROPIN_NGROK" /d "{bat_dir}" cmd /c "{bat_name} --no-pause"'
+                subprocess.Popen(cmd, shell=True)
                 print("Ngrok restarted successfully.")
             else:
                 print(f"ERROR: Could not find {ngrok_bat}")

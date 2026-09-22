@@ -63,7 +63,7 @@ if %ERRORLEVEL% EQU 0 (
 
 :: 1. Launch Server in dedicated window
 echo [1/2] Launching Server in dedicated window...
-start "CROPIN_SERVER" cmd /c ""%SCRIPT_DIR%run_server.bat" --no-pause"
+start "CROPIN_SERVER" /d "%SCRIPT_DIR%" cmd /c "run_server.bat --no-pause"
 
 :: 2. Wait until Server is actually listening on the port
 echo.
@@ -99,7 +99,7 @@ if %ERRORLEVEL% EQU 0 (
 :START_NGROK
 echo.
 echo [2/2] Launching Ngrok Remote Tunnel...
-start "CROPIN_NGROK" cmd /c ""%SCRIPT_DIR%run_ngrok.bat" --no-pause"
+start "CROPIN_NGROK" /d "%SCRIPT_DIR%" cmd /c "run_ngrok.bat --no-pause"
 
 :FINISH
 echo.
