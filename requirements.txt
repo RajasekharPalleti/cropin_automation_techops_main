@@ -14,3 +14,4 @@ pyproj
 shapely
 matplotlib
 playwright
+global-land-mask
