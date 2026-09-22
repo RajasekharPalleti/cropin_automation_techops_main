@@ -1,49 +1,58 @@
 @echo off
-title Windows Auto-Logon Configuration
-echo ========================================================
-echo  Cropin Server - Windows Auto-Logon Setup
-echo ========================================================
-echo.
+setlocal EnableDelayedExpansion
+title Cropin Server - Windows Auto-Logon Setup
 
-:: Capture the logged-in username before potential UAC elevation
+:: 1. Ensure Administrator Privileges (Self-Elevate with persistent /k window)
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [INFO] Elevating to Administrator...
+    powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/k cd /d \"\"%~dp0\"\" && \"\"%~nx0\"\" \"%USERNAME%\" \"%USERDOMAIN%\"' -Verb RunAs"
+    exit /b
+)
+
+cd /d "%~dp0"
+
+:: Capture target user (passed from non-elevated session or current)
 set "TARGET_USER=%USERNAME%"
 set "TARGET_DOMAIN=%USERDOMAIN%"
 if not "%~1"=="" set "TARGET_USER=%~1"
 if not "%~2"=="" set "TARGET_DOMAIN=%~2"
 
-:: Check for Administrative privileges
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [INFO] Requesting Administrator Privileges to configure Auto-Logon...
-    powershell -Command "Start-Process cmd -ArgumentList '/k \"\"%~f0\"\" \"%TARGET_USER%\" \"%TARGET_DOMAIN%\"' -Verb RunAs"
-    exit /b
-)
+echo ========================================================
+echo  Cropin Server - Windows Auto-Logon Setup
+echo ========================================================
+echo  Target User:   %TARGET_USER%
+echo  Target PC:     %TARGET_DOMAIN%
+echo ========================================================
+echo.
 
-:: Unhide the 'Users must enter a username and password' checkbox in netplwiz for Win 10/11
+:: Unlock passwordless checkbox in netplwiz for Win 10/11
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device" /v DevicePasswordLessBuildVersion /t REG_DWORD /d 0 /f >nul 2>&1
 
-echo Target Windows User:   %TARGET_USER%
-echo Target Domain/PC:      %TARGET_DOMAIN%
+echo [1] Enter Password to Enable Auto-Logon
+echo [2] Open Windows Built-in 'netplwiz' Tool (GUI)
+echo [3] Disable Auto-Logon
+echo [4] Exit
 echo.
-echo Please enter the Windows password for %TARGET_USER% to enable
-echo unattended auto-login after system restarts.
-echo.
+set /p "CHOICE=Select an option (1-4, default 1): "
+if "%CHOICE%"=="" set CHOICE=1
 
-set /p "TARGET_PASS=Enter Windows Password for %TARGET_USER%: "
+if "%CHOICE%"=="1" goto :SET_PASSWORD
+if "%CHOICE%"=="2" goto :RUN_NETPLWIZ
+if "%CHOICE%"=="3" goto :DISABLE_LOGON
+if "%CHOICE%"=="4" exit /b
+goto :EOF
+
+:SET_PASSWORD
+echo.
+echo Please enter the Windows password for '%TARGET_USER%':
+set /p "TARGET_PASS=Password: "
 
 if "%TARGET_PASS%"=="" (
-    echo.
-    echo [ERROR] Password cannot be empty!
-    echo If your account has NO password, Windows does not require AutoLogon.
-    echo.
-    echo Opening Windows Netplwiz GUI instead...
-    start netplwiz.exe
+    echo [ERROR] Password cannot be blank.
     pause
     exit /b 1
 )
-
-echo.
-echo Saving Auto-Logon credentials into Windows registry...
 
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "1" /f >nul
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v ForceAutoLogon /t REG_SZ /d "1" /f >nul
@@ -54,17 +63,24 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultD
 if %errorlevel% equ 0 (
     echo.
     echo ========================================================
-    echo  [SUCCESS] Auto-Logon successfully enabled for: %TARGET_USER%
-    echo  Whenever this machine reboots, Windows will automatically
-    echo  log in and start the Cropin Automation Server + Ngrok!
+    echo  [SUCCESS] Auto-Logon configured for %TARGET_USER%!
     echo ========================================================
 ) else (
-    echo.
-    echo [ERROR] Could not update registry. Make sure you ran as Administrator.
-    echo Launching Windows netplwiz tool as fallback...
-    start netplwiz.exe
+    echo [ERROR] Failed to update registry keys.
 )
-
 echo.
+pause
+exit /b
+
+:RUN_NETPLWIZ
+echo Opening netplwiz...
+start netplwiz.exe
+pause
+exit /b
+
+:DISABLE_LOGON
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "0" /f >nul
+reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /f >nul 2>&1
+echo [SUCCESS] Auto-Logon disabled.
 pause
 exit /b

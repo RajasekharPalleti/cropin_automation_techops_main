@@ -1,80 +1,100 @@
 @echo off
-title Cropin Server Auto-Start Setup
-echo ========================================================
-echo  Cropin Server - Windows Auto-Start Setup
-echo ========================================================
-echo.
-echo This script configures the server machine to automatically
-echo start both the Cropin Automation Server and Ngrok tunnel
-echo whenever Windows starts up.
-echo.
+setlocal EnableDelayedExpansion
+title Cropin Server - Windows Auto-Start & Auto-Logon Setup
 
-set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+:: 1. Ensure Administrator Privileges (Self-Elevate if double-clicked)
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [INFO] Elevating to Administrator...
+    powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/k cd /d \"\"%~dp0\"\" && \"\"%~nx0\"\" \"%USERNAME%\" \"%USERDOMAIN%\"' -Verb RunAs"
+    exit /b
+)
 
-:: Resolve absolute paths
-pushd "%~dp0.."
+cd /d "%~dp0"
+pushd ..
 set "PROJECT_DIR=%CD%"
 popd
 set "SCRIPT_DIR=%~dp0"
 set "RUN_ALL_BAT=%SCRIPT_DIR%run_all.bat"
+set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
-:: Clean up old separate shortcuts if they exist to prevent race conditions
-if exist "%STARTUP_DIR%\CropinServer.lnk" (
-    del /f /q "%STARTUP_DIR%\CropinServer.lnk" 2>nul
-)
-if exist "%STARTUP_DIR%\CropinNgrok.lnk" (
-    del /f /q "%STARTUP_DIR%\CropinNgrok.lnk" 2>nul
-)
+:: Get logged in user (passed from initial invocation before elevation)
+set "TARGET_USER=%USERNAME%"
+set "TARGET_DOMAIN=%USERDOMAIN%"
+if not "%~1"=="" set "TARGET_USER=%~1"
+if not "%~2"=="" set "TARGET_DOMAIN=%~2"
 
-echo [1/3] Creating Windows Startup Shortcut for Unified Launcher (run_all.bat)...
-powershell -NoProfile -Command ^
-  "$ws = New-Object -COM WScript.Shell;" ^
-  "$s = $ws.CreateShortcut('%STARTUP_DIR%\CropinAutomation.lnk');" ^
-  "$s.TargetPath = '%RUN_ALL_BAT%';" ^
-  "$s.WorkingDirectory = '%PROJECT_DIR%';" ^
-  "$s.Description = 'Cropin Automation Server and Ngrok Orchestrator';" ^
-  "$s.WindowStyle = 1;" ^
-  "$s.Save()"
-
-if %errorlevel% equ 0 (
-    echo       [OK] Shortcut created: '%STARTUP_DIR%\CropinAutomation.lnk'
-) else (
-    echo       [WARNING] Could not create startup shortcut via PowerShell.
-)
-
+echo ========================================================
+echo  Cropin Server - Windows Auto-Start Setup
+echo ========================================================
+echo  Target User:   %TARGET_USER%
+echo  Target PC:     %TARGET_DOMAIN%
+echo  Project Root:  %PROJECT_DIR%
+echo ========================================================
 echo.
-echo [2/3] Registering Windows Scheduled Task (Runs on Logon with Highest Privileges)...
+
+:: 2. Clean up legacy separate shortcuts
+if exist "%STARTUP_DIR%\CropinServer.lnk" del /f /q "%STARTUP_DIR%\CropinServer.lnk" 2>nul
+if exist "%STARTUP_DIR%\CropinNgrok.lnk" del /f /q "%STARTUP_DIR%\CropinNgrok.lnk" 2>nul
+
+:: 3. Create Windows Startup Folder shortcut for run_all.bat
+echo [1/3] Creating Windows Startup shortcut...
+powershell -NoProfile -Command "$ws = New-Object -COM WScript.Shell; $s = $ws.CreateShortcut('%STARTUP_DIR%\CropinAutomation.lnk'); $s.TargetPath = '%RUN_ALL_BAT%'; $s.WorkingDirectory = '%PROJECT_DIR%'; $s.WindowStyle = 1; $s.Save()"
+if %errorlevel% equ 0 (
+    echo       [OK] Shortcut created in Startup folder.
+) else (
+    echo       [WARNING] Could not create shortcut via PowerShell.
+)
+
+:: 4. Register Windows Scheduled Task (Runs on Logon with Highest Privileges)
+echo.
+echo [2/3] Registering Windows Scheduled Task...
 schtasks /create /tn "CropinAutomationServer" /tr "\"%RUN_ALL_BAT%\"" /sc onlogon /rl highest /f >nul 2>&1
 if %errorlevel% equ 0 (
     echo       [OK] Scheduled Task 'CropinAutomationServer' created successfully.
 ) else (
-    echo       [INFO] Task Scheduler registration skipped (requires Admin). Startup folder shortcut will be used.
+    echo       [INFO] Task Scheduler registration skipped.
+)
+
+:: 5. Configure Windows Auto-Logon
+echo.
+echo [3/3] Configuring Windows Auto-Logon...
+echo ========================================================
+echo  Auto-Logon ensures Windows automatically logs into
+echo  '%TARGET_USER%' whenever the computer restarts,
+echo  so the server and ngrok start completely unattended.
+echo ========================================================
+echo.
+
+:: Unlock the passwordless checkbox in netplwiz for Win 10/11
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device" /v DevicePasswordLessBuildVersion /t REG_DWORD /d 0 /f >nul 2>&1
+
+echo Please enter the Windows password for '%TARGET_USER%'.
+echo (If you do not wish to set Auto-Logon now, simply press Enter to skip).
+echo.
+set /p "TARGET_PASS=Enter Windows Password for %TARGET_USER%: "
+
+if not "%TARGET_PASS%"=="" (
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /t REG_SZ /d "1" /f >nul
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v ForceAutoLogon /t REG_SZ /d "1" /f >nul
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName /t REG_SZ /d "%TARGET_USER%" /f >nul
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ /d "%TARGET_PASS%" /f >nul
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultDomainName /t REG_SZ /d "%TARGET_DOMAIN%" /f >nul
+    
+    echo.
+    echo ========================================================
+    echo  [SUCCESS] Windows Auto-Logon configured for %TARGET_USER%!
+    echo  The computer will now log in automatically on boot.
+    echo ========================================================
+) else (
+    echo.
+    echo [INFO] Auto-Logon password skipped.
+    echo You can configure it later or use Windows 'netplwiz'.
 )
 
 echo.
-echo [3/3] Checking Unattended Auto-Logon...
 echo ========================================================
-echo  IMPORTANT: Unattended Server Reboots
-echo ========================================================
-echo  Windows Startup shortcuts and tasks only trigger when a user logs in.
-echo  If this computer restarts automatically (e.g., Windows Update)
-echo  and remains on the Lock Screen, the server will NOT run
-echo  unless Windows Auto-Logon is enabled.
-echo.
-echo  Would you like to configure Windows Auto-Logon now?
-set /p CONFIGURE_AUTOLOGON="  Configure Auto-Logon? (Y/N, default Y): "
-if /i "%CONFIGURE_AUTOLOGON%"=="N" goto :FINISH
-
-if exist "%SCRIPT_DIR%configure_windows_autologon.bat" (
-    call "%SCRIPT_DIR%configure_windows_autologon.bat"
-)
-
-:FINISH
-echo.
-echo ========================================================
-echo  Auto-Start setup completed!
-echo  Next time this machine restarts, both Server and Ngrok
-echo  will automatically start in sequence.
+echo  All setup completed!
 echo ========================================================
 echo.
 pause
