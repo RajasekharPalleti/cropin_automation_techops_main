@@ -14,23 +14,30 @@ echo and Ngrok to start without requiring anyone to enter a password.
 echo ========================================================
 echo.
 
+:: Capture the logged-in username before potential UAC elevation
+set "ORIG_USER=%USERNAME%"
+set "ORIG_DOMAIN=%USERDOMAIN%"
+if not "%~1"=="" set "ORIG_USER=%~1"
+if not "%~2"=="" set "ORIG_DOMAIN=%~2"
+
 :: Check for Administrative privileges
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo [INFO] Requesting Administrative Privileges...
-    powershell -Command "Start-Process cmd -ArgumentList '/c \"\"%~f0\"\"' -Verb RunAs"
+    powershell -Command "Start-Process cmd -ArgumentList '/c \"\"%~f0\"\" \"%ORIG_USER%\" \"%ORIG_DOMAIN%\"' -Verb RunAs"
     exit /b
 )
 
 :: Unhide the 'Users must enter a username and password' checkbox in netplwiz for Win 10/11
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\PasswordLess\Device" /v DevicePasswordLessBuildVersion /t REG_DWORD /d 0 /f >nul 2>&1
 
-echo [1] Configure Auto-Logon (Enter Username and Password - Secure Masked Input)
+echo [1] Configure Auto-Logon (Enter Password for '%ORIG_USER%')
 echo [2] Open Windows Built-in 'netplwiz' Tool (GUI)
 echo [3] Disable Auto-Logon (Revert to standard password prompt)
 echo [4] Exit
 echo.
-set /p CHOICE="Select an option (1-4): "
+set /p CHOICE="Select an option (1-4, default 1): "
+if "%CHOICE%"=="" set CHOICE=1
 
 if "%CHOICE%"=="1" goto :SETUP_REGISTRY
 if "%CHOICE%"=="2" goto :OPEN_NETPLWIZ
@@ -41,18 +48,25 @@ goto :EOF
 :SETUP_REGISTRY
 echo.
 echo --------------------------------------------------------
-echo Enter Login Credentials for Automatic Startup:
+echo Auto-Logon Account Setup
 echo --------------------------------------------------------
-echo Current Windows User: %USERNAME%
-echo Current Machine/Domain: %USERDOMAIN%
-echo (Note: For Microsoft Accounts e.g. Outlook/Work accounts, enter full email)
+echo Automatically detected current user: %ORIG_USER%
+echo Automatically detected domain/PC:   %ORIG_DOMAIN%
 echo.
 
-set /p INPUT_USER="Username / Email (Press Enter for '%USERNAME%'): "
-if "%INPUT_USER%"=="" set INPUT_USER=%USERNAME%
+set /p USE_DETECTED="Use detected user '%ORIG_USER%'? (Y/N, default Y): "
+if "%USE_DETECTED%"=="" set USE_DETECTED=Y
 
-set /p INPUT_DOMAIN="Domain/Computer Name (Press Enter for '%USERDOMAIN%'): "
-if "%INPUT_DOMAIN%"=="" set INPUT_DOMAIN=%USERDOMAIN%
+if /i "%USE_DETECTED%"=="Y" (
+    set "INPUT_USER=%ORIG_USER%"
+    set "INPUT_DOMAIN=%ORIG_DOMAIN%"
+) else (
+    echo.
+    echo (Note: For Microsoft Accounts e.g. Outlook/Work accounts, enter full email)
+    set /p INPUT_USER="Enter Username / Email: "
+    set /p INPUT_DOMAIN="Enter Domain / Computer Name (Press Enter for '%ORIG_DOMAIN%'): "
+    if "%INPUT_DOMAIN%"=="" set INPUT_DOMAIN=%ORIG_DOMAIN%
+)
 
 echo.
 echo Enter Windows Password for %INPUT_USER%:
