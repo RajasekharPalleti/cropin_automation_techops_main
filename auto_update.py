@@ -150,6 +150,16 @@ def execute_update_process():
             print(f"{config_file} restored.")
             
         print("Git pull successful!")
+        # If new dependencies were added in the repository, install them during update
+        try:
+            print("Verifying requirements after Git pull...")
+            is_win = os.name == 'nt'
+            if is_win and os.path.exists(r".venv\Scripts\pip.exe"):
+                subprocess.call([r".venv\Scripts\pip.exe", "install", "-r", "requirements.txt"])
+            elif os.path.exists(".venv/bin/pip"):
+                subprocess.call([".venv/bin/pip", "install", "-r", "requirements.txt"])
+        except Exception as pip_err:
+            print(f"Warning: Dependency check post-update encountered an issue: {pip_err}")
     except subprocess.CalledProcessError as e:
         print(f"ERROR: Git pull failed with code {e.returncode}. Aborting update.")
         return
@@ -204,6 +214,7 @@ def execute_update_process():
                 # Fallback
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',   '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_ALL_SERVICES*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq STOP_SERVER*',    '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

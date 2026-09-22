@@ -87,6 +87,15 @@ def execute_force_restart():
             safe_log_print(f"{config_file} restored.")
             
         safe_log_print("Git update successful.")
+        try:
+            safe_log_print("Verifying requirements after Git update...")
+            is_win = os.name == 'nt'
+            if is_win and os.path.exists(r".venv\Scripts\pip.exe"):
+                subprocess.call([r".venv\Scripts\pip.exe", "install", "-r", "requirements.txt"])
+            elif os.path.exists(".venv/bin/pip"):
+                subprocess.call([".venv/bin/pip", "install", "-r", "requirements.txt"])
+        except Exception as pip_err:
+            safe_log_print(f"Warning: Dependency check post-update encountered an issue: {pip_err}")
         
     except Exception as e:
         safe_log_print(f"ERROR during Git update: {e}. Proceeding with restart only.")
@@ -141,6 +150,7 @@ def execute_force_restart():
                 # Fallback
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_SERVER*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_NGROK*',   '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq CROPIN_ALL_SERVICES*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_SERVER*', '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq RESTART_NGROK*',  '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.call(['taskkill', '/F', '/FI', 'WINDOWTITLE eq STOP_SERVER*',    '/T'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

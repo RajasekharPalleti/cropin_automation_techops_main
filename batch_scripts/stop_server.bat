@@ -5,21 +5,37 @@ goto :WINDOWS
 
 # Mac/Linux script
 echo -ne "\033]0;STOP_SERVER\007"
-echo "Stopping Server on port 4444..."
-PID=$(lsof -ti:4444)
+cd "$(dirname "$0")/.."
+PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+if [ -z "$PORT" ]; then PORT=4444; fi
+
+echo "Stopping Server on port $PORT..."
+PID=$(lsof -ti:$PORT 2>/dev/null)
 if [ -n "$PID" ]; then
   kill -9 $PID
   echo "Server stopped (PID: $PID)."
 else
-  echo "No server found running on port 4444."
+  echo "No server found running on port $PORT."
 fi
 read -p "Press any key to close..."
 exit 0
 
 :WINDOWS
 title STOP_SERVER
-echo Stopping Server on port 4444...
-for /f "tokens=5" %%a in ('netstat -aon ^| find ":4444" ^| find "LISTENING"') do taskkill /f /pid %%a
+pushd %~dp0\..\
+
+:: Find configured port
+for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I
+set PORT=%PORT: =%
+if "%PORT%"=="" set PORT=4444
+
+echo Stopping Server on port %PORT%...
+for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') do (
+    echo Killing process PID %%a listening on port %PORT%...
+    taskkill /f /pid %%a >nul 2>&1
+)
 echo Server stopped.
+popd
+
 if "%~1"=="--no-pause" exit /b
 pause
