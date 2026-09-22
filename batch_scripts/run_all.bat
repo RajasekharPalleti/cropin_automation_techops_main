@@ -4,7 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
-echo -ne "\033]0;CROPIN_ALL_SERVICES\007"
+printf "\033]0;CROPIN_ALL_SERVICES\007"
 echo "========================================================"
 echo " Starting Cropin Automation Services (Server + Ngrok)..."
 echo "========================================================"
@@ -54,16 +54,16 @@ for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 
 set PORT=%PORT: =%
 if "%PORT%"=="" set PORT=4444
 
-:: Idempotency check: Is Server ALREADY listening?
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = New-Object System.Net.Sockets.TcpClient; try { $c.Connect('127.0.0.1', %PORT%); Write-Host 'UP'; $c.Close() } catch { Write-Host 'DOWN' }" 2>nul | findstr "UP" >nul
+:: Idempotency check: Is Server ALREADY listening on port?
+netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
-    echo [INFO] Server is already running and listening on port %PORT%.
+    echo [INFO] Server is already running on port %PORT%.
     goto :CHECK_NGROK
 )
 
-:: 1. Launch Server in visible window
+:: 1. Launch Server in dedicated window
 echo [1/2] Launching Server in dedicated window...
-start "CROPIN_SERVER" cmd /c ""%SCRIPT_DIR%run_server.bat" --no-pause"
+start "CROPIN_SERVER" "%SCRIPT_DIR%run_server.bat"
 
 :: 2. Wait until Server is actually listening on the port
 echo.
@@ -79,7 +79,7 @@ if %RETRIES% GTR 45 (
 )
 
 timeout /t 2 >nul
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$c = New-Object System.Net.Sockets.TcpClient; try { $c.Connect('127.0.0.1', %PORT%); Write-Host 'UP'; $c.Close() } catch { Write-Host 'WAIT' }" 2>nul | findstr "UP" >nul
+netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo [OK] Server is UP and listening on port %PORT%!
     goto :CHECK_NGROK
@@ -99,7 +99,7 @@ if %ERRORLEVEL% EQU 0 (
 :START_NGROK
 echo.
 echo [2/2] Launching Ngrok Remote Tunnel...
-start "CROPIN_NGROK" cmd /c ""%SCRIPT_DIR%run_ngrok.bat" --no-pause"
+start "CROPIN_NGROK" "%SCRIPT_DIR%run_ngrok.bat"
 
 :FINISH
 echo.

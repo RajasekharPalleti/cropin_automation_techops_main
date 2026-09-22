@@ -4,7 +4,7 @@ goto :WINDOWS
 ::WINDOWS_ONLY
 
 # Mac/Linux script
-echo -ne "\033]0;RESTART_SERVER\007"
+printf "\033]0;RESTART_SERVER\007"
 echo "Restarting Cropin Automation Server..."
 cd "$(dirname "$0")/.."
 PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
