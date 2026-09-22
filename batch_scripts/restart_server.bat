@@ -54,7 +54,7 @@ for /f "tokens=5" %%a in ('netstat -aon ^| find ":%PORT%" ^| find "LISTENING"') 
 timeout /t 2 >nul
 
 echo Starting Server...
-echo Open http://localhost:%PORT% or http://<your-ip>:%PORT% in your browser.
+echo Open http://localhost:%PORT% or http://YOUR-IP-HERE:%PORT% in your browser.
 
 set DO_INSTALL=0
 if not exist .venv\Scripts\activate.bat (
