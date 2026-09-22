@@ -22,7 +22,7 @@ exit 0
 
 :WINDOWS
 title STOP_SERVER
-pushd %~dp0\..\
+pushd "%~dp0.."
 
 :: Find configured port
 for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I

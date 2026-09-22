@@ -26,7 +26,7 @@ echo.
 echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.
 echo.
-pushd %~dp0\..\
+pushd "%~dp0.."
 ngrok http 4444
 popd
 if "%~1"=="--no-pause" exit /b

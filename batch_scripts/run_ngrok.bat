@@ -29,7 +29,7 @@ echo.
 echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.
 echo.
-pushd %~dp0\..\
+pushd "%~dp0.."
 for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I
 set PORT=%PORT: =%
 if "%PORT%"=="" set PORT=4444

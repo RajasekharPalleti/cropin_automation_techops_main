@@ -39,7 +39,7 @@ exit 0
 title RESTART_SERVER
 echo Restarting Cropin Automation Server...
 
-pushd %~dp0\..\
+pushd "%~dp0.."
 
 :: Find configured port
 for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I
@@ -57,15 +57,16 @@ echo Starting Server...
 echo Open http://localhost:%PORT% or http://<your-ip>:%PORT% in your browser.
 
 set DO_INSTALL=0
-if not exist .venv (
+if not exist .venv\Scripts\activate.bat (
     echo Creating new virtual environment...
+    if exist .venv rmdir /s /q .venv >nul 2>&1
     python -m venv .venv
     set DO_INSTALL=1
 )
 
 if "%~1"=="--install-deps" set DO_INSTALL=1
 
-call .venv\Scripts\activate
+call .venv\Scripts\activate.bat
 
 if %DO_INSTALL%==1 (
     echo Installing/Updating requirements...

@@ -44,7 +44,7 @@ exit $SERVER_EXIT
 title CROPIN_SERVER
 echo Starting Cropin Automation Server...
 echo Open http://localhost:4444 or http://<your-ip>:4444 in your browser.
-pushd %~dp0\..\
+pushd "%~dp0.."
 
 :: 1. Verify Python availability
 set PYTHON_CMD=python
