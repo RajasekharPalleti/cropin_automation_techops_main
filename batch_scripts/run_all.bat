@@ -46,13 +46,22 @@ echo  Starting Cropin Automation Services (Server + Ngrok)
 echo ========================================================
 echo.
 
-pushd "%~dp0.."
-set SCRIPT_DIR=%~dp0
+:: Get SCRIPT_DIR without trailing backslash (prevents \" breaking the /d path)
+for %%I in ("%~dp0.") do set "SCRIPT_DIR=%%~fI"
 
-:: Find configured port
-for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I
+:: Change to project root and capture it
+pushd "%~dp0.."
+set "PROJECT_DIR=%CD%"
+
+:: Find configured port using absolute path
+for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" "%PROJECT_DIR%\app\script_configs.py" 2^>nul') do set PORT=%%I
 set PORT=%PORT: =%
 if "%PORT%"=="" set PORT=4444
+
+echo [INFO] Project: %PROJECT_DIR%
+echo [INFO] Scripts: %SCRIPT_DIR%
+echo [INFO] Port:    %PORT%
+echo.
 
 :: Idempotency check: Is Server ALREADY listening on port?
 netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
@@ -62,8 +71,9 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 :: 1. Launch Server in dedicated window
+::    /k keeps the window open so any crash/error stays visible
 echo [1/2] Launching Server in dedicated window...
-start "CROPIN_SERVER" /d "%SCRIPT_DIR%" cmd /c "run_server.bat --no-pause"
+start "CROPIN_SERVER" /d "%SCRIPT_DIR%" cmd /k run_server.bat
 
 :: 2. Wait until Server is actually listening on the port
 echo.
@@ -99,7 +109,7 @@ if %ERRORLEVEL% EQU 0 (
 :START_NGROK
 echo.
 echo [2/2] Launching Ngrok Remote Tunnel...
-start "CROPIN_NGROK" /d "%SCRIPT_DIR%" cmd /c "run_ngrok.bat --no-pause"
+start "CROPIN_NGROK" /d "%SCRIPT_DIR%" cmd /k run_ngrok.bat
 
 :FINISH
 echo.
