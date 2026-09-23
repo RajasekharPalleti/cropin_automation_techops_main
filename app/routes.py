@@ -339,7 +339,7 @@ async def shutdown_server():
     def kill_server():
         print("Shutdown requested via API. Executing stop_server.bat... wait for 10 mins to deployment and refresh the browser for new changes")
         try:
-            bat_path = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
+            bat_path = os.path.abspath("stop_server.bat")
             if os.path.exists(bat_path):
                 # We pipe 'echo .' to bypass the 'pause' at the end of the bat file
                 subprocess.Popen(f'echo. | "{bat_path}"', shell=True)

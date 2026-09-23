@@ -10,7 +10,7 @@ pkill -9 ngrok || true
 echo "Stopped existing ngrok processes."
 echo "Starting new tunnel..."
 echo "The public URL will appear below."
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 if [ -z "$PORT" ]; then PORT=4444; fi
 if [ -f "./ngrok" ]; then
@@ -33,7 +33,7 @@ echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.
 echo.
 
-for %%I in ("%~dp0..") do set "PROJECT_DIR=%%~fI"
+for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 cd /d "%PROJECT_DIR%"
 pushd "%PROJECT_DIR%"
 

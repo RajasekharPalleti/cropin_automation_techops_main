@@ -5,7 +5,7 @@ echo   Cropin Automation - Windows Environment Diagnostic
 echo ========================================================
 echo.
 
-for %%I in ("%~dp0..") do set "PROJECT_DIR=%%~fI"
+for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 echo [1] Checking Project Directory...
 echo     Project Root: %PROJECT_DIR%
 echo.

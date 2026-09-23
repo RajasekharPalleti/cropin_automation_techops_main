@@ -10,7 +10,7 @@ echo ""
 echo "The public URL will appear below."
 echo "Keep this window OPEN to maintain remote access."
 echo ""
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 if [ -z "$PORT" ]; then PORT=4444; fi
 if [ -f "./ngrok" ]; then
@@ -29,8 +29,12 @@ echo.
 echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.
 echo.
-pushd "%~dp0.."
-for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" app\script_configs.py 2^>nul') do set PORT=%%I
+
+for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
+cd /d "%PROJECT_DIR%"
+pushd "%PROJECT_DIR%"
+
+for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" "%PROJECT_DIR%\app\script_configs.py" 2^>nul') do set PORT=%%I
 set PORT=%PORT: =%
 if "%PORT%"=="" set PORT=4444
 
@@ -40,10 +44,8 @@ set NGROK_ATTEMPTS=0
 set /a NGROK_ATTEMPTS+=1
 
 :: Prioritize local ngrok.exe in the repository root
-if exist ngrok.exe (
-    ngrok.exe http %PORT%
-) else if exist "%~dp0..\ngrok.exe" (
-    "%~dp0..\ngrok.exe" http %PORT%
+if exist "%PROJECT_DIR%\ngrok.exe" (
+    "%PROJECT_DIR%\ngrok.exe" http %PORT%
 ) else (
     ngrok http %PORT%
 )

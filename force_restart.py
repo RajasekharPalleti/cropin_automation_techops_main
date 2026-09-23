@@ -118,7 +118,7 @@ def execute_force_restart():
     try:
         if is_windows:
             # Kill the process listening on port 4444
-            stop_bat = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
+            stop_bat = os.path.abspath("stop_server.bat")
             if os.path.exists(stop_bat):
                 subprocess.call(f'echo. | "{stop_bat}"', shell=True)
             
@@ -244,7 +244,7 @@ def execute_force_restart():
     if is_windows:
         safe_log_print("Starting Server in NEW visible terminal...")
         try:
-            start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
+            start_bat = os.path.abspath("run_server.bat")
             if os.path.exists(start_bat):
                 # 0x00000010 is subprocess.CREATE_NEW_CONSOLE on Windows
                 subprocess.Popen(f'"{start_bat}" --no-pause', shell=True, creationflags=0x00000010)
@@ -255,7 +255,7 @@ def execute_force_restart():
             safe_log_print(f"ERROR starting Server: {e}")
     else:
         # Start Server on macOS / Unix
-        start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
+        start_bat = os.path.abspath("run_server.bat")
         launched_visually = False
         
         if sys.platform == 'darwin':
@@ -290,7 +290,7 @@ def execute_force_restart():
     if is_windows:
         safe_log_print("Starting Ngrok in NEW visible terminal...")
         try:
-            ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
+            ngrok_bat = os.path.abspath("run_ngrok.bat")
             if os.path.exists(ngrok_bat):
                 # 0x00000010 is subprocess.CREATE_NEW_CONSOLE on Windows
                 subprocess.Popen(f'"{ngrok_bat}" --no-pause', shell=True, creationflags=0x00000010)
@@ -301,7 +301,7 @@ def execute_force_restart():
             safe_log_print(f"ERROR restarting Ngrok: {e}")
     else:
         # Start Ngrok on macOS / Unix
-        ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
+        ngrok_bat = os.path.abspath("run_ngrok.bat")
         launched_visually = False
         
         if sys.platform == 'darwin':

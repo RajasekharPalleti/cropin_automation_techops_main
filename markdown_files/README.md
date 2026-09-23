@@ -44,19 +44,19 @@ _Important: Since credential files are private, they are not included in the git
     *   *You get the ID from the URL of your Drive folder: `drive.google.com/drive/u/0/folders/<THIS_IS_THE_ID>`*.
 
 ### 5. Run the Application
-You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux** using the scripts in `batch_scripts/`.
+You can use the provided scripts to start and stop the server easily on both **Windows** and **macOS/Linux**:
 
 **Start Server:**
-- **Windows**: Double-click `batch_scripts/run_server.bat`
-- **macOS/Linux**: Run `./batch_scripts/run_server.bat` in terminal
+- **Windows**: Double-click `run_all.bat` (or `run_server.bat`)
+- **macOS/Linux**: Run `./run_all.bat` (or `./run_server.bat`) in terminal
 
 **Stop Server:**
-- **Windows**: Double-click `batch_scripts/stop_server.bat`
-- **macOS/Linux**: Run `./batch_scripts/stop_server.bat` in terminal
+- **Windows**: Double-click `stop_server.bat`
+- **macOS/Linux**: Run `./stop_server.bat` in terminal
 
 **Restart Server:**
-- **Windows**: Double-click `batch_scripts/restart_server.bat`
-- **macOS/Linux**: Run `./batch_scripts/restart_server.bat` in terminal
+- **Windows**: Double-click `restart_server.bat`
+- **macOS/Linux**: Run `./restart_server.bat` in terminal
 
 The application will be accessible at: `http://127.0.0.1:4444` or http:localhost:4444
 ### 6. Remote Access (Optional)
@@ -80,6 +80,6 @@ To access the app from another device (like your phone or another laptop), follo
 -   `static/`: Frontend assets (HTML, CSS, JS).
 -   `sample_templates/`: Excel templates for users.
 -   `uploads/` & `outputs/`: Temporary directories for processing files.
--   `batch_scripts/`: Execution scripts for running the server and ngrok.
+-   `*.bat`: Root execution scripts for running, stopping, and restarting the server and ngrok.
 -   `markdown_files/`: Documentation and guides.
 -   `json_config/`: Configuration files (credentials).

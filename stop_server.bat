@@ -5,7 +5,7 @@ goto :WINDOWS
 
 # Mac/Linux script
 printf "\033]0;STOP_SERVER\007"
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 if [ -z "$PORT" ]; then PORT=4444; fi
 
@@ -22,7 +22,7 @@ exit 0
 
 :WINDOWS
 title STOP_SERVER
-for %%I in ("%~dp0..") do set "PROJECT_DIR=%%~fI"
+for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 cd /d "%PROJECT_DIR%"
 pushd "%PROJECT_DIR%"
 

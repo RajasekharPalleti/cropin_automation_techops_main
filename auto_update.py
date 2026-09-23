@@ -182,7 +182,7 @@ def execute_update_process():
     try:
         if is_windows:
             # Kill the process listening on port 4444
-            stop_bat = os.path.abspath(os.path.join("batch_scripts", "stop_server.bat"))
+            stop_bat = os.path.abspath("stop_server.bat")
             if os.path.exists(stop_bat):
                 subprocess.call(f'echo. | "{stop_bat}"', shell=True)
 
@@ -308,7 +308,7 @@ def execute_update_process():
     if is_windows:
         print("Starting Server via run_server.bat...")
         try:
-            start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
+            start_bat = os.path.abspath("run_server.bat")
             bat_dir = os.path.dirname(start_bat)
             bat_name = os.path.basename(start_bat)
             if os.path.exists(start_bat):
@@ -322,7 +322,7 @@ def execute_update_process():
             print(f"ERROR running run_server.bat: {e}")
     else:
         # Start Server on macOS / Unix
-        start_bat = os.path.abspath(os.path.join("batch_scripts", "run_server.bat"))
+        start_bat = os.path.abspath("run_server.bat")
         launched_visually = False
         
         if sys.platform == 'darwin':
@@ -357,7 +357,7 @@ def execute_update_process():
     if is_windows:
         print("Starting Ngrok tunnel...")
         try:
-            ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
+            ngrok_bat = os.path.abspath("run_ngrok.bat")
             bat_dir = os.path.dirname(ngrok_bat)
             bat_name = os.path.basename(ngrok_bat)
             if os.path.exists(ngrok_bat):
@@ -370,7 +370,7 @@ def execute_update_process():
             print(f"ERROR restarting Ngrok: {e}")
     else:
         # Start Ngrok on macOS / Unix
-        ngrok_bat = os.path.abspath(os.path.join("batch_scripts", "run_ngrok.bat"))
+        ngrok_bat = os.path.abspath("run_ngrok.bat")
         launched_visually = False
         
         if sys.platform == 'darwin':

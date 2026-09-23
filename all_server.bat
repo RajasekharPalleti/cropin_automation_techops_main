@@ -3,11 +3,11 @@
 goto :WINDOWS
 ::WINDOWS_ONLY
 
-# Mac/Linux execution
+# Mac/Linux: run run_all.bat
 DIR="$(dirname "$0")"
-exec bash "$DIR/batch_scripts/run_all.bat" "$@"
+exec bash "$DIR/run_all.bat" "$@"
 
 :WINDOWS
 @echo off
-call "%~dp0batch_scripts\run_all.bat" %*
+call "%~dp0run_all.bat" %*
 exit /b %ERRORLEVEL%

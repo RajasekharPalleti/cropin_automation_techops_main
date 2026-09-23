@@ -10,12 +10,8 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-cd /d "%~dp0"
-pushd ..
-set "PROJECT_DIR=%CD%"
-popd
-set "SCRIPT_DIR=%~dp0"
-set "RUN_ALL_BAT=%SCRIPT_DIR%run_all.bat"
+for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
+set "RUN_ALL_BAT=%PROJECT_DIR%\run_all.bat"
 set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
 :: Get logged in user (passed from initial invocation before elevation)
