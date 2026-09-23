@@ -1,0 +1,3433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Check — Google Maps Visualizer</title>
+    <link rel="icon" href="/static/images/logo.png" type="image/png">
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <!-- SheetJS for client-side Excel/CSV parsing & generation -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <style>
+        :root {
+            --primary: #00897b;
+            --primary-dark: #00695c;
+            --primary-light: #e0f2f1;
+            --primary-rgb: 0, 137, 123;
+            --accent-green: #76be28;
+            --accent-blue: #009ade;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --surface-glass: rgba(255, 255, 255, 0.92);
+            --border: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-subtle: #94a3b8;
+            --danger: #ef4444;
+            --danger-bg: #fef2f2;
+            --success: #10b981;
+            --success-bg: #ecfdf5;
+            --sidebar-width: 430px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --shadow-subtle: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+            --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+            --shadow-lg: 0 10px 25px -3px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── Top Bar ── */
+        .topbar {
+            height: 56px;
+            background: #0f172a;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #fff;
+            padding: 6px 13px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.18s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+            transform: translateX(-1px);
+        }
+
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-badge {
+            background: linear-gradient(135deg, var(--accent-green), var(--primary));
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 137, 123, 0.45);
+        }
+
+        .topbar-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tag-google-maps {
+            background: rgba(66, 133, 244, 0.18);
+            border: 1px solid rgba(66, 133, 244, 0.4);
+            color: #93c5fd;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pill-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #a7f3d0;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .pill-badge .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* ── Workspace Split ── */
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 56px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 500;
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04);
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .sidebar.collapsed {
+            margin-left: calc(-1 * var(--sidebar-width));
+        }
+
+        .sidebar-toggle-btn {
+            position: absolute;
+            right: -28px;
+            top: 20px;
+            width: 28px;
+            height: 38px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 3px 2px 10px rgba(0, 0, 0, 0.08);
+            z-index: 600;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+
+        .sidebar-toggle-btn:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        /* Sidebar Nav Tabs (Segmented Control) */
+        .sidebar-tabs-bar {
+            padding: 12px 16px 8px;
+            background: #f8fafc;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .segmented-tabs {
+            display: flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 9px;
+            gap: 3px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 0.83rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            transition: all 0.18s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            background: var(--surface);
+            color: var(--primary);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .tab-btn .badge-count {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+
+        /* Sidebar Body */
+        .sidebar-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .sidebar-body::-webkit-scrollbar {
+            width: 5px;
+        }
+        .sidebar-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        /* Modern Card UI */
+        .panel-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            box-shadow: var(--shadow-subtle);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .panel-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-md);
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 6px;
+        }
+
+        .panel-title .material-icons {
+            font-size: 1.15rem;
+            color: var(--primary);
+        }
+
+        .panel-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin-bottom: 12px;
+        }
+
+        /* Action Buttons */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 13px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 2px 6px rgba(0, 137, 123, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 137, 123, 0.35);
+        }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--text-main);
+            border-color: var(--border);
+        }
+
+        .btn-outline:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent-green), #5ea01d);
+            color: #fff;
+            border: none;
+            box-shadow: 0 2px 6px rgba(118, 190, 40, 0.28);
+        }
+
+        .btn-accent:hover {
+            background: linear-gradient(135deg, #68aa22, #528e19);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(118, 190, 40, 0.38);
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        /* Dropzone */
+        .dropzone {
+            border: 2px dashed #cbd5e1;
+            border-radius: var(--radius-md);
+            padding: 22px 16px;
+            text-align: center;
+            background: #fafbfc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .dropzone:hover, .dropzone.drag-over {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .dropzone-icon {
+            font-size: 36px;
+            color: var(--primary);
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .dropzone-text {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 3px;
+        }
+
+        .dropzone-hint {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        .dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .selected-file-badge {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+
+        .selected-file-badge.show {
+            display: flex;
+        }
+
+        /* KPI summary */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .kpi-card {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 8px;
+            text-align: center;
+        }
+
+        .kpi-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .kpi-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .kpi-card.success .kpi-val { color: var(--success); }
+        .kpi-card.danger .kpi-val { color: var(--danger); }
+
+        /* Error viewer */
+        .error-log {
+            background: var(--danger-bg);
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.75rem;
+            color: #b91c1c;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error-log.show {
+            display: block;
+        }
+
+        /* ── Locations Tab (Inspector) ── */
+        .inspector-toolbar {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .search-box-wrap {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 14px 10px 36px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.84rem;
+            font-family: inherit;
+            background: #fff;
+            color: var(--text-main);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.14);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: var(--text-muted);
+        }
+
+        .inspector-actions-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .locations-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 2px;
+        }
+
+        .location-item {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .location-item:hover {
+            border-color: var(--primary);
+            background: #f0fdfa;
+            transform: translateX(2px);
+        }
+
+        .location-item.active {
+            border-color: #2563eb !important;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.22), 0 0 0 1px #3b82f6 !important;
+            border-left: 5px solid #2563eb !important;
+            transform: translateX(4px);
+        }
+
+        .loc-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .loc-idx {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .location-item.active .loc-idx {
+            background: #2563eb !important;
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+        }
+
+        .location-item.active .loc-name {
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+        }
+
+        .location-item.active .loc-coords {
+            color: #1d4ed8 !important;
+            font-weight: 600 !important;
+        }
+
+        .location-item.active .loc-actions {
+            opacity: 1 !important;
+        }
+
+        .loc-info {
+            overflow: hidden;
+        }
+
+        .loc-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .loc-coords {
+            font-size: 0.73rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 1px;
+        }
+
+        .loc-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            opacity: 0.5;
+            transition: opacity 0.15s;
+        }
+
+        .location-item:hover .loc-actions {
+            opacity: 1;
+        }
+
+        .icon-btn-sm {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn-sm:hover {
+            color: var(--primary);
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 16px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .material-icons {
+            font-size: 46px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            font-size: 0.84rem;
+        }
+
+        /* ── Map Canvas ── */
+        .map-container {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            background: #e2e8f0;
+        }
+
+        #world-map {
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        /* ── Floating Controls on Google Maps (UI Designer Polish) ── */
+        .map-floating-bar {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 400;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Google Maps Layer Switcher (Segmented Control) */
+        .google-layer-switcher {
+            background: var(--surface-glass);
+            backdrop-filter: blur(12px);
+            padding: 4px;
+            border-radius: 10px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .layer-pill {
+            background: none;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 7px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.16s ease;
+        }
+
+        .layer-pill:hover {
+            background: #f1f5f9;
+            color: var(--text-main);
+        }
+
+        .layer-pill.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 137, 123, 0.35);
+        }
+
+        /* Map Action Tool Buttons */
+        .map-tools-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .map-tool-btn {
+            background: var(--surface-glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            height: 38px;
+            padding: 0 12px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            transition: all 0.16s ease;
+        }
+
+        .map-tool-btn:hover {
+            background: #fff;
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .map-tool-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* Suppress default leaflet zoom controls */
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+        .leaflet-control-attribution {
+            margin-right: 56px !important;
+            font-size: 10px !important;
+            background: rgba(255, 255, 255, 0.75) !important;
+        }
+
+        /* Bottom Coordinates & Scale Status Bar (Moved to Bottom Left to keep Right Bottom clear for Zoom Buttons) */
+        .map-coords-bar {
+            position: absolute;
+            bottom: 14px;
+            left: 14px;
+            z-index: 400;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(8px);
+            color: #f8fafc;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* ── Custom Google-Style Markers & Permanent Labels ── */
+        .custom-pin-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .custom-pin {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35));
+        }
+
+        .custom-pin:hover {
+            transform: scale(1.22) translateY(-4px);
+            z-index: 1000 !important;
+        }
+
+        /* Permanent Label Badge Below Pin (For clear location names on map) */
+        .pin-label-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(4px);
+            color: #0f172a;
+            border: 1px solid rgba(15, 23, 42, 0.15);
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+            white-space: nowrap;
+            margin-top: 2px;
+            pointer-events: none;
+            letter-spacing: -0.2px;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pin-label-badge.hidden-label {
+            display: none !important;
+        }
+
+        /* Modern Tooltip on Hover */
+        .leaflet-tooltip.location-tooltip {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 9px;
+            padding: 8px 14px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            white-space: nowrap;
+        }
+
+        .leaflet-tooltip-top:before {
+            border-top-color: rgba(15, 23, 42, 0.95);
+        }
+
+        .location-tooltip-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.2px;
+        }
+
+        .location-tooltip-sub {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        /* Modern Popup on Click */
+        .leaflet-popup-content-wrapper {
+            border-radius: var(--radius-lg);
+            padding: 0;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            line-height: 1.4;
+            min-width: 270px;
+        }
+
+        .popup-card {
+            background: #fff;
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #fff;
+            padding: 13px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .popup-header .pin-icon {
+            background: var(--primary);
+            width: 30px;
+            height: 30px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            color: #fff;
+        }
+
+        .popup-title {
+            font-size: 0.96rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.2px;
+        }
+
+        .popup-body {
+            padding: 14px 16px;
+        }
+
+        .popup-coord-row {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 8px 11px;
+            margin-bottom: 12px;
+        }
+
+        .coord-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .coord-val {
+            font-size: 0.86rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 1px;
+        }
+
+        .popup-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .popup-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 8px 11px;
+            border-radius: 7px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+        }
+
+        .popup-btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .popup-btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .popup-btn-outline {
+            background: #fff;
+            color: var(--text-main);
+        }
+
+        .popup-btn-outline:hover {
+            background: #f1f5f9;
+        }
+
+        /* Toast Container */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: #0f172a;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.83rem;
+            font-weight: 500;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.25s ease;
+            pointer-events: auto;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.toast-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.toast-error {
+            border-left: 4px solid var(--danger);
+        }
+
+        /* ── Status Badges for Plots ── */
+        .status-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-badge.original {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+        .status-badge.updated {
+            background: #fffbeb;
+            color: #d97706;
+            border: 1px solid #fde68a;
+        }
+        .status-badge.new {
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+        }
+
+        /* ── Custom Floating Zoom Control Widget in Right Bottom Corner ── */
+        .map-zoom-widget {
+            position: absolute;
+            bottom: 24px;
+            right: 16px;
+            z-index: 400;
+            background: var(--surface-glass);
+            backdrop-filter: blur(12px);
+            border-radius: 10px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.16s ease;
+        }
+
+        .zoom-btn:hover {
+            background: #f1f5f9;
+            color: var(--primary);
+        }
+
+        .zoom-btn:active {
+            transform: scale(0.92);
+        }
+
+        .zoom-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0 4px;
+        }
+
+        /* ── Top Floating Action / Alert Banner (Drag / Add Plot) ── */
+        .map-mode-banner {
+            position: absolute;
+            top: 68px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            z-index: 600;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(14px);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 9px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .map-mode-banner.active {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .banner-live-coords {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.77rem;
+            color: #38bdf8;
+            margin-top: 1px;
+        }
+
+        /* ── Draggable Active Marker Ring ── */
+        .custom-pin.drag-active {
+            filter: drop-shadow(0 0 14px #f59e0b) drop-shadow(0 4px 12px rgba(0,0,0,0.6)) !important;
+            animation: pin-drag-pulse 1.2s infinite ease-in-out;
+            cursor: grab !important;
+        }
+
+        @keyframes pin-drag-pulse {
+            0%, 100% { transform: scale(1.28) translateY(-6px); }
+            50% { transform: scale(1.42) translateY(-10px); }
+        }
+
+        /* ── Export & Dialog Modals ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(6px);
+            z-index: 9990;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: var(--surface);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 560px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.25);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modal-pop {
+            from { opacity: 0; transform: scale(0.94); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fafbfc;
+        }
+
+        .modal-icon-badge {
+            width: 38px;
+            height: 38px;
+            border-radius: 9px;
+            background: var(--primary-light);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .modal-subtitle {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .modal-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        .export-option-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            background: #fff;
+            transition: all 0.16s ease;
+        }
+
+        .export-option-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .export-card-header {
+            margin-bottom: 10px;
+        }
+
+        .export-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        .export-badge.badge-warning {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .export-badge.badge-info {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .export-card-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .export-card-desc {
+            font-size: 0.77rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            margin-top: 3px;
+        }
+
+        .export-btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .kpi-row-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .kpi-row-4 .kpi-card {
+            padding: 8px 4px;
+        }
+
+        .kpi-row-4 .kpi-val {
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Header / Topbar ── -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <button class="back-btn" onclick="window.location.href='/'" title="Back to TechOps Automation Console">
+                <span class="material-icons" style="font-size: 1.05rem;">arrow_back</span>
+                Console
+            </button>
+            <div class="topbar-brand">
+                <div class="icon-badge">
+                    <span class="material-icons" style="font-size: 1.2rem;">pin_drop</span>
+                </div>
+                <div class="topbar-title">
+                    <span>Location Check & Exact Lat/Long Manager</span>
+                    <span class="tag-google-maps">
+                        <span class="material-icons" style="font-size: 13px;">public</span>
+                        Google Maps
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="topbar-right">
+            <div class="pill-badge">
+                <span class="dot"></span>
+                <span id="active-pointer-badge">0 Locations</span>
+            </div>
+            <button class="btn-action btn-primary" id="top-export-btn" style="padding: 6px 14px; font-size: 0.8rem; background: #0284c7; border-color: #0284c7;" onclick="openExportModal()" title="Export Plotted & Updated Locations">
+                <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
+                Export Updated Data
+            </button>
+            <button class="btn-action btn-outline" style="padding: 6px 12px; font-size: 0.78rem;" onclick="downloadSampleTemplate('xlsx')">
+                <span class="material-icons" style="font-size: 1rem; color: var(--accent-green);">download</span>
+                Template
+            </button>
+        </div>
+    </header>
+
+    <!-- ── Workspace Layout ── -->
+    <main class="workspace">
+
+        <!-- ── Left Sidebar (Collapsible) ── -->
+        <aside class="sidebar" id="sidebar">
+            <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <span class="material-icons" id="sidebar-toggle-icon" style="font-size: 18px;">chevron_left</span>
+            </button>
+
+            <!-- Navigation Tabs (Segmented Control) -->
+            <div class="sidebar-tabs-bar">
+                <div class="segmented-tabs">
+                    <button class="tab-btn" id="tab-btn-setup" onclick="switchTab('setup')">
+                        <span class="material-icons" style="font-size: 1.05rem;">upload_file</span>
+                        Upload & Template
+                    </button>
+                    <button class="tab-btn active" id="tab-btn-locations" onclick="switchTab('locations')">
+                        <span class="material-icons" style="font-size: 1.05rem;">place</span>
+                        Locations
+                        <span class="badge-count" id="tab-count-badge">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab 1: Upload & Template -->
+            <div class="sidebar-body" id="tab-content-setup" style="display: none;">
+                
+                <!-- Card 1: Upload File -->
+                <div class="panel-card">
+                    <div class="panel-title">
+                        <span class="material-icons">cloud_upload</span>
+                        Upload Location File
+                    </div>
+                    <p class="panel-desc">
+                        Upload your Excel (.xlsx, .xls) or CSV file with <strong>Location Name</strong>, <strong>Latitude</strong>, and <strong>Longitude</strong> (or combined <strong>Coordinates</strong>). Supports all Google Maps formats (DD, DMS, DMM).
+                    </p>
+
+                    <div class="dropzone" id="file-dropzone">
+                        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)" />
+                        <span class="material-icons dropzone-icon">map</span>
+                        <div class="dropzone-text">Drop your Excel/CSV file here</div>
+                        <div class="dropzone-hint">or click to browse (.xlsx, .xls, .csv)</div>
+                    </div>
+
+                    <div class="selected-file-badge" id="selected-file-badge">
+                        <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+                            <span class="material-icons" style="font-size: 1.2rem; color: var(--primary);">insert_drive_file</span>
+                            <span id="file-name-text" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+                        </div>
+                        <button class="icon-btn-sm" onclick="clearSelectedFile()" title="Remove file">
+                            <span class="material-icons" style="font-size: 16px;">close</span>
+                        </button>
+                    </div>
+
+                    <button class="btn-action btn-accent btn-full" id="plot-btn" style="margin-top: 14px;" onclick="processUploadedFile()">
+                        <span class="material-icons" style="font-size: 1.1rem;">pin_drop</span>
+                        Plot on Google Maps
+                    </button>
+                </div>
+
+                <!-- Card 2: Template Management -->
+                <div class="panel-card">
+                    <div class="panel-title">
+                        <span class="material-icons">file_download</span>
+                        Download Ready Template
+                    </div>
+                    <p class="panel-desc">
+                        Get the formatted template with columns: <strong>Location Name</strong>, <strong>Latitude</strong>, and <strong>Longitude</strong>.
+                    </p>
+
+                    <div class="btn-grid">
+                        <button class="btn-action btn-primary" onclick="downloadSampleTemplate('xlsx')">
+                            <span class="material-icons" style="font-size: 1rem;">table_view</span>
+                            Download XLSX
+                        </button>
+                        <button class="btn-action btn-outline" onclick="downloadSampleTemplate('csv')">
+                            <span class="material-icons" style="font-size: 1rem;">description</span>
+                            Download CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card 3: Metrics & Health -->
+                <div class="panel-card">
+                    <div class="panel-title">
+                        <span class="material-icons">analytics</span>
+                        Dataset Summary
+                    </div>
+
+                    <div class="kpi-row">
+                        <div class="kpi-card">
+                            <div class="kpi-val" id="kpi-total">0</div>
+                            <div class="kpi-label">Total Rows</div>
+                        </div>
+                        <div class="kpi-card success">
+                            <div class="kpi-val" id="kpi-valid">0</div>
+                            <div class="kpi-label">Valid Plotted</div>
+                        </div>
+                        <div class="kpi-card danger">
+                            <div class="kpi-val" id="kpi-errors">0</div>
+                            <div class="kpi-label">Skipped / Err</div>
+                        </div>
+                    </div>
+
+                    <div class="error-log" id="error-log-box"></div>
+                </div>
+
+            </div>
+
+            <!-- Tab 2: Locations List Inspector -->
+            <div class="sidebar-body" id="tab-content-locations">
+                <div class="inspector-toolbar">
+                    <!-- Quick KPI Metrics Bar -->
+                    <div class="kpi-row-4">
+                        <div class="kpi-card" title="Total active plots">
+                            <div class="kpi-val" id="kpi-loc-total">0</div>
+                            <div class="kpi-label">Total</div>
+                        </div>
+                        <div class="kpi-card success" title="Original coordinates unchanged">
+                            <div class="kpi-val" id="kpi-loc-orig">0</div>
+                            <div class="kpi-label">Original</div>
+                        </div>
+                        <div class="kpi-card" style="border-color:#fde68a;background:#fffbeb;" title="Edited / Dragged to new lat/long">
+                            <div class="kpi-val" id="kpi-loc-updated" style="color:#d97706;">0</div>
+                            <div class="kpi-label" style="color:#b45309;">Updated</div>
+                        </div>
+                        <div class="kpi-card" style="border-color:#bfdbfe;background:#eff6ff;" title="Newly added plots">
+                            <div class="kpi-val" id="kpi-loc-new" style="color:#2563eb;">0</div>
+                            <div class="kpi-label" style="color:#1d4ed8;">New</div>
+                        </div>
+                    </div>
+
+                    <div class="search-box-wrap" style="margin-top:4px;">
+                        <span class="material-icons search-icon">search</span>
+                        <input type="text" class="search-input" id="search-locations" placeholder="Search locations or coordinates..." oninput="filterLocationsList()" />
+                    </div>
+
+                    <div class="inspector-actions-row">
+                        <button class="btn-action btn-primary" style="flex:1.4; padding: 7px 10px; font-size: 0.78rem;" onclick="toggleAddPlotMode()" title="Place a new plot directly on the map">
+                            <span class="material-icons" style="font-size: 1rem;">add_location_alt</span> Add Plot
+                        </button>
+                        <button class="btn-action btn-outline" style="flex:1; padding: 7px 10px; font-size: 0.78rem;" onclick="fitAllMarkers()" title="Fit all markers to screen">
+                            <span class="material-icons" style="font-size: 1rem;">center_focus_strong</span> Fit All
+                        </button>
+                        <button class="btn-action btn-outline" style="padding: 7px 12px; font-size: 0.78rem; color: var(--danger); border-color: #fecaca;" onclick="promptClearAllLocations()" title="Clear all loaded locations and reset">
+                            <span class="material-icons" style="font-size: 1rem; color: var(--danger);">delete_sweep</span> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="locations-list" id="locations-list-container">
+                    <div class="empty-state">
+                        <span class="material-icons">location_off</span>
+                        <p><strong>No locations plotted yet.</strong><br>Switch to <strong>Upload & Template</strong> to upload your file, or click <strong>➕ Add Plot</strong> to place and verify exact coordinates.</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ── Main Google Map Canvas ── -->
+        <section class="map-container">
+            <div id="world-map"></div>
+
+            <!-- Top Mode Alerts / Banners -->
+            <div class="map-mode-banner" id="banner-drag-mode">
+                <span class="pulse-dot" style="background:#f59e0b;box-shadow:0 0 8px #f59e0b;"></span>
+                <div>
+                    <div style="font-weight:700;font-size:0.86rem;display:flex;align-items:center;gap:6px;">
+                        <span>🎯 Drag / Move Pin:</span>
+                        <span id="banner-drag-name" style="color:#fde047;">Plot Name</span>
+                    </div>
+                    <div class="banner-live-coords" id="banner-drag-coords">Drag marker to exact location (Coordinates update live)</div>
+                </div>
+                <div style="display:flex;gap:6px;margin-left:8px;">
+                    <button class="btn-action btn-primary" style="padding:5px 12px;font-size:0.75rem;background:#f59e0b;border-color:#f59e0b;" onclick="saveDragPosition()">
+                        <span class="material-icons" style="font-size:14px;">check</span> Save Position
+                    </button>
+                    <button class="btn-action btn-outline" style="padding:5px 10px;font-size:0.75rem;background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.25);" onclick="cancelDragPosition()">
+                        <span class="material-icons" style="font-size:14px;">close</span> Cancel
+                    </button>
+                </div>
+            </div>
+
+            <div class="map-mode-banner" id="banner-add-mode">
+                <span class="pulse-dot" style="background:#3b82f6;box-shadow:0 0 8px #3b82f6;"></span>
+                <div>
+                    <div style="font-weight:700;font-size:0.86rem;color:#93c5fd;">📍 Add New Plot Mode Active</div>
+                    <div class="banner-live-coords">Click anywhere on the map to place a new plot pin</div>
+                </div>
+                <button class="btn-action btn-outline" style="padding:5px 10px;font-size:0.75rem;background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.25);margin-left:8px;" onclick="toggleAddPlotMode(false)">
+                    <span class="material-icons" style="font-size:14px;">close</span> Cancel (Esc)
+                </button>
+            </div>
+
+            <!-- Floating Top Right Controls (Google Layer Switcher & Tools) -->
+            <div class="map-floating-bar">
+                <!-- Google Maps Layer Switcher -->
+                <div class="google-layer-switcher">
+                    <button class="layer-pill" id="layer-btn-google-streets" onclick="switchGoogleLayer('streets')">
+                        <span class="material-icons" style="font-size: 15px;">map</span> Google Map
+                    </button>
+                    <button class="layer-pill active" id="layer-btn-google-hybrid" onclick="switchGoogleLayer('hybrid')">
+                        <span class="material-icons" style="font-size: 15px;">satellite_alt</span> Satellite
+                    </button>
+                    <button class="layer-pill" id="layer-btn-google-terrain" onclick="switchGoogleLayer('terrain')">
+                        <span class="material-icons" style="font-size: 15px;">terrain</span> Terrain
+                    </button>
+                </div>
+
+                <!-- Quick Action Tools Group -->
+                <div class="map-tools-group">
+                    <button class="map-tool-btn" id="btn-add-plot-tool" onclick="toggleAddPlotMode()" title="Add a new plot on the map">
+                        <span class="material-icons" style="font-size: 17px; color: var(--accent-green);">add_location_alt</span>
+                        <span>Add Plot</span>
+                    </button>
+                    <button class="map-tool-btn" id="toggle-pin-labels-tool" onclick="togglePinLabels()" title="Show Location Names under Pins">
+                        <span class="material-icons" style="font-size: 17px;">label_outline</span>
+                        <span>Labels</span>
+                    </button>
+                    <button class="map-tool-btn" id="toggle-cluster-btn" onclick="toggleClustering()" title="Toggle Clustering Grouping">
+                        <span class="material-icons" style="font-size: 17px;">bubble_chart</span>
+                    </button>
+                    <button class="map-tool-btn" onclick="fitAllMarkers()" title="Fit All Markers to Screen">
+                        <span class="material-icons" style="font-size: 17px;">center_focus_strong</span>
+                    </button>
+                    <button class="map-tool-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+                        <span class="material-icons" style="font-size: 17px;">fullscreen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Screen Zoom Widget in Right Bottom Corner (Zoom +, Zoom −, Zoom Back to Default) -->
+            <div class="map-zoom-widget">
+                <button class="zoom-btn" onclick="map.zoomIn()" title="Zoom In (+)">
+                    <span class="material-icons" style="font-size:18px;">add</span>
+                </button>
+                <div class="zoom-divider"></div>
+                <button class="zoom-btn" onclick="map.zoomOut()" title="Zoom Out (−)">
+                    <span class="material-icons" style="font-size:18px;">remove</span>
+                </button>
+                <div class="zoom-divider"></div>
+                <button class="zoom-btn" onclick="fitAllMarkers()" title="Zoom back to default view / Fit all plots">
+                    <span class="material-icons" style="font-size:17px;">zoom_out_map</span>
+                </button>
+            </div>
+
+            <!-- Real-time Coordinates & Status Bar -->
+            <div class="map-coords-bar" id="map-coords-bar">
+                <span id="cursor-coords">Lat: 0.000000, Lng: 0.000000</span>
+                <span>|</span>
+                <span id="map-zoom-level">Zoom: 3</span>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ── Export Modal ── -->
+    <div class="modal-overlay" id="export-modal" onclick="if(event.target === this) closeExportModal()">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="modal-icon-badge">
+                        <span class="material-icons" style="font-size:20px;">file_download</span>
+                    </div>
+                    <div>
+                        <div class="modal-title">Export Verified Coordinates</div>
+                        <div class="modal-subtitle">Download updated plot latitudes & longitudes for field and TechOps operations</div>
+                    </div>
+                </div>
+                <button class="icon-btn-sm" onclick="closeExportModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Option 1: All Plots (Updated Master) -->
+                <div class="export-option-card">
+                    <div class="export-card-header">
+                        <div class="export-badge">Full Master Dataset</div>
+                        <div class="export-card-title">1. All Plots (Updated Master)</div>
+                        <p class="export-card-desc">Exports every plotted location with its latest exact coordinates (original, moved, and newly added plots).</p>
+                    </div>
+                    <div class="export-btn-group">
+                        <button class="btn-action btn-primary" onclick="exportData('all', 'xlsx')">
+                            <span class="material-icons" style="font-size:15px;">table_view</span> Excel (.xlsx)
+                        </button>
+                        <button class="btn-action btn-outline" onclick="exportData('all', 'csv')">
+                            <span class="material-icons" style="font-size:15px;">description</span> CSV (.csv)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Option 2: Only Edited & New Plots -->
+                <div class="export-option-card">
+                    <div class="export-card-header">
+                        <div class="export-badge badge-warning" id="export-modified-badge">Edited & New Only</div>
+                        <div class="export-card-title">2. Edited & New Plots Only (Delta)</div>
+                        <p class="export-card-desc">Exports only the locations that were dragged/adjusted to new coordinates or newly added during this session.</p>
+                    </div>
+                    <div class="export-btn-group">
+                        <button class="btn-action btn-primary" style="background:#f59e0b;border-color:#f59e0b;" onclick="exportData('modified', 'xlsx')">
+                            <span class="material-icons" style="font-size:15px;">table_view</span> Excel (.xlsx)
+                        </button>
+                        <button class="btn-action btn-outline" onclick="exportData('modified', 'csv')">
+                            <span class="material-icons" style="font-size:15px;">description</span> CSV (.csv)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Option 3: Full Audit Report (Before & After) -->
+                <div class="export-option-card">
+                    <div class="export-card-header">
+                        <div class="export-badge badge-info">Audit Trail</div>
+                        <div class="export-card-title">3. Comprehensive Audit Sheet (Before & After)</div>
+                        <p class="export-card-desc">Includes Location Name, Updated Lat/Lng, Original Lat/Lng, Distance Shift (meters), and Status (Original, Updated, New).</p>
+                    </div>
+                    <div class="export-btn-group">
+                        <button class="btn-action btn-primary" style="background:#0f172a;border-color:#0f172a;" onclick="exportData('audit', 'xlsx')">
+                            <span class="material-icons" style="font-size:15px;">table_view</span> Audit Excel (.xlsx)
+                        </button>
+                        <button class="btn-action btn-outline" onclick="exportData('audit', 'csv')">
+                            <span class="material-icons" style="font-size:15px;">description</span> Audit CSV (.csv)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Delete Confirmation Warning Modal ── -->
+    <div class="modal-overlay" id="delete-confirm-modal" onclick="if(event.target === this) closeDeleteModal()">
+        <div class="modal-dialog" style="max-width: 440px;">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="modal-icon-badge" style="background:#fee2e2;color:#dc2626;">
+                        <span class="material-icons" style="font-size:20px;">warning</span>
+                    </div>
+                    <div>
+                        <div class="modal-title" style="color:#b91c1c;">Delete Plot?</div>
+                        <div class="modal-subtitle">Permanent removal confirmation</div>
+                    </div>
+                </div>
+                <button class="icon-btn-sm" onclick="closeDeleteModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:16px 20px;">
+                <p style="font-size:0.88rem;color:var(--text-main);margin-bottom:12px;">
+                    Are you sure you want to delete this plot? This action cannot be undone and will remove it from the map, location list, and all export files.
+                </p>
+                <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.82rem;">
+                    <div style="font-weight:700;color:var(--text-main);" id="delete-modal-plot-name">Plot Name</div>
+                    <div style="font-family:'JetBrains Mono',monospace;color:var(--text-muted);font-size:0.78rem;margin-top:4px;" id="delete-modal-plot-coords">Coordinates</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border);">
+                <button class="btn-action btn-outline" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-action btn-primary" id="confirm-delete-btn" style="background:#dc2626;border-color:#dc2626;" onclick="executeDeletePlot()">
+                    <span class="material-icons" style="font-size:15px;">delete</span> Yes, Delete Plot
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Clear All Confirmation Modal ── -->
+    <div class="modal-overlay" id="clear-confirm-modal" onclick="if(event.target === this) closeClearModal()">
+        <div class="modal-dialog" style="max-width: 440px;">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="modal-icon-badge" style="background:#fee2e2;color:#dc2626;">
+                        <span class="material-icons" style="font-size:20px;">delete_sweep</span>
+                    </div>
+                    <div>
+                        <div class="modal-title" style="color:#b91c1c;">Clear All Plotted Locations?</div>
+                        <div class="modal-subtitle">Reset entire session data</div>
+                    </div>
+                </div>
+                <button class="icon-btn-sm" onclick="closeClearModal()">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body" style="padding:16px 20px;">
+                <p style="font-size:0.88rem;color:var(--text-main);margin-bottom:10px;">
+                    This will clear all loaded plots (<strong id="clear-modal-count">0 plots</strong>) from the map, list, and your browser's saved session.
+                </p>
+                <p style="font-size:0.82rem;color:var(--text-muted);">
+                    You will start with a fresh clean map. Make sure you have exported any updated plots first if needed.
+                </p>
+            </div>
+            <div class="modal-footer" style="padding:12px 20px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border);">
+                <button class="btn-action btn-outline" onclick="closeClearModal()">Cancel</button>
+                <button class="btn-action btn-primary" style="background:#dc2626;border-color:#dc2626;" onclick="executeClearAllLocations()">
+                    <span class="material-icons" style="font-size:15px;">delete_forever</span> Clear Everything
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast Notifications Container ── -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- ── Core Logic ── -->
+    <script>
+        // ── Global State ──
+        let map;
+        let markersGroup;
+        let clusterGroup;
+        let activeGoogleLayerKey = localStorage.getItem('cropin_map_layer') || 'hybrid';
+        let googleLayers = {};
+        let locationsData = [];
+        let selectedFile = null;
+        let isClusteringEnabled = true;
+        let showPinLabels = false; // Labels OFF by default. Only shown when user clicks Labels button.
+        let markerIdMap = new Map();
+
+        // Mode States
+        let isAddPlotMode = false;
+        let activeDragId = null;
+        let activeDragMarker = null;
+        let dragInitialCoords = null;
+
+        // ── LocalStorage Session Persistence ──
+        const STORAGE_KEY = 'cropin_location_check_plots_v2';
+
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(locationsData));
+            } catch (err) {
+                console.warn('LocalStorage save failed:', err);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        plotLocationsArray(parsed, false);
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.warn('LocalStorage load failed:', err);
+            }
+            return false;
+        }
+
+        // ── Initialization ──
+        window.addEventListener('DOMContentLoaded', () => {
+            initGoogleMap();
+            initDragAndDrop();
+            initKeyboardShortcuts();
+            
+            // Configure default Popup margins so popups never overlap the top floating bar
+            if (L.Popup && L.Popup.prototype && L.Popup.prototype.options) {
+                L.Popup.prototype.options.autoPan = true;
+                L.Popup.prototype.options.autoPanPaddingTopLeft = L.point(40, 95);
+                L.Popup.prototype.options.autoPanPaddingBottomRight = L.point(40, 60);
+            }
+
+            // Restore previously uploaded / edited session on refresh
+            const hasRestored = loadFromLocalStorage();
+            if (!hasRestored) {
+                // Clean startup: 0 pre-added dummy locations -> Start on Upload & Template tab
+                updateMetricsAndKPIs();
+                renderLocationsList([]);
+                switchTab('setup');
+            } else {
+                switchTab('locations');
+            }
+        });
+
+        function initGoogleMap() {
+            // Google Maps Tile Layers
+            googleLayers = {
+                streets: L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['0', '1', '2', '3'],
+                    attribution: '&copy; Google Maps'
+                }),
+                hybrid: L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['0', '1', '2', '3'],
+                    attribution: '&copy; Google Maps'
+                }),
+                terrain: L.tileLayer('https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['0', '1', '2', '3'],
+                    attribution: '&copy; Google Maps'
+                })
+            };
+
+            // Instantiate Map with Satellite (hybrid) auto-selected by default
+            const initialLayerKey = localStorage.getItem('cropin_map_layer') || 'hybrid';
+            activeGoogleLayerKey = initialLayerKey;
+
+            map = L.map('world-map', {
+                center: [20.5937, 78.9629], // Center India / World
+                zoom: 4,
+                layers: [googleLayers[initialLayerKey]],
+                zoomControl: false
+            });
+
+            // Update layer switcher button UI
+            document.querySelectorAll('.google-layer-switcher .layer-pill').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`layer-btn-google-${initialLayerKey}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            // Layer Groups
+            markersGroup = L.featureGroup();
+            clusterGroup = L.markerClusterGroup({
+                showCoverageOnHover: false,
+                maxClusterRadius: 40,
+                spiderfyOnMaxZoom: true,
+                iconCreateFunction: function(cluster) {
+                    const count = cluster.getChildCount();
+                    return L.divIcon({
+                        html: `<div style="background:linear-gradient(135deg,#00897b,#76be28);color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;box-shadow:0 3px 10px rgba(0,137,123,0.45);border:2px solid #fff;">${count}</div>`,
+                        className: 'cluster-icon',
+                        iconSize: L.point(34, 34)
+                    });
+                }
+            });
+
+            map.addLayer(clusterGroup);
+
+            // Keep labels hidden when expanding clusters if labels are turned off
+            clusterGroup.on('spiderfied', () => {
+                if (!showPinLabels) {
+                    document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.add('hidden-label'));
+                }
+            });
+            clusterGroup.on('unspiderfied', () => {
+                if (!showPinLabels) {
+                    document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.add('hidden-label'));
+                }
+            });
+
+            // Map Click Listener for "Add Plot" mode
+            map.on('click', (e) => {
+                if (isAddPlotMode) {
+                    handleMapClickForAddPlot(e.latlng);
+                }
+            });
+
+            // Real-time Cursor Coordinates listener
+            map.on('mousemove', (e) => {
+                document.getElementById('cursor-coords').textContent = 
+                    `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+            });
+
+            map.on('zoomend', () => {
+                document.getElementById('map-zoom-level').textContent = `Zoom: ${map.getZoom()}`;
+            });
+        }
+
+        function initKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (isAddPlotMode) toggleAddPlotMode(false);
+                    if (activeDragMarker) cancelDragPosition();
+                    closeExportModal();
+                }
+            });
+        }
+
+        // ── Google Maps Switcher ──
+        function switchGoogleLayer(key) {
+            Object.values(googleLayers).forEach(l => map.removeLayer(l));
+            document.querySelectorAll('.google-layer-switcher .layer-pill').forEach(btn => btn.classList.remove('active'));
+
+            map.addLayer(googleLayers[key]);
+            document.getElementById(`layer-btn-google-${key}`).classList.add('active');
+            activeGoogleLayerKey = key;
+            localStorage.setItem('cropin_map_layer', key);
+        }
+
+        // ── Toggle Pin Labels Directly on Map ──
+        function togglePinLabels() {
+            showPinLabels = !showPinLabels;
+            const btn1 = document.getElementById('toggle-labels-btn');
+            const btn2 = document.getElementById('toggle-pin-labels-tool');
+
+            if (showPinLabels) {
+                if (btn1) {
+                    btn1.classList.add('btn-primary');
+                    btn1.classList.remove('btn-outline');
+                    const icon = btn1.querySelector('.material-icons');
+                    if (icon) icon.textContent = 'label';
+                }
+                if (btn2) {
+                    btn2.classList.add('active');
+                    const icon = btn2.querySelector('.material-icons');
+                    if (icon) icon.textContent = 'label';
+                }
+                document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.remove('hidden-label'));
+                showToast("Location names displayed on map pins", 'success');
+            } else {
+                if (btn1) {
+                    btn1.classList.remove('btn-primary');
+                    btn1.classList.add('btn-outline');
+                    const icon = btn1.querySelector('.material-icons');
+                    if (icon) icon.textContent = 'label_outline';
+                }
+                if (btn2) {
+                    btn2.classList.remove('active');
+                    const icon = btn2.querySelector('.material-icons');
+                    if (icon) icon.textContent = 'label_outline';
+                }
+                document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.add('hidden-label'));
+                showToast("Location names hidden (hover pins to view)");
+            }
+        }
+
+        // ── Marker Clustering Toggle ──
+        function toggleClustering() {
+            isClusteringEnabled = !isClusteringEnabled;
+            const btn = document.getElementById('toggle-cluster-btn');
+
+            if (isClusteringEnabled) {
+                btn.classList.add('active');
+                map.removeLayer(markersGroup);
+                clusterGroup.clearLayers();
+                markersGroup.eachLayer(m => clusterGroup.addLayer(m));
+                map.addLayer(clusterGroup);
+                showToast("Clustering enabled (grouped pins)");
+            } else {
+                btn.classList.remove('active');
+                map.removeLayer(clusterGroup);
+                map.addLayer(markersGroup);
+                showToast("Clustering disabled (all individual pins shown)");
+            }
+        }
+
+        // ── Zoom Controls ──
+        function zoomToStreetLevel() {
+            const currentZoom = map.getZoom();
+            if (currentZoom < 18) {
+                map.setZoom(18);
+            } else {
+                map.setZoom(19);
+            }
+            showToast("Zoomed to High-Detail Street / Plot View (18x)");
+        }
+
+        function zoomInDetail(lat, lng) {
+            map.flyTo([lat, lng], 18, {
+                animate: true,
+                duration: 1.2
+            });
+            showToast("Zoomed to 18x high-detail street view");
+        }
+
+        // ── Universal Google Maps Coordinate Parsers ──
+        // Supports:
+        // 1. Decimal Degrees: 41.40338, -2.17403
+        // 2. DMS: 41°24'12.2"N, 2°10'26.5"E, 41d24m12.2sN, 41:24:12.2 S
+        // 3. DMM: 41 24.2028 N, 2 10.4418 W
+        // 4. Negative values & cardinal directions (N/S/E/W, South, West)
+        function parseCoordinate(coordVal, coordType = null) {
+            if (coordVal === null || coordVal === undefined) return null;
+            const s = String(coordVal).trim();
+            if (!s) return null;
+
+            // Direct numeric float check
+            const num = Number(s);
+            if (!isNaN(num) && isFinite(num)) {
+                return num;
+            }
+
+            let isNegative = false;
+            let workStr = s;
+
+            if (workStr.startsWith('-')) {
+                isNegative = true;
+                workStr = workStr.substring(1).trim();
+            }
+
+            const upper = workStr.toUpperCase();
+
+            if (coordType === 'lat') {
+                if (upper.includes('SOUTH') || /(?:[\d\.\'\"°]|\b)S\b/.test(upper) || upper.endsWith('S')) {
+                    isNegative = true;
+                } else if (upper.includes('NORTH') || /(?:[\d\.\'\"°]|\b)N\b/.test(upper) || upper.endsWith('N')) {
+                    isNegative = false;
+                }
+            } else if (coordType === 'lng') {
+                if (upper.includes('WEST') || /(?:[\d\.\'\"°s]|\b)W\b/.test(upper) || upper.endsWith('W')) {
+                    isNegative = true;
+                } else if (upper.includes('EAST') || /(?:[\d\.\'\"°s]|\b)E\b/.test(upper) || upper.endsWith('E')) {
+                    isNegative = false;
+                }
+            } else {
+                if (upper.includes('SOUTH') || upper.includes('WEST') || upper.endsWith('S') || upper.endsWith('W')) {
+                    isNegative = true;
+                }
+            }
+
+            // Extract numeric tokens
+            const cleaned = workStr.replace(/[^\d\.]+/g, ' ').trim();
+            const parts = cleaned.split(/\s+/).filter(Boolean).map(Number);
+            if (parts.length === 0 || isNaN(parts[0])) return null;
+
+            let val = 0;
+            if (parts.length === 1) {
+                val = parts[0];
+            } else if (parts.length === 2) {
+                val = parts[0] + parts[1] / 60.0;
+            } else if (parts.length >= 3) {
+                val = parts[0] + parts[1] / 60.0 + parts[2] / 3600.0;
+            } else {
+                return null;
+            }
+
+            return isNegative ? -val : val;
+        }
+
+        // Parses single-column string with both lat and lng (e.g. "41.40338, 2.17403" or "41°24'12.2\"N 2°10'26.5\"E")
+        function parseLatLngPair(coordStr) {
+            if (!coordStr) return null;
+            const s = String(coordStr).trim();
+
+            const delims = [',', ';', '/'];
+            for (const d of delims) {
+                if (s.includes(d)) {
+                    const parts = s.split(d);
+                    if (parts.length >= 2) {
+                        const lat = parseCoordinate(parts[0], 'lat');
+                        const lng = parseCoordinate(parts[1], 'lng');
+                        if (lat !== null && lng !== null) return { lat, lng };
+                    }
+                }
+            }
+
+            // Cardinal direction pattern (e.g. 41°24'12.2"N 2°10'26.5"E)
+            const match = s.match(/([0-9\.\s°\'\"d]+[NSns])\s*[,;]?\s*([0-9\.\s°\'\"d]+[EWew])/);
+            if (match) {
+                const lat = parseCoordinate(match[1], 'lat');
+                const lng = parseCoordinate(match[2], 'lng');
+                if (lat !== null && lng !== null) return { lat, lng };
+            }
+
+            // Space-separated pair (e.g. "12.971598 77.594566")
+            const spaceParts = s.split(/\s+/).filter(Boolean);
+            if (spaceParts.length === 2) {
+                const lat = parseCoordinate(spaceParts[0], 'lat');
+                const lng = parseCoordinate(spaceParts[1], 'lng');
+                if (lat !== null && lng !== null) return { lat, lng };
+            }
+
+            return null;
+        }
+
+        // Distance formula between two lat/lng points (meters)
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            if (lat1 === lat2 && lon1 === lon2) return 0;
+            const R = 6371000;
+            const toRad = Math.PI / 180;
+            const dLat = (lat2 - lat1) * toRad;
+            const dLon = (lon2 - lon1) * toRad;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return Math.round(R * c);
+        }
+
+        function formatDistance(meters) {
+            if (meters === 0) return "0 m";
+            if (meters < 1000) return `${meters} m`;
+            return `${(meters / 1000).toFixed(2)} km`;
+        }
+
+        // ── Custom SVG Pin Generation with Status Badges ──
+        function createCustomPinIcon(label, id, status = 'Original') {
+            const labelClass = showPinLabels ? 'pin-label-badge' : 'pin-label-badge hidden-label';
+            
+            // Gradients and indicator by status
+            let gradStart = '#00897b';
+            let gradEnd = '#76be28';
+            let statusTag = '';
+
+            if (status === 'Updated') {
+                gradStart = '#f59e0b';
+                gradEnd = '#ea580c';
+                statusTag = ' <span style="color:#d97706;font-size:9px;">● EDITED</span>';
+            } else if (status === 'New') {
+                gradStart = '#3b82f6';
+                gradEnd = '#8b5cf6';
+                statusTag = ' <span style="color:#2563eb;font-size:9px;">● NEW</span>';
+            }
+
+            const htmlContent = `
+                <div class="custom-pin-wrap" id="pin-wrap-${id}">
+                    <div class="custom-pin" id="pin-svg-${id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 42" width="28" height="36">
+                            <defs>
+                                <linearGradient id="pinGrad-${id}" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="${gradStart}" />
+                                    <stop offset="100%" stop-color="${gradEnd}" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M16 0C7.163 0 0 7.163 0 16c0 10.5 16 26 16 26s16-15.5 16-26c0-8.837-7.163-16-16-16z" fill="url(#pinGrad-${id})" stroke="#ffffff" stroke-width="1.8"/>
+                            <circle cx="16" cy="16" r="5.5" fill="#ffffff" />
+                        </svg>
+                    </div>
+                    <span class="${labelClass}" title="${escapeHtml(label)}">${escapeHtml(label)}${statusTag}</span>
+                </div>
+            `;
+
+            return L.divIcon({
+                className: '',
+                html: htmlContent,
+                iconSize: [160, 56],
+                iconAnchor: [80, 36],
+                popupAnchor: [0, -36]
+            });
+        }
+
+        // ── Build Rich Marker Popup HTML ──
+        function buildMarkerPopupContent(item) {
+            const id = item.id;
+            const name = item.name;
+            const lat = item.lat;
+            const lng = item.lng;
+            const status = item.status || 'Original';
+
+            let statusBadgeClass = 'original';
+            let statusText = 'ORIGINAL';
+            if (status === 'Updated') {
+                statusBadgeClass = 'updated';
+                statusText = 'EDITED / UPDATED';
+            } else if (status === 'New') {
+                statusBadgeClass = 'new';
+                statusText = 'NEW PLOT';
+            }
+
+            let shiftInfoHtml = '';
+            if (status === 'Updated' && item.originalLat !== null && item.originalLat !== undefined) {
+                const dist = getDistanceMeters(item.originalLat, item.originalLng, lat, lng);
+                shiftInfoHtml = `
+                    <div style="font-size:0.72rem;color:#b45309;background:#fef3c7;border-radius:5px;padding:3px 7px;margin-top:4px;">
+                        <span>Original: ${item.originalLat}, ${item.originalLng}</span>
+                        <span style="font-weight:700;margin-left:4px;">(Shift: ${formatDistance(dist)})</span>
+                    </div>
+                `;
+            }
+
+            const revertBtnHtml = (status === 'Updated' && item.originalLat !== null) ? `
+                <button class="popup-btn popup-btn-outline" style="color:#b45309;" onclick="revertPlotToOriginal(${id})" title="Revert to original coordinates before edit">
+                    <span class="material-icons" style="font-size:14px;">history</span> Revert
+                </button>
+            ` : '';
+
+            return `
+                <div class="popup-card">
+                    <div class="popup-header">
+                        <div class="pin-icon" style="background:${status === 'Updated' ? '#f59e0b' : status === 'New' ? '#3b82f6' : 'var(--primary)'}">
+                            <span class="material-icons" style="font-size:16px;">${status === 'New' ? 'add_location' : 'place'}</span>
+                        </div>
+                        <div style="flex:1;overflow:hidden;">
+                            <div class="popup-title">${escapeHtml(name)}</div>
+                            <span class="status-badge ${statusBadgeClass}" style="margin-top:2px;">${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="popup-body">
+                        <div class="popup-coord-row">
+                            <div class="coord-label">Current Google Maps Coordinates</div>
+                            <div class="coord-val">${item.rawLat || item.lat}°, ${item.rawLng || item.lng}°</div>
+                            ${shiftInfoHtml}
+                        </div>
+
+                        <!-- View Mode Actions -->
+                        <div id="popup-view-mode-${id}">
+                            <div style="margin-bottom: 8px;">
+                                <button class="btn-action btn-primary btn-full" style="background:#f59e0b;border-color:#f59e0b;padding:8px 12px;font-size:0.8rem;" onclick="startDragMode(${id})" title="Click to drag this pin to an exact nearby point">
+                                    <span class="material-icons" style="font-size:16px;">open_with</span>
+                                    Drag to Move / Adjust Location
+                                </button>
+                            </div>
+                            <div class="popup-actions" style="margin-bottom: 8px;">
+                                <button class="popup-btn popup-btn-outline" onclick="showPopupEditForm(${id})">
+                                    <span class="material-icons" style="font-size:14px;">edit</span> Edit Details
+                                </button>
+                                ${revertBtnHtml}
+                                <button class="popup-btn popup-btn-outline" onclick="zoomDownTwoLevels()" title="Zoom down by 2 levels">
+                                    <span class="material-icons" style="font-size:14px;">zoom_out</span> Zoom Down
+                                </button>
+                            </div>
+                            <div class="popup-actions">
+                                <button class="popup-btn popup-btn-outline" onclick="copyCoords(${lat}, ${lng})">
+                                    <span class="material-icons" style="font-size:14px;">content_copy</span> Copy Coords
+                                </button>
+                                <a class="popup-btn popup-btn-outline" href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener noreferrer">
+                                    <span class="material-icons" style="font-size:14px;color:#1a73e8;">open_in_new</span> Google Maps
+                                </a>
+                            </div>
+                            <div style="margin-top: 8px; text-align: right;">
+                                <button class="icon-btn-sm" style="color:var(--danger);font-size:0.75rem;display:inline-flex;align-items:center;gap:4px;" onclick="promptDeleteLocation(${id})">
+                                    <span class="material-icons" style="font-size:14px;">delete_outline</span> Remove Plot
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Inline Manual Edit Form -->
+                        <div id="popup-edit-mode-${id}" style="display:none;margin-top:4px;">
+                            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+                                <label style="font-size:0.72rem;font-weight:600;color:var(--text-muted);">Plot / Location Name:</label>
+                                <input type="text" id="edit-name-${id}" value="${escapeHtml(name)}" class="search-input" style="padding:6px 10px;font-size:0.8rem;" />
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                                    <div>
+                                        <label style="font-size:0.72rem;font-weight:600;color:var(--text-muted);">Latitude:</label>
+                                        <input type="text" id="edit-lat-${id}" value="${item.rawLat || item.lat}" class="search-input" style="padding:6px 8px;font-size:0.78rem;font-family:'JetBrains Mono',monospace;" />
+                                    </div>
+                                    <div>
+                                        <label style="font-size:0.72rem;font-weight:600;color:var(--text-muted);">Longitude:</label>
+                                        <input type="text" id="edit-lng-${id}" value="${item.rawLng || item.lng}" class="search-input" style="padding:6px 8px;font-size:0.78rem;font-family:'JetBrains Mono',monospace;" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:6px;">
+                                <button class="btn-action btn-primary" style="flex:1;padding:6px;font-size:0.76rem;" onclick="saveManualEdit(${id})">
+                                    <span class="material-icons" style="font-size:14px;">check</span> Save Changes
+                                </button>
+                                <button class="btn-action btn-outline" style="padding:6px 10px;font-size:0.76rem;" onclick="hidePopupEditForm(${id})">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showPopupEditForm(id) {
+            const viewDiv = document.getElementById(`popup-view-mode-${id}`);
+            const editDiv = document.getElementById(`popup-edit-mode-${id}`);
+            if (viewDiv && editDiv) {
+                viewDiv.style.display = 'none';
+                editDiv.style.display = 'block';
+            }
+        }
+
+        function hidePopupEditForm(id) {
+            const viewDiv = document.getElementById(`popup-view-mode-${id}`);
+            const editDiv = document.getElementById(`popup-edit-mode-${id}`);
+            if (viewDiv && editDiv) {
+                viewDiv.style.display = 'block';
+                editDiv.style.display = 'none';
+            }
+        }
+
+        function saveManualEdit(id) {
+            const item = locationsData.find(x => x.id === id);
+            const marker = markerIdMap.get(id);
+            if (!item || !marker) return;
+
+            const nameInput = document.getElementById(`edit-name-${id}`);
+            const latInput = document.getElementById(`edit-lat-${id}`);
+            const lngInput = document.getElementById(`edit-lng-${id}`);
+
+            const newName = nameInput ? nameInput.value.trim() : item.name;
+            const newLat = parseCoordinate(latInput ? latInput.value : item.lat, 'lat');
+            const newLng = parseCoordinate(lngInput ? lngInput.value : item.lng, 'lng');
+
+            if (newLat === null || isNaN(newLat) || newLat < -90 || newLat > 90) {
+                showToast("Invalid Latitude value entered (-90 to 90)", 'error');
+                return;
+            }
+            if (newLng === null || isNaN(newLng) || newLng < -180 || newLng > 180) {
+                showToast("Invalid Longitude value entered (-180 to 180)", 'error');
+                return;
+            }
+
+            const isPositionChanged = (Math.abs(item.lat - newLat) > 0.0000001 || Math.abs(item.lng - newLng) > 0.0000001);
+
+            if (isPositionChanged) {
+                if (item.originalLat === null || item.originalLat === undefined) {
+                    item.originalLat = item.lat;
+                    item.originalLng = item.lng;
+                    item.rawOriginalLat = item.rawLat ? item.rawLat : String(item.lat);
+                    item.rawOriginalLng = item.rawLng ? item.rawLng : String(item.lng);
+                }
+                if (item.status === 'Original') {
+                    item.status = 'Updated';
+                }
+            }
+
+            item.name = newName || item.name;
+            item.lat = newLat;
+            item.lng = newLng;
+            item.rawLat = String(newLat);
+            item.rawLng = String(newLng);
+
+            marker.setLatLng([item.lat, item.lng]);
+            marker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
+            marker.setPopupContent(buildMarkerPopupContent(item));
+            marker.setTooltipContent(`
+                <div class="location-tooltip-title">${escapeHtml(item.name)}</div>
+                <span class="location-tooltip-sub">${item.rawLat || item.lat}, ${item.rawLng || item.lng}</span>
+            `);
+
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+            showToast(`Plot updated: ${item.name}`, 'success');
+        }
+
+        // ── Plot Locations on Map ──
+        function plotLocationsArray(locations, shouldSave = true) {
+            markersGroup.clearLayers();
+            clusterGroup.clearLayers();
+            markerIdMap.clear();
+            locationsData = [];
+
+            let validCount = 0;
+            let invalidCount = 0;
+            const errorLogs = [];
+
+            locations.forEach((loc, idx) => {
+                const lat = typeof loc.lat === 'number' ? loc.lat : parseCoordinate(loc.lat, 'lat');
+                const lng = typeof loc.lng === 'number' ? loc.lng : parseCoordinate(loc.lng, 'lng');
+                const rawLat = loc.rawLat || loc.raw_lat || (typeof loc.lat === 'string' ? loc.lat.trim() : (loc.lat !== undefined && loc.lat !== null ? String(loc.lat) : ''));
+                const rawLng = loc.rawLng || loc.raw_lng || (typeof loc.lng === 'string' ? loc.lng.trim() : (loc.lng !== undefined && loc.lng !== null ? String(loc.lng) : ''));
+                const name = (loc.name && String(loc.name).trim()) ? String(loc.name).trim() : `Plot ${idx + 1}`;
+
+                if (lat === null || lng === null || isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    invalidCount++;
+                    errorLogs.push(`Row ${idx + 1} (${name}): Invalid coordinates [${loc.lat}, ${loc.lng}]`);
+                    return;
+                }
+
+                const locItem = {
+                    id: loc.id || (idx + 1),
+                    name: name,
+                    lat: lat, // full precision float
+                    lng: lng, // full precision float
+                    rawLat: rawLat || String(lat),
+                    rawLng: rawLng || String(lng),
+                    status: loc.status || 'Original',
+                    originalLat: loc.originalLat ?? null,
+                    originalLng: loc.originalLng ?? null,
+                    rawOriginalLat: loc.rawOriginalLat ?? null,
+                    rawOriginalLng: loc.rawOriginalLng ?? null
+                };
+
+                locationsData.push(locItem);
+                validCount++;
+
+                // Build Leaflet Marker
+                const marker = L.marker([locItem.lat, locItem.lng], {
+                    icon: createCustomPinIcon(name, locItem.id, locItem.status),
+                    title: name
+                });
+
+                // On-Hover Tooltip with Crisp Place Name & Un-trimmed Coordinates
+                marker.bindTooltip(`
+                    <div class="location-tooltip-title">${escapeHtml(name)}</div>
+                    <span class="location-tooltip-sub">${locItem.rawLat || locItem.lat}, ${locItem.rawLng || locItem.lng}</span>
+                `, {
+                    direction: 'top',
+                    sticky: true,
+                    offset: [0, -18],
+                    className: 'location-tooltip'
+                });
+
+                // On-Click Detailed Card Popup with AutoPan margin so it never overlaps top floating bar
+                marker.bindPopup(buildMarkerPopupContent(locItem), {
+                    maxWidth: 320,
+                    autoPan: true,
+                    autoPanPaddingTopLeft: L.point(40, 95),
+                    autoPanPaddingBottomRight: L.point(40, 60)
+                });
+
+                marker.on('click', () => {
+                    highlightLocationInList(locItem.id);
+                });
+
+                markersGroup.addLayer(marker);
+                clusterGroup.addLayer(marker);
+                markerIdMap.set(locItem.id, marker);
+            });
+
+            if (shouldSave) {
+                saveToLocalStorage();
+            }
+
+            // Update Metrics & Error display
+            document.getElementById('kpi-total').textContent = locations.length;
+            document.getElementById('kpi-valid').textContent = validCount;
+            document.getElementById('kpi-errors').textContent = invalidCount;
+
+            const errorBox = document.getElementById('error-log-box');
+            if (errorLogs.length > 0) {
+                errorBox.innerHTML = `<strong>Validation Issues (${errorLogs.length}):</strong><br>` + errorLogs.join('<br>');
+                errorBox.classList.add('show');
+            } else {
+                errorBox.classList.remove('show');
+                errorBox.innerHTML = '';
+            }
+
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+
+            if (!showPinLabels) {
+                document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.add('hidden-label'));
+            } else {
+                document.querySelectorAll('.pin-label-badge').forEach(el => el.classList.remove('hidden-label'));
+            }
+
+            if (validCount > 0 && shouldSave) {
+                fitAllMarkers();
+                showToast(`Plotted ${validCount} locations on Google Maps!`, 'success');
+            } else if (locations.length > 0 && validCount === 0) {
+                showToast("No valid coordinates found in uploaded dataset", 'error');
+            }
+        }
+
+        // ── KPI & Summary Synchronizer ──
+        function updateMetricsAndKPIs() {
+            const total = locationsData.length;
+            const orig = locationsData.filter(x => (x.status || 'Original') === 'Original').length;
+            const updated = locationsData.filter(x => x.status === 'Updated').length;
+            const newlyAdded = locationsData.filter(x => x.status === 'New').length;
+
+            // Inspector Toolbar KPIs
+            const elTotal = document.getElementById('kpi-loc-total');
+            const elOrig = document.getElementById('kpi-loc-orig');
+            const elUpdated = document.getElementById('kpi-loc-updated');
+            const elNew = document.getElementById('kpi-loc-new');
+            if (elTotal) elTotal.textContent = total;
+            if (elOrig) elOrig.textContent = orig;
+            if (elUpdated) elUpdated.textContent = updated;
+            if (elNew) elNew.textContent = newlyAdded;
+
+            // Badges
+            document.getElementById('tab-count-badge').textContent = total;
+            document.getElementById('active-pointer-badge').textContent = `${total} Plots`;
+
+            // Export modified count badge
+            const expModBadge = document.getElementById('export-modified-badge');
+            if (expModBadge) {
+                expModBadge.textContent = `${updated + newlyAdded} Modified Plots`;
+            }
+        }
+
+        // ── "➕ Add Plot" Workflow ──
+        function toggleAddPlotMode(forceState = null) {
+            isAddPlotMode = forceState !== null ? forceState : !isAddPlotMode;
+            const banner = document.getElementById('banner-add-mode');
+            const toolBtn = document.getElementById('btn-add-plot-tool');
+            const mapEl = document.getElementById('world-map');
+
+            if (isAddPlotMode) {
+                // If drag mode was active, cancel it first
+                if (activeDragMarker) cancelDragPosition();
+
+                banner.classList.add('active');
+                if (toolBtn) toolBtn.classList.add('active');
+                mapEl.style.cursor = 'crosshair';
+                showToast("Click anywhere on the map to place a new plot");
+            } else {
+                banner.classList.remove('active');
+                if (toolBtn) toolBtn.classList.remove('active');
+                mapEl.style.cursor = '';
+            }
+        }
+
+        function handleMapClickForAddPlot(latlng) {
+            const nextId = locationsData.length > 0 ? Math.max(...locationsData.map(x => x.id)) + 1 : 1;
+            const newPlot = {
+                id: nextId,
+                name: `Plot ${nextId}`,
+                lat: latlng.lat,
+                lng: latlng.lng,
+                rawLat: String(latlng.lat),
+                rawLng: String(latlng.lng),
+                status: 'New',
+                originalLat: null,
+                originalLng: null
+            };
+
+            locationsData.push(newPlot);
+
+            // Create and place marker
+            const marker = L.marker([newPlot.lat, newPlot.lng], {
+                icon: createCustomPinIcon(newPlot.name, newPlot.id, newPlot.status),
+                title: newPlot.name
+            });
+
+            marker.bindTooltip(`
+                <div class="location-tooltip-title">${escapeHtml(newPlot.name)}</div>
+                <span class="location-tooltip-sub">${newPlot.rawLat}, ${newPlot.rawLng}</span>
+            `, {
+                direction: 'top',
+                sticky: true,
+                offset: [0, -18],
+                className: 'location-tooltip'
+            });
+
+            marker.bindPopup(buildMarkerPopupContent(newPlot), {
+                maxWidth: 320,
+                autoPan: true,
+                autoPanPaddingTopLeft: L.point(40, 95),
+                autoPanPaddingBottomRight: L.point(40, 60)
+            });
+
+            marker.on('click', () => {
+                highlightLocationInList(newPlot.id);
+            });
+
+            markersGroup.addLayer(marker);
+            clusterGroup.addLayer(marker);
+            markerIdMap.set(newPlot.id, marker);
+
+            toggleAddPlotMode(false);
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+            switchTab('locations');
+
+            // Open popup and focus
+            setTimeout(() => {
+                marker.openPopup();
+                highlightLocationInList(newPlot.id);
+            }, 300);
+
+            showToast(`Plot #${nextId} created at ${newPlot.rawLat}, ${newPlot.rawLng}!`, 'success');
+        }
+
+        // ── "🎯 Drag / Move Pin to Exact Location" Workflow (Directly Zoom to Max Level & Drag Mode) ──
+        function startDragMode(id) {
+            const item = locationsData.find(x => x.id === id);
+            const marker = markerIdMap.get(id);
+            if (!item || !marker) return;
+
+            // 1. Immediately dismiss any active toast message
+            const toast = document.getElementById('toast');
+            if (toast) toast.classList.remove('show');
+
+            // 2. Unconditionally close and purge ALL popups from the map & DOM
+            map.closePopup();
+            marker.closePopup();
+            markersGroup.eachLayer(m => { if (m.closePopup) m.closePopup(); });
+            clusterGroup.eachLayer(m => { if (m.closePopup) m.closePopup(); });
+            document.querySelectorAll('.leaflet-popup').forEach(p => p.remove());
+
+            // 3. Highlight sidebar item in distinct color
+            highlightLocationInList(id);
+
+            // 4. If another marker is already in drag mode, save it first
+            if (activeDragMarker && activeDragId !== id) {
+                saveDragPosition();
+            }
+
+            // Record initial position before this drag session
+            dragInitialCoords = { lat: item.lat, lng: item.lng };
+            activeDragId = id;
+            activeDragMarker = marker;
+
+            const maxZoom = map.getMaxZoom() || 20;
+
+            const activateMarkerDrag = () => {
+                // Ensure popups remain completely removed so marker pin is unobstructed
+                map.closePopup();
+                document.querySelectorAll('.leaflet-popup').forEach(p => p.remove());
+
+                // Enable Leaflet marker dragging
+                marker.dragging.enable();
+
+                // Add pulse halo animation
+                const pinSvg = document.getElementById(`pin-svg-${id}`);
+                if (pinSvg) pinSvg.classList.add('drag-active');
+
+                // Show Top Drag Banner
+                const banner = document.getElementById('banner-drag-mode');
+                document.getElementById('banner-drag-name').textContent = item.name;
+                document.getElementById('banner-drag-coords').textContent = 
+                    `Current: ${item.rawLat || item.lat}, ${item.rawLng || item.lng} — Drag marker to desired spot`;
+                banner.classList.add('active');
+
+                // Drag event listener for real-time live coordinate feedback
+                marker.off('drag', onMarkerDragging);
+                marker.off('dragend', onMarkerDragEnd);
+                marker.on('drag', onMarkerDragging);
+                marker.on('dragend', onMarkerDragEnd);
+
+                // Note: Toast message suppressed per user instruction
+            };
+
+            // Uncluster if needed and fly directly to max zoom
+            if (isClusteringEnabled && clusterGroup.hasLayer(marker)) {
+                clusterGroup.zoomToShowLayer(marker, () => {
+                    map.setView([item.lat, item.lng], maxZoom, { animate: true });
+                    setTimeout(activateMarkerDrag, 180);
+                });
+            } else {
+                map.flyTo([item.lat, item.lng], maxZoom, {
+                    animate: true,
+                    duration: 0.5
+                });
+                map.once('moveend', activateMarkerDrag);
+                setTimeout(() => {
+                    if (!marker.dragging.enabled()) {
+                        activateMarkerDrag();
+                    }
+                }, 550);
+            }
+        }
+
+        function onMarkerDragging(e) {
+            if (!activeDragMarker || !dragInitialCoords) return;
+            const cur = activeDragMarker.getLatLng();
+            const dist = getDistanceMeters(dragInitialCoords.lat, dragInitialCoords.lng, cur.lat, cur.lng);
+            
+            document.getElementById('banner-drag-coords').textContent = 
+                `Lat: ${cur.lat}, Lng: ${cur.lng} (Moved ${formatDistance(dist)})`;
+        }
+
+        function onMarkerDragEnd(e) {
+            if (!activeDragMarker || !activeDragId) return;
+            const item = locationsData.find(x => x.id === activeDragId);
+            if (!item) return;
+
+            const finalPos = activeDragMarker.getLatLng();
+            const newLat = finalPos.lat;
+            const newLng = finalPos.lng;
+
+            // Set original coordinates if not already recorded
+            if (item.originalLat === null || item.originalLat === undefined) {
+                item.originalLat = dragInitialCoords.lat;
+                item.originalLng = dragInitialCoords.lng;
+                item.rawOriginalLat = item.rawLat ? item.rawLat : String(dragInitialCoords.lat);
+                item.rawOriginalLng = item.rawLng ? item.rawLng : String(dragInitialCoords.lng);
+            }
+
+            item.lat = newLat;
+            item.lng = newLng;
+            item.rawLat = String(newLat);
+            item.rawLng = String(newLng);
+            if (item.status === 'Original') {
+                item.status = 'Updated';
+            }
+
+            // Update pin icon style to 'Updated'
+            activeDragMarker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
+
+            // Update tooltips & popups
+            activeDragMarker.setTooltipContent(`
+                <div class="location-tooltip-title">${escapeHtml(item.name)}</div>
+                <span class="location-tooltip-sub">${item.rawLat}, ${item.rawLng}</span>
+            `);
+            activeDragMarker.setPopupContent(buildMarkerPopupContent(item));
+
+            const dist = getDistanceMeters(Number(item.originalLat), Number(item.originalLng), newLat, newLng);
+            document.getElementById('banner-drag-coords').textContent = 
+                `Adjusted: ${item.rawLat}, ${item.rawLng} (${formatDistance(dist)} shift) — Click "Save Position" to lock`;
+
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+        }
+
+        function saveDragPosition() {
+            if (!activeDragMarker || !activeDragId) return;
+            const item = locationsData.find(x => x.id === activeDragId);
+            
+            // Disable dragging
+            activeDragMarker.dragging.disable();
+            activeDragMarker.off('drag', onMarkerDragging);
+            activeDragMarker.off('dragend', onMarkerDragEnd);
+
+            // Remove pulse halo
+            const pinSvg = document.getElementById(`pin-svg-${activeDragId}`);
+            if (pinSvg) pinSvg.classList.remove('drag-active');
+
+            // Hide Top Banner
+            document.getElementById('banner-drag-mode').classList.remove('active');
+
+            // Re-open popup showing verified coordinates
+            if (item) {
+                activeDragMarker.setPopupContent(buildMarkerPopupContent(item));
+                activeDragMarker.openPopup();
+                showToast(`Coordinates locked & updated for "${item.name}"!`, 'success');
+            }
+
+            saveToLocalStorage();
+            activeDragId = null;
+            activeDragMarker = null;
+            dragInitialCoords = null;
+        }
+
+        function cancelDragPosition() {
+            // Dismiss toast
+            const toast = document.getElementById('toast');
+            if (toast) toast.classList.remove('show');
+
+            // Hide banner unconditionally
+            const banner = document.getElementById('banner-drag-mode');
+            if (banner) banner.classList.remove('active');
+
+            // Remove any pulse halos
+            document.querySelectorAll('.custom-pin-wrap svg').forEach(el => el.classList.remove('drag-active'));
+
+            if (activeDragMarker && activeDragId && dragInitialCoords) {
+                const item = locationsData.find(x => x.id === activeDragId);
+
+                // Revert marker to initial coords before this drag
+                if (item) {
+                    item.lat = dragInitialCoords.lat;
+                    item.lng = dragInitialCoords.lng;
+                    item.rawLat = String(dragInitialCoords.lat);
+                    item.rawLng = String(dragInitialCoords.lng);
+                    activeDragMarker.setLatLng([item.lat, item.lng]);
+                    activeDragMarker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
+                    activeDragMarker.setPopupContent(buildMarkerPopupContent(item));
+                }
+
+                activeDragMarker.dragging.disable();
+                activeDragMarker.off('drag', onMarkerDragging);
+                activeDragMarker.off('dragend', onMarkerDragEnd);
+            }
+
+            activeDragId = null;
+            activeDragMarker = null;
+            dragInitialCoords = null;
+        }
+
+        function revertPlotToOriginal(id) {
+            const item = locationsData.find(x => x.id === id);
+            const marker = markerIdMap.get(id);
+            if (!item || !marker || item.originalLat === null) return;
+
+            item.lat = typeof item.originalLat === 'number' ? item.originalLat : parseFloat(item.originalLat);
+            item.lng = typeof item.originalLng === 'number' ? item.originalLng : parseFloat(item.originalLng);
+            item.rawLat = item.rawOriginalLat || String(item.originalLat);
+            item.rawLng = item.rawOriginalLng || String(item.originalLng);
+            item.originalLat = null;
+            item.originalLng = null;
+            item.rawOriginalLat = null;
+            item.rawOriginalLng = null;
+            item.status = 'Original';
+
+            marker.setLatLng([item.lat, item.lng]);
+            marker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
+            marker.setPopupContent(buildMarkerPopupContent(item));
+            marker.setTooltipContent(`
+                <div class="location-tooltip-title">${escapeHtml(item.name)}</div>
+                <span class="location-tooltip-sub">${item.rawLat}, ${item.rawLng}</span>
+            `);
+
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+            marker.openPopup();
+            showToast(`Plot "${item.name}" restored to original coordinates`);
+        }
+
+        // ── Fit Map to All Markers / Zoom Back to Default ──
+        function fitAllMarkers() {
+            if (markersGroup.getLayers().length > 0) {
+                const bounds = markersGroup.getBounds();
+                map.fitBounds(bounds, {
+                    padding: [60, 60],
+                    maxZoom: 15,
+                    animate: true,
+                    duration: 0.9
+                });
+                showToast("Zoomed back to overview of all plots");
+            } else {
+                map.setView([20.5937, 78.9629], 4);
+                showToast("Map view reset to default", 'info');
+            }
+        }
+
+        // ── Copy Coordinates ──
+        function copyCoords(lat, lng) {
+            const text = `${lat}, ${lng}`;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(`Copied to clipboard: ${text}`);
+            });
+        }
+
+        // ── Sidebar Tabs & Toggle ──
+        function switchTab(tab) {
+            document.querySelectorAll('.segmented-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-content-setup').style.display = 'none';
+            document.getElementById('tab-content-locations').style.display = 'none';
+
+            if (tab === 'setup') {
+                document.getElementById('tab-btn-setup').classList.add('active');
+                document.getElementById('tab-content-setup').style.display = 'flex';
+            } else {
+                document.getElementById('tab-btn-locations').classList.add('active');
+                document.getElementById('tab-content-locations').style.display = 'flex';
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('sidebar-toggle-icon');
+            sidebar.classList.toggle('collapsed');
+            if (sidebar.classList.contains('collapsed')) {
+                icon.textContent = 'chevron_right';
+            } else {
+                icon.textContent = 'chevron_left';
+            }
+            setTimeout(() => { map.invalidateSize(); }, 320);
+        }
+
+        // ── Render Location List in Inspector ──
+        function renderLocationsList(list) {
+            const container = document.getElementById('locations-list-container');
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="material-icons">location_off</span>
+                        <p><strong>No locations plotted yet.</strong><br>Switch to <strong>Upload & Template</strong> to upload your file, or click <strong>➕ Add Plot</strong> to place and verify exact coordinates.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = list.map(item => {
+                const status = item.status || 'Original';
+                let badgeHtml = '';
+                if (status === 'Updated') {
+                    badgeHtml = `<span class="status-badge updated" style="margin-left:6px;">EDITED</span>`;
+                } else if (status === 'New') {
+                    badgeHtml = `<span class="status-badge new" style="margin-left:6px;">NEW</span>`;
+                }
+
+                return `
+                    <div class="location-item" id="loc-item-${item.id}" onclick="flyToLocation(${item.id})">
+                        <div class="loc-left">
+                            <div class="loc-idx" style="${status === 'Updated' ? 'background:#fef3c7;color:#b45309;' : status === 'New' ? 'background:#eff6ff;color:#2563eb;' : ''}">
+                                ${item.id}
+                            </div>
+                            <div class="loc-info">
+                                <div class="loc-name" title="${escapeHtml(item.name)}">
+                                    ${escapeHtml(item.name)} ${badgeHtml}
+                                </div>
+                                <div class="loc-coords">${item.rawLat || item.lat}, ${item.rawLng || item.lng}</div>
+                            </div>
+                        </div>
+                        <div class="loc-actions" onclick="event.stopPropagation()">
+                            <button class="icon-btn-sm" onclick="startDragFromList(${item.id})" title="Directly Zoom & Drag Marker" style="color:#d97706;">
+                                <span class="material-icons" style="font-size: 16px;">open_with</span>
+                            </button>
+                            <button class="icon-btn-sm" onclick="copyCoords(${item.lat}, ${item.lng})" title="Copy Coordinates">
+                                <span class="material-icons" style="font-size: 16px;">content_copy</span>
+                            </button>
+                            <a class="icon-btn-sm" href="https://www.google.com/maps?q=${item.lat},${item.lng}" target="_blank" title="View on Google Maps">
+                                <span class="material-icons" style="font-size: 16px; color: #1a73e8;">open_in_new</span>
+                            </a>
+                            <button class="icon-btn-sm" onclick="promptDeleteLocation(${item.id})" title="Remove Plot">
+                                <span class="material-icons" style="font-size: 16px; color: var(--danger);">delete_outline</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterLocationsList() {
+            const q = document.getElementById('search-locations').value.toLowerCase().trim();
+            if (!q) {
+                renderLocationsList(locationsData);
+                return;
+            }
+            const filtered = locationsData.filter(item => 
+                item.name.toLowerCase().includes(q) || 
+                String(item.rawLat || item.lat).includes(q) || 
+                String(item.rawLng || item.lng).includes(q) ||
+                (item.status && item.status.toLowerCase().includes(q))
+            );
+            renderLocationsList(filtered);
+        }
+
+        // ── Card Click: Highlight in Sidebar, Zoom to Location & Open Clicked Menu ──
+        function flyToLocation(id) {
+            // Dismiss any active drag mode before flying to another plot
+            if (activeDragMarker) {
+                cancelDragPosition();
+            }
+
+            const item = locationsData.find(x => x.id === id);
+            const marker = markerIdMap.get(id);
+            if (!item || !marker) return;
+
+            // Highlight sidebar item in distinct color
+            highlightLocationInList(id);
+
+            const maxZoom = map.getMaxZoom() || 20;
+
+            const openMarkerPopupMenu = () => {
+                marker.setPopupContent(buildMarkerPopupContent(item));
+                marker.openPopup();
+                setTimeout(() => {
+                    if (!marker.isPopupOpen()) {
+                        marker.openPopup();
+                    }
+                }, 100);
+            };
+
+            if (isClusteringEnabled && clusterGroup.hasLayer(marker)) {
+                clusterGroup.zoomToShowLayer(marker, () => {
+                    if (map.getZoom() < maxZoom) {
+                        map.setView([item.lat, item.lng], maxZoom, { animate: true });
+                        setTimeout(openMarkerPopupMenu, 220);
+                    } else {
+                        map.panTo([item.lat, item.lng], { animate: true });
+                        setTimeout(openMarkerPopupMenu, 180);
+                    }
+                });
+            } else {
+                map.flyTo([item.lat, item.lng], maxZoom, {
+                    animate: true,
+                    duration: 0.6
+                });
+
+                let opened = false;
+                const onEnd = () => {
+                    if (opened) return;
+                    opened = true;
+                    map.off('moveend', onEnd);
+                    openMarkerPopupMenu();
+                };
+
+                map.on('moveend', onEnd);
+                setTimeout(() => {
+                    if (!opened) {
+                        opened = true;
+                        map.off('moveend', onEnd);
+                        openMarkerPopupMenu();
+                    }
+                }, 650);
+            }
+        }
+
+        // ── Drag Pin Click: Directly Zoom to Max Level & Enter Drag Mode ──
+        function startDragFromList(id) {
+            startDragMode(id);
+        }
+
+        // ── Zoom Down by 2 Levels ──
+        function zoomDownTwoLevels() {
+            const currentZoom = map.getZoom();
+            const minZoom = map.getMinZoom() || 1;
+            const newZoom = Math.max(minZoom, currentZoom - 2);
+            map.setZoom(newZoom, { animate: true });
+            showToast(`Zoomed down to level ${newZoom} (-2 levels)`);
+        }
+
+        function highlightLocationInList(id) {
+            document.querySelectorAll('.location-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.getElementById(`loc-item-${id}`);
+            if (activeEl) {
+                activeEl.classList.add('active');
+                activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        // ── Delete Plot with Warning Confirmation & Delete in All Places ──
+        let pendingDeletePlotId = null;
+
+        function promptDeleteLocation(id) {
+            const item = locationsData.find(x => x.id === id);
+            if (!item) return;
+            pendingDeletePlotId = id;
+            document.getElementById('delete-modal-plot-name').textContent = item.name;
+            document.getElementById('delete-modal-plot-coords').textContent = `Coordinates: ${item.rawLat || item.lat}, ${item.rawLng || item.lng}`;
+            document.getElementById('delete-confirm-modal').classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            pendingDeletePlotId = null;
+            document.getElementById('delete-confirm-modal').classList.remove('active');
+        }
+
+        function executeDeletePlot() {
+            if (pendingDeletePlotId === null) return;
+            const id = pendingDeletePlotId;
+            const item = locationsData.find(x => x.id === id);
+            const name = item ? item.name : `Plot ${id}`;
+
+            // Cancel drag if currently dragging this plot
+            if (activeDragMarker && activeDragId === id) {
+                cancelDragPosition();
+            }
+
+            // Remove marker from map layers
+            const marker = markerIdMap.get(id);
+            if (marker) {
+                markersGroup.removeLayer(marker);
+                clusterGroup.removeLayer(marker);
+                markerIdMap.delete(id);
+            }
+
+            // Remove from locations array
+            locationsData = locationsData.filter(x => x.id !== id);
+
+            // Persist to localStorage
+            saveToLocalStorage();
+
+            updateMetricsAndKPIs();
+            filterLocationsList();
+
+            closeDeleteModal();
+            showToast(`Plot "${name}" deleted from all places`, 'success');
+        }
+
+        // ── Clear All Data with Warning Confirmation ──
+        function promptClearAllLocations() {
+            if (locationsData.length === 0) {
+                showToast("No locations to clear", 'info');
+                return;
+            }
+            document.getElementById('clear-modal-count').textContent = `${locationsData.length} plots`;
+            document.getElementById('clear-confirm-modal').classList.add('active');
+        }
+
+        function closeClearModal() {
+            document.getElementById('clear-confirm-modal').classList.remove('active');
+        }
+
+        function executeClearAllLocations() {
+            plotLocationsArray([], false);
+            localStorage.removeItem(STORAGE_KEY);
+            closeClearModal();
+            switchTab('setup');
+            showToast("All locations cleared and reset", 'info');
+        }
+
+        // ── Template Download Handlers ──
+        function downloadSampleTemplate(format) {
+            const url = `/api/location-check/template?format=${format}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Location_Check_Template.${format}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast(`Downloading ${format.toUpperCase()} template...`, 'success');
+        }
+
+        // ── Drag & Drop / File Upload Handler ──
+        function initDragAndDrop() {
+            const dropzone = document.getElementById('file-dropzone');
+            
+            ['dragenter', 'dragover'].forEach(name => {
+                dropzone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('drag-over');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(name => {
+                dropzone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('drag-over');
+                });
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    handleFileChosen(files[0]);
+                }
+            });
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFileChosen(e.target.files[0]);
+            }
+        }
+
+        function handleFileChosen(file) {
+            selectedFile = file;
+            document.getElementById('file-name-text').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            document.getElementById('selected-file-badge').classList.add('show');
+            showToast(`File selected: ${file.name}`);
+        }
+
+        function clearSelectedFile() {
+            selectedFile = null;
+            document.getElementById('file-input').value = '';
+            document.getElementById('selected-file-badge').classList.remove('show');
+        }
+
+        function processUploadedFile() {
+            if (!selectedFile) {
+                showToast("Please select or drop an Excel (.xlsx) or CSV file first.", 'error');
+                return;
+            }
+
+            const fileName = selectedFile.name.toLowerCase();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[firstSheetName];
+                    const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+                    if (!jsonRows || jsonRows.length === 0) {
+                        showToast("The uploaded file contains no rows.", 'error');
+                        return;
+                    }
+
+                    // Flexible Column Matching
+                    const sampleRow = jsonRows[0];
+                    let nameKey = null, latKey = null, lngKey = null, pairKey = null;
+
+                    for (const key of Object.keys(sampleRow)) {
+                        const clean = key.trim().toLowerCase();
+                        if (!nameKey && ['location name', 'location', 'name', 'place', 'title', 'site', 'locationname', 'plot', 'plot name', 'plot_name', 'farm', 'field'].includes(clean)) {
+                            nameKey = key;
+                        } else if (!latKey && ['latitude', 'lat', 'latitude (dd)', 'lat_dd', 'y'].includes(clean)) {
+                            latKey = key;
+                        } else if (!lngKey && ['longitude', 'long', 'lng', 'lon', 'longitude (dd)', 'lon_dd', 'x'].includes(clean)) {
+                            lngKey = key;
+                        } else if (!pairKey && ['coordinates', 'coord', 'coords', 'latlong', 'lat_long', 'lat, long', 'lat long', 'gps', 'geolocation'].includes(clean)) {
+                            pairKey = key;
+                        }
+                    }
+
+                    if ((!latKey || !lngKey) && !pairKey) {
+                        showToast(`Could not find Latitude / Longitude or Coordinates columns. Headers found: ${Object.keys(sampleRow).join(', ')}`, 'error');
+                        return;
+                    }
+
+                    const parsedLocations = [];
+
+                    jsonRows.forEach((row, idx) => {
+                        const name = nameKey && row[nameKey] ? String(row[nameKey]).trim() : `Plot ${idx + 1}`;
+                        let lat = null, lng = null;
+                        let rawLat = null, rawLng = null;
+
+                        if (latKey && lngKey) {
+                            rawLat = (row[latKey] !== undefined && row[latKey] !== null) ? String(row[latKey]).trim() : null;
+                            rawLng = (row[lngKey] !== undefined && row[lngKey] !== null) ? String(row[lngKey]).trim() : null;
+                            lat = parseCoordinate(row[latKey], 'lat');
+                            lng = parseCoordinate(row[lngKey], 'lng');
+                        } else if (pairKey) {
+                            const rawPair = (row[pairKey] !== undefined && row[pairKey] !== null) ? String(row[pairKey]).trim() : "";
+                            const pair = parseLatLngPair(row[pairKey]);
+                            if (pair) {
+                                lat = pair.lat;
+                                lng = pair.lng;
+                                rawLat = String(pair.lat);
+                                rawLng = String(pair.lng);
+                            }
+                        }
+
+                        parsedLocations.push({
+                            name: name,
+                            lat: lat,
+                            lng: lng,
+                            rawLat: rawLat,
+                            rawLng: rawLng,
+                            status: 'Original'
+                        });
+                    });
+
+                    plotLocationsArray(parsedLocations, true);
+                    switchTab('locations');
+
+                } catch (err) {
+                    console.error("Client parsing error:", err);
+                    showToast(`Error parsing file: ${err.message}`, 'error');
+                }
+            };
+
+            reader.readAsArrayBuffer(selectedFile);
+        }
+
+        // ── Export Modal & File Generation Handlers ──
+        function openExportModal() {
+            if (locationsData.length === 0) {
+                showToast("No locations currently plotted to export.", 'error');
+                return;
+            }
+            updateMetricsAndKPIs();
+            document.getElementById('export-modal').classList.add('active');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.remove('active');
+        }
+
+        function exportData(type, format) {
+            if (locationsData.length === 0) {
+                showToast("No plotted locations to export.", 'error');
+                return;
+            }
+
+            let exportRows = [];
+            let fileName = "";
+
+            if (type === 'all') {
+                // Option 1: All Plots (Updated Master)
+                fileName = `Updated_Plot_Locations_Master.${format}`;
+                const headers = ["Plot ID", "Location Name", "Latitude", "Longitude", "Status"];
+                const rows = locationsData.map(d => [
+                    d.id,
+                    d.name,
+                    d.rawLat || d.lat,
+                    d.rawLng || d.lng,
+                    d.status || 'Original'
+                ]);
+                exportRows = [headers, ...rows];
+
+            } else if (type === 'modified') {
+                // Option 2: Only Edited & New Plots
+                const modifiedPlots = locationsData.filter(d => d.status === 'Updated' || d.status === 'New');
+                if (modifiedPlots.length === 0) {
+                    showToast("No modified or newly added plots found yet! Drag a pin or add a plot first.", 'error');
+                    return;
+                }
+                fileName = `Modified_And_New_Plots_Only.${format}`;
+                const headers = ["Plot ID", "Location Name", "Latitude (Updated)", "Longitude (Updated)", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)"];
+                const rows = modifiedPlots.map(d => {
+                    const shift = (d.originalLat !== null && d.originalLat !== undefined) ? 
+                        getDistanceMeters(Number(d.originalLat), Number(d.originalLng), d.lat, d.lng) : 0;
+                    return [
+                        d.id,
+                        d.name,
+                        d.rawLat || d.lat,
+                        d.rawLng || d.lng,
+                        d.status,
+                        d.rawOriginalLat || (d.originalLat !== null && d.originalLat !== undefined ? d.originalLat : ""),
+                        d.rawOriginalLng || (d.originalLng !== null && d.originalLng !== undefined ? d.originalLng : ""),
+                        shift
+                    ];
+                });
+                exportRows = [headers, ...rows];
+
+            } else if (type === 'audit') {
+                // Option 3: Comprehensive Audit Sheet
+                fileName = `Plot_Coordinates_Audit_Report.${format}`;
+                const headers = ["Plot ID", "Location Name", "Current Latitude", "Current Longitude", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)", "Verification Status"];
+                const rows = locationsData.map(d => {
+                    const isUpdated = d.status === 'Updated';
+                    const shift = (isUpdated && d.originalLat !== null && d.originalLat !== undefined) ? 
+                        getDistanceMeters(Number(d.originalLat), Number(d.originalLng), d.lat, d.lng) : 0;
+                    return [
+                        d.id,
+                        d.name,
+                        d.rawLat || d.lat,
+                        d.rawLng || d.lng,
+                        d.status || 'Original',
+                        d.rawOriginalLat || (d.originalLat !== null && d.originalLat !== undefined ? d.originalLat : (d.rawLat || d.lat)),
+                        d.rawOriginalLng || (d.originalLng !== null && d.originalLng !== undefined ? d.originalLng : (d.rawLng || d.lng)),
+                        shift,
+                        isUpdated ? "Coordinates Adjusted" : (d.status === 'New' ? "Newly Added Plot" : "Original Verified")
+                    ];
+                });
+                exportRows = [headers, ...rows];
+            }
+
+            // Export with SheetJS
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportRows);
+
+            // Styling column widths
+            ws['!cols'] = [
+                { wch: 10 },
+                { wch: 32 },
+                { wch: 20 },
+                { wch: 20 },
+                { wch: 16 },
+                { wch: 20 },
+                { wch: 20 },
+                { wch: 18 },
+                { wch: 24 }
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "Verified_Coordinates");
+            XLSX.writeFile(wb, fileName, { bookType: format });
+
+            closeExportModal();
+            showToast(`Exported ${fileName} successfully!`, 'success');
+        }
+
+        // Backward compatibility
+        function exportCurrentPlottedToExcel() {
+            openExportModal();
+        }
+
+        // ── Fullscreen Toggle ──
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.warn("Fullscreen failed", err);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // ── Toast Notifications ──
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            let icon = 'info';
+            if (type === 'success') icon = 'check_circle';
+            if (type === 'error') icon = 'error';
+
+            toast.innerHTML = `
+                <span class="material-icons" style="font-size: 1.1rem; color: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#38bdf8'}">${icon}</span>
+                <span>${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 250);
+            }, 3200);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

@@ -1153,6 +1153,276 @@ async def update_phone_page():
     return FileResponse("static/update_phone.html")
 
 
+@router.get("/location-check")
+async def location_check_page():
+    """Serve the standalone location check page."""
+    return FileResponse("static/location_check.html")
+
+
+@router.get("/api/location-check/template")
+async def download_location_check_template(format: str = "xlsx"):
+    """Download the Location Check template as XLSX or CSV."""
+    template_path = os.path.join(TEMPLATES_DIR, "Location_Check_Template.xlsx")
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    if format.lower() == "csv":
+        import io
+        import pandas as pd
+        df = pd.read_excel(template_path)
+        stream = io.StringIO()
+        df.to_csv(stream, index=False)
+        from fastapi.responses import Response
+        return Response(
+            content=stream.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="Location_Check_Template.csv"'}
+        )
+
+    return FileResponse(
+        template_path,
+        filename="Location_Check_Template.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="Location_Check_Template.xlsx"'}
+    )
+
+
+class LocationItem(BaseModel):
+    name: str
+    latitude: float
+    longitude: float
+
+class CreateTemplateRequest(BaseModel):
+    locations: list[LocationItem]
+    filename: str = "Custom_Location_Template.xlsx"
+
+@router.post("/api/location-check/create-template")
+async def create_location_check_template(payload: CreateTemplateRequest):
+    """Dynamically generate a custom Location Check Excel file from user-supplied locations."""
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Locations"
+
+    headers = ["Location Name", "Latitude", "Longitude"]
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="009ADE", end_color="009ADE", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    center_align = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin", color="E0E0E0"),
+        right=Side(style="thin", color="E0E0E0"),
+        top=Side(style="thin", color="E0E0E0"),
+        bottom=Side(style="thin", color="E0E0E0")
+    )
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+
+    for loc in payload.locations:
+        ws.append([loc.name, loc.latitude, loc.longitude])
+
+    for row in ws.iter_rows(min_row=2, max_row=len(payload.locations) + 1):
+        row[0].alignment = left_align
+        row[1].alignment = center_align
+        row[2].alignment = center_align
+        for cell in row:
+            cell.border = thin_border
+            cell.font = Font(name="Calibri", size=11)
+
+    ws.column_dimensions["A"].width = 30
+    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["C"].width = 18
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = payload.filename if payload.filename.endswith(".xlsx") else f"{payload.filename}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/api/location-check/parse")
+async def parse_location_file(file: UploadFile = File(...)):
+    """Parse and validate uploaded location files (Excel or CSV)."""
+    import io
+    import pandas as pd
+    import re
+
+    def parse_single_coord(coord_str, is_lat=None):
+        if coord_str is None or pd.isna(coord_str):
+            return None
+        s = str(coord_str).strip()
+        if not s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            pass
+
+        is_neg = False
+        if s.startswith('-'):
+            is_neg = True
+            s = s[1:].strip()
+
+        su = s.upper()
+        if is_lat is True:
+            if 'SOUTH' in su or re.search(r'(?:[\d\.\'\"°]|\b)S\b', su) or su.endswith('S'):
+                is_neg = True
+            elif 'NORTH' in su or re.search(r'(?:[\d\.\'\"°]|\b)N\b', su) or su.endswith('N'):
+                is_neg = False
+        elif is_lat is False:
+            if 'WEST' in su or re.search(r'(?:[\d\.\'\"°s]|\b)W\b', su) or su.endswith('W'):
+                is_neg = True
+            elif 'EAST' in su or re.search(r'(?:[\d\.\'\"°s]|\b)E\b', su) or su.endswith('E'):
+                is_neg = False
+        else:
+            if 'SOUTH' in su or 'WEST' in su or su.endswith('S') or su.endswith('W'):
+                is_neg = True
+
+        cleaned = re.sub(r'[^\d\.]+', ' ', s).strip()
+        parts = [float(p) for p in cleaned.split() if p]
+        if not parts:
+            return None
+        if len(parts) == 1:
+            val = parts[0]
+        elif len(parts) == 2:
+            val = parts[0] + parts[1] / 60.0
+        elif len(parts) >= 3:
+            val = parts[0] + parts[1] / 60.0 + parts[2] / 3600.0
+        else:
+            return None
+        return -val if is_neg else val
+
+    def parse_combined_coords(val_str):
+        if val_str is None or pd.isna(val_str):
+            return None, None
+        s = str(val_str).strip()
+        for delim in [',', ';', '/']:
+            if delim in s:
+                p = s.split(delim, 1)
+                lat = parse_single_coord(p[0], True)
+                lng = parse_single_coord(p[1], False)
+                if lat is not None and lng is not None:
+                    return lat, lng
+        # Space separated with directional letters
+        match = re.search(r'([0-9\.\s°\'\"d]+[NSns])\s*[,;]?\s*([0-9\.\s°\'\"d]+[EWew])', s)
+        if match:
+            lat = parse_single_coord(match.group(1), True)
+            lng = parse_single_coord(match.group(2), False)
+            if lat is not None and lng is not None:
+                return lat, lng
+        # Space separated numbers (e.g. 12.971598 77.594566)
+        parts = s.split()
+        if len(parts) == 2:
+            lat = parse_single_coord(parts[0], True)
+            lng = parse_single_coord(parts[1], False)
+            if lat is not None and lng is not None:
+                return lat, lng
+        return None, None
+
+    try:
+        contents = await file.read()
+        filename_lower = file.filename.lower()
+        if filename_lower.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(contents))
+        elif filename_lower.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(io.BytesIO(contents))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Please upload .xlsx, .xls, or .csv")
+
+        # Flexible column matching
+        name_col = None
+        lat_col = None
+        lon_col = None
+        pair_col = None
+
+        for col in df.columns:
+            c = str(col).strip().lower()
+            if not name_col and c in ["location name", "location", "location_name", "locationname", "name", "plot", "plot name", "plot_name", "place", "title", "site", "farm", "field"]:
+                name_col = col
+            elif not lat_col and c in ["latitude", "lat", "latitude (dd)", "lat_dd", "y"]:
+                lat_col = col
+            elif not lon_col and c in ["longitude", "long", "lng", "lon", "longitude (dd)", "lon_dd", "x"]:
+                lon_col = col
+            elif not pair_col and c in ["coordinates", "coord", "coords", "latlong", "lat_long", "lat, long", "lat long", "gps", "geolocation"]:
+                pair_col = col
+
+        if (not lat_col or not lon_col) and not pair_col:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "success": False,
+                    "error": f"Missing Latitude/Longitude or Coordinates columns. Found columns: {list(df.columns)}. Expected: 'Location Name', 'Latitude', 'Longitude' or 'Coordinates'."
+                }
+            )
+
+        valid_locations = []
+        invalid_rows = []
+
+        for idx, row in df.iterrows():
+            row_num = idx + 2
+            loc_name = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col])) else f"Location {idx + 1}"
+
+            lat = None
+            lon = None
+
+            if lat_col and lon_col:
+                raw_lat = row[lat_col]
+                raw_lon = row[lon_col]
+                lat = parse_single_coord(raw_lat, is_lat=True)
+                lon = parse_single_coord(raw_lon, is_lat=False)
+            elif pair_col:
+                raw_pair = row[pair_col]
+                lat, lon = parse_combined_coords(raw_pair)
+
+            if lat is None or lon is None:
+                invalid_rows.append({"row": row_num, "name": loc_name, "error": f"Could not parse valid coordinates from row {row_num}"})
+                continue
+
+            if not (-90.0 <= lat <= 90.0):
+                invalid_rows.append({"row": row_num, "name": loc_name, "error": f"Latitude {lat} out of range (-90 to 90)"})
+                continue
+            if not (-180.0 <= lon <= 180.0):
+                invalid_rows.append({"row": row_num, "name": loc_name, "error": f"Longitude {lon} out of range (-180 to 180)"})
+                continue
+
+            valid_locations.append({
+                "id": idx + 1,
+                "row": row_num,
+                "name": loc_name,
+                "lat": float(lat),
+                "lng": float(lon),
+                "raw_lat": str(row[lat_col]).strip() if (lat_col and pd.notna(row.get(lat_col))) else str(lat),
+                "raw_lng": str(row[lon_col]).strip() if (lon_col and pd.notna(row.get(lon_col))) else str(lon),
+                "status": "Original"
+            })
+
+        return {
+            "success": True,
+            "filename": file.filename,
+            "total_rows": len(df),
+            "valid_count": len(valid_locations),
+            "invalid_count": len(invalid_rows),
+            "locations": valid_locations,
+            "invalid_rows": invalid_rows
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(e)}")
+
+
+
 class PasswordAutomationRequest(BaseModel):
     admin_username: str
     admin_password: str
