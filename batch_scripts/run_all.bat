@@ -46,12 +46,12 @@ echo  Starting Cropin Automation Services (Server + Ngrok)
 echo ========================================================
 echo.
 
-:: Get SCRIPT_DIR without trailing backslash (prevents \" breaking the /d path)
+:: Get canonical SCRIPT_DIR and PROJECT_DIR
 for %%I in ("%~dp0.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%~dp0..") do set "PROJECT_DIR=%%~fI"
 
-:: Change to project root and capture it
-pushd "%~dp0.."
-set "PROJECT_DIR=%CD%"
+cd /d "%PROJECT_DIR%"
+pushd "%PROJECT_DIR%"
 
 :: Find configured port using absolute path
 for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" "%PROJECT_DIR%\app\script_configs.py" 2^>nul') do set PORT=%%I
@@ -73,7 +73,7 @@ if %ERRORLEVEL% EQU 0 (
 :: 1. Launch Server in dedicated window
 ::    /k keeps the window open so any crash/error stays visible
 echo [1/2] Launching Server in dedicated window...
-start "CROPIN_SERVER" /d "%SCRIPT_DIR%" cmd /k run_server.bat
+start "CROPIN_SERVER" cmd /k "cd /d \"%SCRIPT_DIR%\" && call run_server.bat"
 
 :: 2. Wait until Server is actually listening on the port
 echo.
@@ -109,7 +109,7 @@ if %ERRORLEVEL% EQU 0 (
 :START_NGROK
 echo.
 echo [2/2] Launching Ngrok Remote Tunnel...
-start "CROPIN_NGROK" /d "%SCRIPT_DIR%" cmd /k run_ngrok.bat
+start "CROPIN_NGROK" cmd /k "cd /d \"%SCRIPT_DIR%\" && call run_ngrok.bat"
 
 :FINISH
 echo.
