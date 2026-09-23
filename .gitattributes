@@ -1,0 +1,15 @@
+# Ensure Windows batch files always use CRLF line endings
+# Windows CMD cannot parse LF-only .bat files - it reads the whole file as one giant command
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Python and other source files use LF (Unix standard)
+*.py text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
