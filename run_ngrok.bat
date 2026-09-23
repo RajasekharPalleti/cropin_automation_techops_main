@@ -24,7 +24,7 @@ exit 0
 :WINDOWS
 @echo off
 title CROPIN_NGROK
-echo Initializing Remote Tunnel...
+echo Initializing Remote Tunnel
 echo.
 echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.
@@ -57,8 +57,8 @@ if %NGROK_EXIT% NEQ 0 (
     if %NGROK_ATTEMPTS% LSS 3 (
         echo.
         echo [WARNING] Ngrok exited (code %NGROK_EXIT%). Network might still be connecting.
-        echo Retrying in 5 seconds (attempt %NGROK_ATTEMPTS%/3)...
-        timeout /t 5 >nul
+        echo Retrying in 5 seconds (attempt %NGROK_ATTEMPTS%/3)
+        ping 127.0.0.1 -n 6 >nul
         goto :LAUNCH_NGROK
     )
 )

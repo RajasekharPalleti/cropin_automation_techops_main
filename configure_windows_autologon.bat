@@ -5,8 +5,8 @@ title Cropin Server - Windows Auto-Logon Setup
 :: 1. Ensure Administrator Privileges (Self-Elevate with persistent /k window)
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [INFO] Elevating to Administrator...
-    powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/k cd /d \"\"%~dp0\"\" && \"\"%~nx0\"\" \"%USERNAME%\" \"%USERDOMAIN%\"' -Verb RunAs"
+    echo [INFO] Elevating to Administrator
+    powershell -NoProfile -Command "Start-Process cmd -ArgumentList '/k cd /d """%~dp0.""" && """%~f0""" """%USERNAME%""" """%USERDOMAIN%"""' -Verb RunAs"
     exit /b
 )
 
@@ -73,7 +73,7 @@ pause
 exit /b
 
 :RUN_NETPLWIZ
-echo Opening netplwiz...
+echo Opening netplwiz
 start netplwiz.exe
 pause
 exit /b

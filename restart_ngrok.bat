@@ -23,11 +23,11 @@ exit 0
 
 :WINDOWS
 title RESTART_NGROK
-echo Restarting ngrok...
+echo Restarting ngrok
 taskkill /IM ngrok.exe /F >nul 2>&1
 echo Stopped existing ngrok processes.
 echo.
-echo Initializing Remote Tunnel...
+echo Initializing Remote Tunnel
 echo.
 echo The public URL will appear below.
 echo Keep this window OPEN to maintain remote access.

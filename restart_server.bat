@@ -38,7 +38,7 @@ exit 0
 :WINDOWS
 title RESTART_SERVER
 echo ========================================================
-echo  Restarting Cropin Automation Server...
+echo  Restarting Cropin Automation Server
 echo ========================================================
 
 for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
@@ -52,92 +52,118 @@ if "%PORT%"=="" set PORT=4444
 
 :: Kill existing process on port using native findstr (avoids git find.exe collision)
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
-    echo Killing existing process on port %PORT% (PID: %%a)...
-    taskkill /f /pid %%a >nul 2>&1
+    echo Killing existing process on port %PORT% (PID: %%a)
+    taskkill /f /t /pid %%a >nul 2>&1
 )
-timeout /t 2 >nul
+ping 127.0.0.1 -n 5 >nul
 
-echo Starting Server...
+echo Starting Server
 echo Open http://localhost:%PORT% or http://YOUR-IP-HERE:%PORT% in your browser.
 
 :: 1. Verify Virtual Environment or Python availability
 set PYTHON_CMD=python
 set "VENV_PY=%PROJECT_DIR%\.venv\Scripts\python.exe"
 
-if exist "%VENV_PY%" (
-    echo Using existing virtual environment Python...
-) else (
-    python --version >nul 2>&1
-    if %ERRORLEVEL% NEQ 0 (
-        py --version >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
-            set PYTHON_CMD=py
-        ) else (
-            py -3 --version >nul 2>&1
-            if %ERRORLEVEL% EQU 0 (
-                set PYTHON_CMD=py -3
-            ) else (
-                echo.
-                echo ========================================================
-                echo [ERROR] Python is not installed or not in your PATH!
-                echo Please install Python from https://www.python.org/
-                echo Make sure to check 'Add Python to PATH' during install.
-                echo ========================================================
-                pause
-                popd
-                exit /b 1
-            )
-        )
-    )
-)
+if exist "%VENV_PY%" goto :VENV_FOUND
 
+python --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto :PYTHON_OK
+
+py --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto :PY_OK
+
+py -3 --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto :PY3_OK
+
+echo.
+echo ========================================================
+echo [ERROR] Python is not installed or not in your PATH!
+echo Please install Python from https://www.python.org/
+echo Make sure to check 'Add Python to PATH' during install.
+echo ========================================================
+if "%~1"=="--no-pause" goto :EXIT_ERR
+if "%~2"=="--no-pause" goto :EXIT_ERR
+pause
+:EXIT_ERR
+popd
+exit /b 1
+
+:PY_OK
+set PYTHON_CMD=py
+goto :PYTHON_OK
+
+:PY3_OK
+set PYTHON_CMD=py -3
+goto :PYTHON_OK
+
+:VENV_FOUND
+echo Using existing virtual environment Python
+goto :CHECK_VENV_ACTIVATE
+
+:PYTHON_OK
+
+:CHECK_VENV_ACTIVATE
 :: 2. Verify Windows-compatible Virtual Environment
 set DO_INSTALL=0
-if not exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" (
-    echo Creating new virtual environment...
-    if exist "%PROJECT_DIR%\.venv" rmdir /s /q "%PROJECT_DIR%\.venv" >nul 2>&1
-    %PYTHON_CMD% -m venv "%PROJECT_DIR%\.venv"
-    set DO_INSTALL=1
-)
+if exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" goto :ACTIVATE_OK
 
+echo Creating fresh virtual environment for Windows
+if exist "%PROJECT_DIR%\.venv" rmdir /s /q "%PROJECT_DIR%\.venv" >nul 2>&1
+%PYTHON_CMD% -m venv "%PROJECT_DIR%\.venv"
+set DO_INSTALL=1
+
+:ACTIVATE_OK
 if "%~1"=="--install-deps" set DO_INSTALL=1
+if "%~2"=="--install-deps" set DO_INSTALL=1
 
-if exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" (
-    call "%PROJECT_DIR%\.venv\Scripts\activate.bat"
-) else (
-    echo.
-    echo ========================================================
-    echo [ERROR] Could not find or create .venv\Scripts\activate.bat!
-    echo ========================================================
-    pause
-    popd
-    exit /b 1
-)
+if exist "%PROJECT_DIR%\.venv\Scripts\activate.bat" goto :ACTIVATE_EXISTS
 
-if %DO_INSTALL%==1 (
-    echo Installing/Updating requirements...
-    "%PROJECT_DIR%\.venv\Scripts\python.exe" -m pip install -r requirements.txt
-    "%PROJECT_DIR%\.venv\Scripts\python.exe" -m playwright install chromium
-)
+echo.
+echo ========================================================
+echo [ERROR] Could not find or create .venv\Scripts\activate.bat!
+echo Check that Python has the venv module available.
+echo ========================================================
+if "%~1"=="--no-pause" goto :EXIT_ERR
+if "%~2"=="--no-pause" goto :EXIT_ERR
+pause
+popd
+exit /b 1
 
-:: 3. Launch Main Application
-if exist "%PROJECT_DIR%\.venv\Scripts\python.exe" (
-    "%PROJECT_DIR%\.venv\Scripts\python.exe" -m app.main
-) else (
-    python -m app.main
-)
+:ACTIVATE_EXISTS
+call "%PROJECT_DIR%\.venv\Scripts\activate.bat"
 
+:: 3. Initial dependency installation if newly created
+if %DO_INSTALL% NEQ 1 goto :SKIP_INSTALL
+echo Installing requirements (one-time setup)
+"%PROJECT_DIR%\.venv\Scripts\python.exe" -m pip install -r requirements.txt
+"%PROJECT_DIR%\.venv\Scripts\python.exe" -m playwright install chromium
+
+:SKIP_INSTALL
+
+:: 4. Launch Main Application
+if exist "%PROJECT_DIR%\.venv\Scripts\python.exe" goto :RUN_VENV_APP
+python -m app.main
+goto :CHECK_APP_EXIT
+
+:RUN_VENV_APP
+"%PROJECT_DIR%\.venv\Scripts\python.exe" -m app.main
+
+:CHECK_APP_EXIT
 set SERVER_EXIT=%ERRORLEVEL%
 popd
 
-if %SERVER_EXIT% NEQ 0 (
-    echo.
-    echo ========================================================
-    echo [ERROR] Server crashed with exit code %SERVER_EXIT%!
-    echo ========================================================
-    pause
-    exit /b %SERVER_EXIT%
-)
+if %SERVER_EXIT% EQU 0 goto :SERVER_OK
+echo.
+echo ========================================================
+echo [ERROR] Server stopped with exit code %SERVER_EXIT%!
+echo If this is an error, review the error message above.
+echo ========================================================
+if "%~1"=="--no-pause" exit /b %SERVER_EXIT%
+if "%~2"=="--no-pause" exit /b %SERVER_EXIT%
+pause
+exit /b %SERVER_EXIT%
 
+:SERVER_OK
 if "%~1"=="--no-pause" exit /b
+if "%~2"=="--no-pause" exit /b
 pause

@@ -5,8 +5,8 @@ title Cropin Server - Windows Auto-Start & Auto-Logon Setup
 :: 1. Ensure Administrator Privileges (Self-Elevate if double-clicked)
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [INFO] Elevating to Administrator...
-    powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList '/k cd /d \"\"%~dp0\"\" && \"\"%~nx0\"\" \"%USERNAME%\" \"%USERDOMAIN%\"' -Verb RunAs"
+    echo [INFO] Elevating to Administrator
+    powershell -NoProfile -Command "Start-Process cmd -ArgumentList '/k cd /d """%~dp0.""" && """%~f0""" """%USERNAME%""" """%USERDOMAIN%"""' -Verb RunAs"
     exit /b
 )
 
@@ -34,7 +34,7 @@ if exist "%STARTUP_DIR%\CropinServer.lnk" del /f /q "%STARTUP_DIR%\CropinServer.
 if exist "%STARTUP_DIR%\CropinNgrok.lnk" del /f /q "%STARTUP_DIR%\CropinNgrok.lnk" 2>nul
 
 :: 3. Create Windows Startup Folder shortcut for run_all.bat
-echo [1/3] Creating Windows Startup shortcut...
+echo [1/3] Creating Windows Startup shortcut
 powershell -NoProfile -Command "$ws = New-Object -COM WScript.Shell; $s = $ws.CreateShortcut('%STARTUP_DIR%\CropinAutomation.lnk'); $s.TargetPath = '%RUN_ALL_BAT%'; $s.WorkingDirectory = '%PROJECT_DIR%'; $s.WindowStyle = 1; $s.Save()"
 if %errorlevel% equ 0 (
     echo       [OK] Shortcut created in Startup folder.
@@ -44,7 +44,7 @@ if %errorlevel% equ 0 (
 
 :: 4. Register Windows Scheduled Task (Runs on Logon with Highest Privileges)
 echo.
-echo [2/3] Registering Windows Scheduled Task...
+echo [2/3] Registering Windows Scheduled Task
 schtasks /create /tn "CropinAutomationServer" /tr "\"%RUN_ALL_BAT%\"" /sc onlogon /rl highest /f >nul 2>&1
 if %errorlevel% equ 0 (
     echo       [OK] Scheduled Task 'CropinAutomationServer' created successfully.
@@ -54,7 +54,7 @@ if %errorlevel% equ 0 (
 
 :: 5. Configure Windows Auto-Logon
 echo.
-echo [3/3] Configuring Windows Auto-Logon...
+echo [3/3] Configuring Windows Auto-Logon
 echo ========================================================
 echo  Auto-Logon ensures Windows automatically logs into
 echo  '%TARGET_USER%' whenever the computer restarts,

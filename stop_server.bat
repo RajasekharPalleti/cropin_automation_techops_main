@@ -31,10 +31,10 @@ for /f "tokens=2 delims==" %%I in ('findstr "SERVER_PORT" "%PROJECT_DIR%\app\scr
 set PORT=%PORT: =%
 if "%PORT%"=="" set PORT=4444
 
-echo Stopping Server on port %PORT%...
+echo Stopping Server on port %PORT%
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT%" ^| findstr "LISTENING"') do (
-    echo Killing process PID %%a listening on port %PORT%...
-    taskkill /f /pid %%a >nul 2>&1
+    echo Killing process PID %%a listening on port %PORT%
+    taskkill /f /t /pid %%a >nul 2>&1
 )
 echo Server stopped.
 popd

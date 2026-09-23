@@ -70,12 +70,12 @@ if %ERRORLEVEL% EQU 0 (
 
 :: 1. Launch Server in dedicated window
 ::    /k keeps the window open so any crash/error stays visible
-echo [1/2] Launching Server in dedicated window...
-start "CROPIN_SERVER" cmd /k "cd /d \"%PROJECT_DIR%\" && call run_server.bat"
+echo [1/2] Launching Server in dedicated window
+start "CROPIN_SERVER" /D "%PROJECT_DIR%" cmd /k "call run_server.bat"
 
 :: 2. Wait until Server is actually listening on the port
 echo.
-echo Waiting for Server to start on port %PORT% [timeout: 90s]...
+echo Waiting for Server to start on port %PORT% [timeout: 90s]
 set RETRIES=0
 
 :WAIT_FOR_SERVER
@@ -86,7 +86,7 @@ if %RETRIES% GTR 45 (
     goto :CHECK_NGROK
 )
 
-timeout /t 2 >nul
+ping 127.0.0.1 -n 3 >nul
 netstat -ano | findstr ":%PORT%" | findstr "LISTENING" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo [OK] Server is UP and listening on port %PORT%!
@@ -106,8 +106,8 @@ if %ERRORLEVEL% EQU 0 (
 
 :START_NGROK
 echo.
-echo [2/2] Launching Ngrok Remote Tunnel...
-start "CROPIN_NGROK" cmd /k "cd /d \"%PROJECT_DIR%\" && call run_ngrok.bat"
+echo [2/2] Launching Ngrok Remote Tunnel
+start "CROPIN_NGROK" /D "%PROJECT_DIR%" cmd /k "call run_ngrok.bat"
 
 :FINISH
 echo.
@@ -119,5 +119,5 @@ echo ========================================================
 echo.
 popd
 
-timeout /t 5 >nul
+ping 127.0.0.1 -n 6 >nul
 exit /b

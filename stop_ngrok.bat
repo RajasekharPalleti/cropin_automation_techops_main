@@ -14,7 +14,7 @@ exit 0
 :WINDOWS
 @echo off
 title STOP_NGROK
-echo Stopping all ghost ngrok processes...
+echo Stopping all ghost ngrok processes
 taskkill /IM ngrok.exe /F
 if %ERRORLEVEL% EQU 0 (
     echo.
