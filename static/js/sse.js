@@ -278,6 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         evtSource.onerror = (err) => {
             console.error('SSE Error (Connection Lost?):', err);
+
+            // Capture last known event ID before closing (for replay on reconnect)
+            const lastId = evtSource.lastEventId || null;
             closeSSE();
 
             // Auto-reconnect only if a script is still running
@@ -289,8 +292,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (consoleContent) consoleContent.appendChild(line);
 
                 setTimeout(() => {
-                    console.log('Attempting auto-reconnect...');
-                    connectSSE();
+                    console.log('Attempting auto-reconnect... lastEventId:', lastId);
+                    // Pass lastEventId as query param (Render proxy strips headers)
+                    const clientId = window.getClientId ? window.getClientId() : sessionStorage.getItem('clientId');
+                    const url = lastId
+                        ? `/api/logs/${clientId}?last_event_id=${encodeURIComponent(lastId)}`
+                        : `/api/logs/${clientId}`;
+                    evtSource = new EventSource(url);
+                    logBuffer = [];
+                    isRenderPending = false;
+
+                    evtSource.onmessage = (event) => {
+                        logBuffer.push(event.data);
+                        if (!isRenderPending) {
+                            isRenderPending = true;
+                            requestAnimationFrame(flushLogs);
+                        }
+                    };
+                    evtSource.onerror = arguments.callee; // reuse same handler on next error
                 }, 5000);
             }
         };

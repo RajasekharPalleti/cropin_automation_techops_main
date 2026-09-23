@@ -19,7 +19,7 @@ HTTP_PROXY  = ""
 HTTPS_PROXY = ""
 
 # SSE / streaming settings
-SSE_HEARTBEAT_TIMEOUT = 15.0  # seconds — keeps TCP connection alive when idle
+SSE_HEARTBEAT_TIMEOUT = 8.0   # seconds — keeps TCP alive; must be well under Render's 30s proxy timeout
 
 # Backup cleanup settings
 CLEANUP_RETENTION_DAYS    = 90     # Files older than this are deleted from Drive

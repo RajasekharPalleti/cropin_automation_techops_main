@@ -125,9 +125,11 @@ async def process_background_script(
 # ---------------------------------------------------------------------------
 
 @router.get("/api/logs/{client_id}")
-async def sse_endpoint(client_id: str, request: Request):
+async def sse_endpoint(client_id: str, request: Request, last_event_id: str = None):
     """Server-Sent Events stream — clients subscribe here to receive live logs."""
-    last_event_id = request.headers.get("Last-Event-ID")
+    # Accept Last-Event-ID via header (native SSE standard) OR query param
+    # (Render's reverse proxy strips custom headers, so query param is the fallback)
+    last_event_id = last_event_id or request.headers.get("Last-Event-ID")
     await manager.connect(client_id, last_event_id)
     return StreamingResponse(
         manager.stream_logs(client_id),
