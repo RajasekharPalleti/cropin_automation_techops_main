@@ -1,45 +1,5 @@
-:<<"::WINDOWS_ONLY"
+:; exec "$(dirname "$0")/run_all.sh" "$@"
 @echo off
-goto :WINDOWS
-::WINDOWS_ONLY
-
-# Mac/Linux script
-printf "\033]0;CROPIN_ALL_SERVICES\007"
-echo "========================================================"
-echo " Starting Cropin Automation Services (Server + Ngrok)..."
-echo "========================================================"
-cd "$(dirname "$0")"
-
-PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-if [ -z "$PORT" ]; then PORT=4444; fi
-
-# Check if server is already running
-if nc -z 127.0.0.1 $PORT 2>/dev/null; then
-    echo "ℹ️  Server is already running on port $PORT."
-else
-    echo "1. Starting Server..."
-    bash ./run_server.bat &
-    
-    echo "Waiting for Server to be ready on port $PORT..."
-    for i in {1..60}; do
-        if nc -z 127.0.0.1 $PORT 2>/dev/null || (echo > /dev/tcp/127.0.0.1/$PORT) 2>/dev/null; then
-            echo "✅ Server is UP on port $PORT!"
-            break
-        fi
-        sleep 1
-    done
-fi
-
-# Check if ngrok is already running
-if pgrep -x "ngrok" >/dev/null 2>&1; then
-    echo "ℹ️  Ngrok is already running."
-else
-    echo "2. Starting Ngrok Tunnel..."
-    bash ./run_ngrok.bat
-fi
-exit 0
-
-:WINDOWS
 title CROPIN_ALL_SERVICES
 echo ========================================================
 echo  Starting Cropin Automation Services (Server + Ngrok)

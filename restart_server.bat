@@ -1,41 +1,5 @@
-:<<"::WINDOWS_ONLY"
+:; exec "$(dirname "$0")/restart_server.sh" "$@"
 @echo off
-goto :WINDOWS
-::WINDOWS_ONLY
-
-# Mac/Linux script
-printf "\033]0;RESTART_SERVER\007"
-echo "Restarting Cropin Automation Server..."
-cd "$(dirname "$0")"
-PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-if [ -z "$PORT" ]; then PORT=4444; fi
-
-PID=$(lsof -ti:$PORT 2>/dev/null)
-if [ -n "$PID" ]; then
-  kill -9 $PID
-  echo "Old Process (PID: $PID) killed."
-else
-  echo "No existing process found on port $PORT."
-fi
-sleep 2
-
-echo "Starting Server..."
-echo "Open http://localhost:$PORT or http://<your-ip>:$PORT in your browser."
-if [ ! -d ".venv" ]; then
-    echo "Creating new virtual environment..."
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip3 install -r requirements.txt
-    playwright install chromium
-else
-    source .venv/bin/activate
-fi
-
-python3 -m app.main
-read -p "Press any key to close..."
-exit 0
-
-:WINDOWS
 title RESTART_SERVER
 echo ========================================================
 echo  Restarting Cropin Automation Server

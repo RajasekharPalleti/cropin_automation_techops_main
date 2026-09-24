@@ -1421,7 +1421,7 @@
                         Upload Location File
                     </div>
                     <p class="panel-desc">
-                        Upload your Excel (.xlsx, .xls) or CSV file with <strong>Location Name</strong>, <strong>Latitude</strong>, and <strong>Longitude</strong> (or combined <strong>Coordinates</strong>). Supports all Google Maps formats (DD, DMS, DMM).
+                        Upload <strong>any Excel (.xlsx, .xls) or CSV template</strong>. Automatically detects <strong>Croppable Area Name</strong>, <strong>CA Name</strong>, <strong>Plot Name</strong>, <strong>Asset Name</strong>, <strong>Location Name</strong>, and all <strong>Latitude & Longitude</strong> columns (DD, DMS, Centroid X/Y, or Coordinates). You do not need to rename columns or download our template.
                     </p>
 
                     <div class="dropzone" id="file-dropzone">
@@ -1451,10 +1451,10 @@
                 <div class="panel-card">
                     <div class="panel-title">
                         <span class="material-icons">file_download</span>
-                        Download Ready Template
+                        Download Sample Template (Optional)
                     </div>
                     <p class="panel-desc">
-                        Get the formatted template with columns: <strong>Location Name</strong>, <strong>Latitude</strong>, and <strong>Longitude</strong>.
+                        Need a blank starting template? Download ready-to-use sample spreadsheets below. Or simply upload your own existing files directly above.
                     </p>
 
                     <div class="btn-grid">
@@ -1666,7 +1666,7 @@
                     <div class="export-card-header">
                         <div class="export-badge">Full Master Dataset</div>
                         <div class="export-card-title">1. All Plots (Updated Master)</div>
-                        <p class="export-card-desc">Exports every plotted location with its latest exact coordinates (original, moved, and newly added plots).</p>
+                        <p class="export-card-desc">Exports every plotted location with its latest exact coordinates. If you uploaded a custom template (e.g. Croppable Area Name, CA Name, Plot Name, Asset Name, etc.), all original columns are preserved with coordinates updated!</p>
                     </div>
                     <div class="export-btn-group">
                         <button class="btn-action btn-primary" onclick="exportData('all', 'xlsx')">
@@ -1797,6 +1797,9 @@
         let googleLayers = {};
         let locationsData = [];
         let selectedFile = null;
+        let uploadedTemplateHeaders = [];
+        let uploadedFileName = '';
+        let detectedColumns = null;
         let isClusteringEnabled = true;
         let showPinLabels = false; // Labels OFF by default. Only shown when user clicks Labels button.
         let markerIdMap = new Map();
@@ -1809,10 +1812,18 @@
 
         // ── LocalStorage Session Persistence ──
         const STORAGE_KEY = 'cropin_location_check_plots_v2';
+        const HEADERS_STORAGE_KEY = 'cropin_location_check_headers_v2';
 
         function saveToLocalStorage() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(locationsData));
+                if (uploadedTemplateHeaders && uploadedTemplateHeaders.length > 0) {
+                    localStorage.setItem(HEADERS_STORAGE_KEY, JSON.stringify({
+                        headers: uploadedTemplateHeaders,
+                        fileName: uploadedFileName,
+                        detected: detectedColumns
+                    }));
+                }
             } catch (err) {
                 console.warn('LocalStorage save failed:', err);
             }
@@ -1820,6 +1831,15 @@
 
         function loadFromLocalStorage() {
             try {
+                const savedHeaders = localStorage.getItem(HEADERS_STORAGE_KEY);
+                if (savedHeaders) {
+                    try {
+                        const h = JSON.parse(savedHeaders);
+                        uploadedTemplateHeaders = h.headers || [];
+                        uploadedFileName = h.fileName || '';
+                        detectedColumns = h.detected || null;
+                    } catch (e) {}
+                }
                 const saved = localStorage.getItem(STORAGE_KEY);
                 if (saved) {
                     const parsed = JSON.parse(saved);
@@ -2381,6 +2401,12 @@
             item.rawLat = String(newLat);
             item.rawLng = String(newLng);
 
+            if (item.originalRow) {
+                if (item.originalNameKey) item.originalRow[item.originalNameKey] = item.name;
+                if (item.originalLatKey) item.originalRow[item.originalLatKey] = item.rawLat;
+                if (item.originalLngKey) item.originalRow[item.originalLngKey] = item.rawLng;
+            }
+
             marker.setLatLng([item.lat, item.lng]);
             marker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
             marker.setPopupContent(buildMarkerPopupContent(item));
@@ -2430,7 +2456,11 @@
                     originalLat: loc.originalLat ?? null,
                     originalLng: loc.originalLng ?? null,
                     rawOriginalLat: loc.rawOriginalLat ?? null,
-                    rawOriginalLng: loc.rawOriginalLng ?? null
+                    rawOriginalLng: loc.rawOriginalLng ?? null,
+                    originalRow: loc.originalRow || null,
+                    originalLatKey: loc.originalLatKey || (detectedColumns ? detectedColumns.latKey : null),
+                    originalLngKey: loc.originalLngKey || (detectedColumns ? detectedColumns.lngKey : null),
+                    originalNameKey: loc.originalNameKey || (detectedColumns ? detectedColumns.nameKey : null)
                 };
 
                 locationsData.push(locItem);
@@ -2557,6 +2587,15 @@
 
         function handleMapClickForAddPlot(latlng) {
             const nextId = locationsData.length > 0 ? Math.max(...locationsData.map(x => x.id)) + 1 : 1;
+            const latKey = detectedColumns ? detectedColumns.latKey : 'Latitude';
+            const lngKey = detectedColumns ? detectedColumns.lngKey : 'Longitude';
+            const nameKey = detectedColumns ? detectedColumns.nameKey : 'Location Name';
+
+            const newRow = {};
+            if (nameKey) newRow[nameKey] = `Plot ${nextId}`;
+            if (latKey) newRow[latKey] = String(latlng.lat);
+            if (lngKey) newRow[lngKey] = String(latlng.lng);
+
             const newPlot = {
                 id: nextId,
                 name: `Plot ${nextId}`,
@@ -2566,7 +2605,11 @@
                 rawLng: String(latlng.lng),
                 status: 'New',
                 originalLat: null,
-                originalLng: null
+                originalLng: null,
+                originalRow: newRow,
+                originalLatKey: latKey,
+                originalLngKey: lngKey,
+                originalNameKey: nameKey
             };
 
             locationsData.push(newPlot);
@@ -2731,6 +2774,11 @@
                 item.status = 'Updated';
             }
 
+            if (item.originalRow) {
+                if (item.originalLatKey) item.originalRow[item.originalLatKey] = item.rawLat;
+                if (item.originalLngKey) item.originalRow[item.originalLngKey] = item.rawLng;
+            }
+
             // Update pin icon style to 'Updated'
             activeDragMarker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
 
@@ -2829,6 +2877,11 @@
             item.rawOriginalLat = null;
             item.rawOriginalLng = null;
             item.status = 'Original';
+
+            if (item.originalRow) {
+                if (item.originalLatKey) item.originalRow[item.originalLatKey] = item.rawLat;
+                if (item.originalLngKey) item.originalRow[item.originalLngKey] = item.rawLng;
+            }
 
             marker.setLatLng([item.lat, item.lng]);
             marker.setIcon(createCustomPinIcon(item.name, item.id, item.status));
@@ -3116,6 +3169,10 @@
         function executeClearAllLocations() {
             plotLocationsArray([], false);
             localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(HEADERS_STORAGE_KEY);
+            uploadedTemplateHeaders = [];
+            uploadedFileName = '';
+            detectedColumns = null;
             closeClearModal();
             switchTab('setup');
             showToast("All locations cleared and reset", 'info');
@@ -3180,6 +3237,177 @@
             document.getElementById('selected-file-badge').classList.remove('show');
         }
 
+        // ── Comprehensive Intelligent Column Detection ──
+        // Seamlessly handles ANY uploaded template (CropIn, GIS, Excel, CSV)
+        // Detects: Croppable Area Name, CA Name, Plot Name, Asset Name, Location Name, and all Lat/Lng variants
+        function detectLocationColumns(headers) {
+            let bestNameKey = null, bestNameScore = -1;
+            let bestLatKey = null, bestLatScore = -1;
+            let bestLngKey = null, bestLngScore = -1;
+            let bestPairKey = null, bestPairScore = -1;
+
+            headers.forEach(originalKey => {
+                const raw = String(originalKey || '').trim();
+                if (!raw) return;
+                const lower = raw.toLowerCase();
+                const norm = lower.replace(/[_\.\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+                const hasLatWord = /\blat\b|\blatitude\b|latitude|centroid y|centroid_y/i.test(lower) || norm.includes('lat') || norm.endsWith(' y') || norm === 'y';
+                const hasLonWord = /\blong\b|\blon\b|\blng\b|\blongitude\b|longitude|centroid x|centroid_x/i.test(lower) || norm.includes('lon') || norm.includes('lng') || norm.includes('long') || norm.endsWith(' x') || norm === 'x';
+                const hasCoordWord = norm.includes('coord') || norm.includes('latlong') || norm.includes('lat_long') || norm.includes('lat long') || norm.includes('gps') || norm.includes('geolocation');
+
+                // 1. COMBINED COORDINATES
+                if (hasCoordWord && !hasLatWord && !hasLonWord) {
+                    let score = 50;
+                    if (norm === 'coordinates' || norm === 'coords' || norm === 'latlong') score = 100;
+                    else if (norm.includes('croppable area') || norm.includes('ca coord') || norm.includes('plot coord') || norm.includes('asset coord')) score = 90;
+                    else if (norm.includes('coord') || norm.includes('latlong')) score = 70;
+                    if (score > bestPairScore) {
+                        bestPairScore = score;
+                        bestPairKey = originalKey;
+                    }
+                }
+
+                // 2. LATITUDE
+                if (hasLatWord && !hasLonWord && !hasCoordWord) {
+                    let score = 0;
+                    if (norm === 'latitude' || norm === 'lat' || norm === 'lat dd' || norm === 'latitude (dd)' || norm === 'lat (dd)' || norm === 'latitude dd') {
+                        score = 100;
+                    } else if (norm === 'croppable area latitude' || norm === 'croppable area lat' || norm === 'croppable_area_latitude' || norm === 'croppable_area_lat') {
+                        score = 98;
+                    } else if (norm === 'ca latitude' || norm === 'ca lat' || norm === 'ca_latitude' || norm === 'ca_lat') {
+                        score = 96;
+                    } else if (norm === 'plot latitude' || norm === 'plot lat' || norm === 'plot_latitude' || norm === 'plot_lat') {
+                        score = 95;
+                    } else if (norm === 'asset latitude' || norm === 'asset lat' || norm === 'asset_latitude' || norm === 'asset_lat') {
+                        score = 94;
+                    } else if (norm === 'centroid latitude' || norm === 'centroid lat' || norm === 'centroid y' || norm === 'croppable area centroid y' || norm === 'ca centroid y') {
+                        score = 92;
+                    } else if (norm.includes('croppable area') && (norm.includes('lat') || norm.endsWith('y'))) {
+                        score = 88;
+                    } else if ((/\bca\b/i.test(norm) || norm.includes('ca ')) && (norm.includes('lat') || norm.endsWith('y'))) {
+                        score = 86;
+                    } else if (norm.includes('plot') && norm.includes('lat')) {
+                        score = 84;
+                    } else if (norm.includes('asset') && norm.includes('lat')) {
+                        score = 82;
+                    } else if (norm.includes('centroid') && (norm.includes('lat') || norm.endsWith('y'))) {
+                        score = 80;
+                    } else if (norm.includes('latitude') || /\blat\b/i.test(norm)) {
+                        score = 75;
+                    } else if (norm.includes('lat')) {
+                        score = 65;
+                    } else if (norm === 'y' || norm.endsWith(' y')) {
+                        score = 50;
+                    }
+
+                    if (score > bestLatScore) {
+                        bestLatScore = score;
+                        bestLatKey = originalKey;
+                    }
+                }
+
+                // 3. LONGITUDE
+                if (hasLonWord && !hasLatWord && !hasCoordWord) {
+                    let score = 0;
+                    if (norm === 'longitude' || norm === 'long' || norm === 'lon' || norm === 'lng' || norm === 'lon dd' || norm === 'longitude (dd)' || norm === 'lon (dd)' || norm === 'lng (dd)' || norm === 'long (dd)' || norm === 'longitude dd') {
+                        score = 100;
+                    } else if (norm === 'croppable area longitude' || norm === 'croppable area lon' || norm === 'croppable area lng' || norm === 'croppable area long' || norm === 'croppable_area_longitude' || norm === 'croppable_area_lon') {
+                        score = 98;
+                    } else if (norm === 'ca longitude' || norm === 'ca lon' || norm === 'ca lng' || norm === 'ca long' || norm === 'ca_longitude' || norm === 'ca_lon' || norm === 'ca_lng') {
+                        score = 96;
+                    } else if (norm === 'plot longitude' || norm === 'plot lon' || norm === 'plot lng' || norm === 'plot long' || norm === 'plot_longitude' || norm === 'plot_lon') {
+                        score = 95;
+                    } else if (norm === 'asset longitude' || norm === 'asset lon' || norm === 'asset lng' || norm === 'asset long' || norm === 'asset_longitude' || norm === 'asset_lon') {
+                        score = 94;
+                    } else if (norm === 'centroid longitude' || norm === 'centroid lon' || norm === 'centroid lng' || norm === 'centroid x' || norm === 'croppable area centroid x' || norm === 'ca centroid x') {
+                        score = 92;
+                    } else if (norm.includes('croppable area') && (norm.includes('lon') || norm.includes('lng') || norm.includes('long') || norm.endsWith('x'))) {
+                        score = 88;
+                    } else if ((/\bca\b/i.test(norm) || norm.includes('ca ')) && (norm.includes('lon') || norm.includes('lng') || norm.includes('long') || norm.endsWith('x'))) {
+                        score = 86;
+                    } else if (norm.includes('plot') && (norm.includes('lon') || norm.includes('lng') || norm.includes('long'))) {
+                        score = 84;
+                    } else if (norm.includes('asset') && (norm.includes('lon') || norm.includes('lng') || norm.includes('long'))) {
+                        score = 82;
+                    } else if (norm.includes('centroid') && (norm.includes('lon') || norm.includes('lng') || norm.includes('long') || norm.endsWith('x'))) {
+                        score = 80;
+                    } else if (norm.includes('longitude') || /\blon\b|\blng\b|\blong\b/i.test(norm)) {
+                        score = 75;
+                    } else if (norm.includes('lon') || norm.includes('lng') || norm.includes('long')) {
+                        score = 65;
+                    } else if (norm === 'x' || norm.endsWith(' x')) {
+                        score = 50;
+                    }
+
+                    if (score > bestLngScore) {
+                        bestLngScore = score;
+                        bestLngKey = originalKey;
+                    }
+                }
+
+                // 4. NAME (Must NOT be coordinate column)
+                if (!hasLatWord && !hasLonWord && !hasCoordWord) {
+                    let score = 0;
+                    if (norm === 'croppable area name' || norm === 'croppable area') {
+                        score = 100;
+                    } else if (norm === 'ca name') {
+                        score = 98;
+                    } else if (norm === 'plot name' || norm === 'plot') {
+                        score = 96;
+                    } else if (norm === 'asset name' || norm === 'asset') {
+                        score = 94;
+                    } else if (norm === 'location name' || norm === 'location') {
+                        score = 92;
+                    } else if (norm === 'field name' || norm === 'field' || norm === 'farm name' || norm === 'farm') {
+                        score = 90;
+                    } else if (norm === 'site name' || norm === 'site' || norm === 'place name' || norm === 'place' || norm === 'title') {
+                        score = 85;
+                    } else if (norm.includes('croppable area name') || norm.includes('croppable area')) {
+                        score = 82;
+                    } else if (norm.includes('ca name') || (/\bca\b/i.test(norm) && norm.includes('name'))) {
+                        score = 80;
+                    } else if (norm.includes('plot name') || (norm.includes('plot') && norm.includes('name'))) {
+                        score = 78;
+                    } else if (norm.includes('asset name') || (norm.includes('asset') && norm.includes('name'))) {
+                        score = 76;
+                    } else if (norm.includes('location name') || (norm.includes('location') && norm.includes('name'))) {
+                        score = 74;
+                    } else if (norm.includes('field name') || norm.includes('farm name')) {
+                        score = 72;
+                    } else if (norm === 'plot no' || norm === 'plot id' || norm === 'plot number' || norm === 'asset id') {
+                        score = 68;
+                    } else if (norm === 'name') {
+                        score = 65;
+                    } else if (norm.includes('croppable')) {
+                        score = 60;
+                    } else if (/\bca\b/i.test(norm)) {
+                        score = 55;
+                    } else if (norm.includes('plot')) {
+                        score = 52;
+                    } else if (norm.includes('asset')) {
+                        score = 50;
+                    } else if (norm.includes('name')) {
+                        score = 45;
+                    } else if (norm.includes('location') || norm.includes('field') || norm.includes('farm') || norm.includes('site')) {
+                        score = 40;
+                    }
+
+                    if (score > bestNameScore) {
+                        bestNameScore = score;
+                        bestNameKey = originalKey;
+                    }
+                }
+            });
+
+            return {
+                nameKey: bestNameKey,
+                latKey: bestLatKey,
+                lngKey: bestLngKey,
+                pairKey: bestPairKey
+            };
+        }
+
         function processUploadedFile() {
             if (!selectedFile) {
                 showToast("Please select or drop an Excel (.xlsx) or CSV file first.", 'error');
@@ -3202,27 +3430,25 @@
                         return;
                     }
 
-                    // Flexible Column Matching
+                    // Flexible Column Matching with instring heuristics
                     const sampleRow = jsonRows[0];
-                    let nameKey = null, latKey = null, lngKey = null, pairKey = null;
+                    const allKeys = Object.keys(sampleRow);
+                    const cols = detectLocationColumns(allKeys);
 
-                    for (const key of Object.keys(sampleRow)) {
-                        const clean = key.trim().toLowerCase();
-                        if (!nameKey && ['location name', 'location', 'name', 'place', 'title', 'site', 'locationname', 'plot', 'plot name', 'plot_name', 'farm', 'field'].includes(clean)) {
-                            nameKey = key;
-                        } else if (!latKey && ['latitude', 'lat', 'latitude (dd)', 'lat_dd', 'y'].includes(clean)) {
-                            latKey = key;
-                        } else if (!lngKey && ['longitude', 'long', 'lng', 'lon', 'longitude (dd)', 'lon_dd', 'x'].includes(clean)) {
-                            lngKey = key;
-                        } else if (!pairKey && ['coordinates', 'coord', 'coords', 'latlong', 'lat_long', 'lat, long', 'lat long', 'gps', 'geolocation'].includes(clean)) {
-                            pairKey = key;
-                        }
-                    }
+                    const nameKey = cols.nameKey;
+                    const latKey = cols.latKey;
+                    const lngKey = cols.lngKey;
+                    const pairKey = cols.pairKey;
 
                     if ((!latKey || !lngKey) && !pairKey) {
-                        showToast(`Could not find Latitude / Longitude or Coordinates columns. Headers found: ${Object.keys(sampleRow).join(', ')}`, 'error');
+                        showToast(`Could not find Latitude / Longitude or Coordinates columns in uploaded file. Headers found: ${allKeys.join(', ')}`, 'error');
                         return;
                     }
+
+                    // Save uploaded metadata so export can preserve all original template columns
+                    uploadedTemplateHeaders = [...allKeys];
+                    uploadedFileName = selectedFile.name;
+                    detectedColumns = cols;
 
                     const parsedLocations = [];
 
@@ -3248,17 +3474,29 @@
                         }
 
                         parsedLocations.push({
+                            id: idx + 1,
                             name: name,
                             lat: lat,
                             lng: lng,
                             rawLat: rawLat,
                             rawLng: rawLng,
-                            status: 'Original'
+                            status: 'Original',
+                            originalRow: Object.assign({}, row),
+                            originalLatKey: latKey,
+                            originalLngKey: lngKey,
+                            originalNameKey: nameKey
                         });
                     });
 
                     plotLocationsArray(parsedLocations, true);
                     switchTab('locations');
+
+                    // Show confirmation of matched template columns
+                    const matchTags = [];
+                    if (nameKey) matchTags.push(`Name: "${nameKey}"`);
+                    if (latKey && lngKey) matchTags.push(`Lat/Lng: "${latKey}" & "${lngKey}"`);
+                    else if (pairKey) matchTags.push(`Coords: "${pairKey}"`);
+                    showToast(`Loaded ${parsedLocations.length} rows! Matched ${matchTags.join(', ')}`, 'success');
 
                 } catch (err) {
                     console.error("Client parsing error:", err);
@@ -3291,29 +3529,57 @@
 
             let exportRows = [];
             let fileName = "";
+            const defaultNameHeader = (detectedColumns && detectedColumns.nameKey) ? detectedColumns.nameKey : "Location Name";
+            const defaultLatHeader = (detectedColumns && detectedColumns.latKey) ? detectedColumns.latKey : "Latitude";
+            const defaultLngHeader = (detectedColumns && detectedColumns.lngKey) ? detectedColumns.lngKey : "Longitude";
 
             if (type === 'all') {
                 // Option 1: All Plots (Updated Master)
-                fileName = `Updated_Plot_Locations_Master.${format}`;
-                const headers = ["Plot ID", "Location Name", "Latitude", "Longitude", "Status"];
-                const rows = locationsData.map(d => [
-                    d.id,
-                    d.name,
-                    d.rawLat || d.lat,
-                    d.rawLng || d.lng,
-                    d.status || 'Original'
-                ]);
-                exportRows = [headers, ...rows];
+                // If the user uploaded an arbitrary custom template with extra columns, preserve ALL original columns with coordinates updated!
+                if (uploadedTemplateHeaders && uploadedTemplateHeaders.length > 0) {
+                    const cleanBaseName = (uploadedFileName || 'Plot_Locations_Master').replace(/\.[^/.]+$/, '');
+                    fileName = `Updated_${cleanBaseName}.${format}`;
+                    const headers = [...uploadedTemplateHeaders];
+                    const hasStatusCol = headers.some(h => h.toLowerCase() === 'status' || h.toLowerCase() === 'verification status');
+                    if (!hasStatusCol) headers.push("Verification Status");
+
+                    const rows = locationsData.map(d => {
+                        const rowObj = d.originalRow ? Object.assign({}, d.originalRow) : {};
+                        if (d.originalLatKey) rowObj[d.originalLatKey] = d.rawLat || d.lat;
+                        if (d.originalLngKey) rowObj[d.originalLngKey] = d.rawLng || d.lng;
+                        if (d.originalNameKey) rowObj[d.originalNameKey] = d.name;
+
+                        const rowArr = uploadedTemplateHeaders.map(h => {
+                            return (rowObj[h] !== undefined && rowObj[h] !== null) ? rowObj[h] : '';
+                        });
+                        if (!hasStatusCol) {
+                            rowArr.push(d.status || 'Original');
+                        }
+                        return rowArr;
+                    });
+                    exportRows = [headers, ...rows];
+                } else {
+                    fileName = `Updated_Plot_Locations_Master.${format}`;
+                    const headers = ["Plot ID", defaultNameHeader, defaultLatHeader, defaultLngHeader, "Status"];
+                    const rows = locationsData.map(d => [
+                        d.id,
+                        d.name,
+                        d.rawLat || d.lat,
+                        d.rawLng || d.lng,
+                        d.status || 'Original'
+                    ]);
+                    exportRows = [headers, ...rows];
+                }
 
             } else if (type === 'modified') {
                 // Option 2: Only Edited & New Plots
                 const modifiedPlots = locationsData.filter(d => d.status === 'Updated' || d.status === 'New');
                 if (modifiedPlots.length === 0) {
-                    showToast("No modified or newly added plots found yet! Drag a pin or add a plot first.", 'error');
+                    showToast("No modified or newly added plots found yet! Drag a pin or edit a plot first.", 'error');
                     return;
                 }
                 fileName = `Modified_And_New_Plots_Only.${format}`;
-                const headers = ["Plot ID", "Location Name", "Latitude (Updated)", "Longitude (Updated)", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)"];
+                const headers = ["Plot ID", defaultNameHeader, "Latitude (Updated)", "Longitude (Updated)", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)"];
                 const rows = modifiedPlots.map(d => {
                     const shift = (d.originalLat !== null && d.originalLat !== undefined) ? 
                         getDistanceMeters(Number(d.originalLat), Number(d.originalLng), d.lat, d.lng) : 0;
@@ -3333,7 +3599,7 @@
             } else if (type === 'audit') {
                 // Option 3: Comprehensive Audit Sheet
                 fileName = `Plot_Coordinates_Audit_Report.${format}`;
-                const headers = ["Plot ID", "Location Name", "Current Latitude", "Current Longitude", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)", "Verification Status"];
+                const headers = ["Plot ID", defaultNameHeader, "Current Latitude", "Current Longitude", "Status", "Original Latitude", "Original Longitude", "Shift Distance (m)", "Verification Status"];
                 const rows = locationsData.map(d => {
                     const isUpdated = d.status === 'Updated';
                     const shift = (isUpdated && d.originalLat !== null && d.originalLat !== undefined) ? 

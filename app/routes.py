@@ -1342,29 +1342,175 @@ async def parse_location_file(file: UploadFile = File(...)):
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format. Please upload .xlsx, .xls, or .csv")
 
-        # Flexible column matching
-        name_col = None
-        lat_col = None
-        lon_col = None
-        pair_col = None
+        # Comprehensive Intelligent Column Detection for any uploaded template
+        def detect_columns(columns):
+            best_name_col, best_name_score = None, -1
+            best_lat_col, best_lat_score = None, -1
+            best_lon_col, best_lon_score = None, -1
+            best_pair_col, best_pair_score = None, -1
 
-        for col in df.columns:
-            c = str(col).strip().lower()
-            if not name_col and c in ["location name", "location", "location_name", "locationname", "name", "plot", "plot name", "plot_name", "place", "title", "site", "farm", "field"]:
-                name_col = col
-            elif not lat_col and c in ["latitude", "lat", "latitude (dd)", "lat_dd", "y"]:
-                lat_col = col
-            elif not lon_col and c in ["longitude", "long", "lng", "lon", "longitude (dd)", "lon_dd", "x"]:
-                lon_col = col
-            elif not pair_col and c in ["coordinates", "coord", "coords", "latlong", "lat_long", "lat, long", "lat long", "gps", "geolocation"]:
-                pair_col = col
+            for col in columns:
+                raw = str(col).strip()
+                if not raw:
+                    continue
+                lower = raw.lower()
+                norm = re.sub(r'[\s_\.\-]+', ' ', lower).strip()
+
+                has_lat = bool(re.search(r'\blat\b|\blatitude\b|latitude|centroid y|centroid_y', lower) or 'lat' in norm or norm.endswith(' y') or norm == 'y')
+                has_lon = bool(re.search(r'\blong\b|\blon\b|\blng\b|\blongitude\b|longitude|centroid x|centroid_x', lower) or 'lon' in norm or 'lng' in norm or 'long' in norm or norm.endswith(' x') or norm == 'x')
+                has_coord = any(k in norm for k in ['coord', 'latlong', 'lat_long', 'lat long', 'gps', 'geolocation'])
+
+                # Combined coordinates
+                if has_coord and not has_lat and not has_lon:
+                    score = 50
+                    if norm in ['coordinates', 'coords', 'latlong']:
+                        score = 100
+                    elif any(k in norm for k in ['croppable area', 'ca coord', 'plot coord', 'asset coord']):
+                        score = 90
+                    elif 'coord' in norm or 'latlong' in norm:
+                        score = 70
+                    if score > best_pair_score:
+                        best_pair_score = score
+                        best_pair_col = col
+
+                # Latitude
+                if has_lat and not has_lon and not has_coord:
+                    score = 0
+                    if norm in ['latitude', 'lat', 'lat dd', 'latitude (dd)', 'lat (dd)', 'latitude dd']:
+                        score = 100
+                    elif norm in ['croppable area latitude', 'croppable area lat', 'croppable_area_latitude', 'croppable_area_lat']:
+                        score = 98
+                    elif norm in ['ca latitude', 'ca lat', 'ca_latitude', 'ca_lat']:
+                        score = 96
+                    elif norm in ['plot latitude', 'plot lat', 'plot_latitude', 'plot_lat']:
+                        score = 95
+                    elif norm in ['asset latitude', 'asset lat', 'asset_latitude', 'asset_lat']:
+                        score = 94
+                    elif norm in ['centroid latitude', 'centroid lat', 'centroid y', 'croppable area centroid y', 'ca centroid y']:
+                        score = 92
+                    elif 'croppable area' in norm and ('lat' in norm or norm.endswith('y')):
+                        score = 88
+                    elif (re.search(r'\bca\b', norm) or 'ca ' in norm) and ('lat' in norm or norm.endswith('y')):
+                        score = 86
+                    elif 'plot' in norm and 'lat' in norm:
+                        score = 84
+                    elif 'asset' in norm and 'lat' in norm:
+                        score = 82
+                    elif 'centroid' in norm and ('lat' in norm or norm.endswith('y')):
+                        score = 80
+                    elif 'latitude' in norm or re.search(r'\blat\b', norm):
+                        score = 75
+                    elif 'lat' in norm:
+                        score = 65
+                    elif norm == 'y' or norm.endswith(' y'):
+                        score = 50
+
+                    if score > best_lat_score:
+                        best_lat_score = score
+                        best_lat_col = col
+
+                # Longitude
+                if has_lon and not has_lat and not has_coord:
+                    score = 0
+                    if norm in ['longitude', 'long', 'lon', 'lng', 'lon dd', 'longitude (dd)', 'lon (dd)', 'lng (dd)', 'long (dd)', 'longitude dd']:
+                        score = 100
+                    elif norm in ['croppable area longitude', 'croppable area lon', 'croppable area lng', 'croppable area long', 'croppable_area_longitude', 'croppable_area_lon']:
+                        score = 98
+                    elif norm in ['ca longitude', 'ca lon', 'ca lng', 'ca long', 'ca_longitude', 'ca_lon', 'ca_lng']:
+                        score = 96
+                    elif norm in ['plot longitude', 'plot lon', 'plot lng', 'plot long', 'plot_longitude', 'plot_lon']:
+                        score = 95
+                    elif norm in ['asset longitude', 'asset lon', 'asset lng', 'asset long', 'asset_longitude', 'asset_lon']:
+                        score = 94
+                    elif norm in ['centroid longitude', 'centroid lon', 'centroid lng', 'centroid x', 'croppable area centroid x', 'ca centroid x']:
+                        score = 92
+                    elif 'croppable area' in norm and (any(k in norm for k in ['lon', 'lng', 'long']) or norm.endswith('x')):
+                        score = 88
+                    elif (re.search(r'\bca\b', norm) or 'ca ' in norm) and (any(k in norm for k in ['lon', 'lng', 'long']) or norm.endswith('x')):
+                        score = 86
+                    elif 'plot' in norm and any(k in norm for k in ['lon', 'lng', 'long']):
+                        score = 84
+                    elif 'asset' in norm and any(k in norm for k in ['lon', 'lng', 'long']):
+                        score = 82
+                    elif 'centroid' in norm and (any(k in norm for k in ['lon', 'lng', 'long']) or norm.endswith('x')):
+                        score = 80
+                    elif 'longitude' in norm or re.search(r'\blon\b|\blng\b|\blong\b', norm):
+                        score = 75
+                    elif any(k in norm for k in ['lon', 'lng', 'long']):
+                        score = 65
+                    elif norm == 'x' or norm.endswith(' x'):
+                        score = 50
+
+                    if score > best_lon_score:
+                        best_lon_score = score
+                        best_lon_col = col
+
+                # Name column (Must NOT be a coordinate column)
+                if not has_lat and not has_lon and not has_coord:
+                    score = 0
+                    if norm in ['croppable area name', 'croppable area']:
+                        score = 100
+                    elif norm in ['ca name']:
+                        score = 98
+                    elif norm in ['plot name', 'plot']:
+                        score = 96
+                    elif norm in ['asset name', 'asset']:
+                        score = 94
+                    elif norm in ['location name', 'location']:
+                        score = 92
+                    elif norm in ['field name', 'field', 'farm name', 'farm']:
+                        score = 90
+                    elif norm in ['site name', 'site', 'place name', 'place', 'title']:
+                        score = 85
+                    elif 'croppable area name' in norm or 'croppable area' in norm:
+                        score = 82
+                    elif 'ca name' in norm or (re.search(r'\bca\b', norm) and 'name' in norm):
+                        score = 80
+                    elif 'plot name' in norm or ('plot' in norm and 'name' in norm):
+                        score = 78
+                    elif 'asset name' in norm or ('asset' in norm and 'name' in norm):
+                        score = 76
+                    elif 'location name' in norm or ('location' in norm and 'name' in norm):
+                        score = 74
+                    elif 'field name' in norm or 'farm name' in norm:
+                        score = 72
+                    elif norm in ['plot no', 'plot id', 'plot number', 'asset id']:
+                        score = 68
+                    elif norm == 'name':
+                        score = 65
+                    elif 'croppable' in norm:
+                        score = 60
+                    elif re.search(r'\bca\b', norm):
+                        score = 55
+                    elif 'plot' in norm:
+                        score = 52
+                    elif 'asset' in norm:
+                        score = 50
+                    elif 'name' in norm:
+                        score = 45
+                    elif any(k in norm for k in ['location', 'field', 'farm', 'site']):
+                        score = 40
+
+                    if score > best_name_score:
+                        best_name_score = score
+                        best_name_col = col
+
+            return best_name_col, best_lat_col, best_lon_col, best_pair_col
+
+        name_col, lat_col, lon_col, pair_col = detect_columns(df.columns)
 
         if (not lat_col or not lon_col) and not pair_col:
             return JSONResponse(
                 status_code=422,
                 content={
                     "success": False,
-                    "error": f"Missing Latitude/Longitude or Coordinates columns. Found columns: {list(df.columns)}. Expected: 'Location Name', 'Latitude', 'Longitude' or 'Coordinates'."
+                    "error": (
+                        f"Missing Latitude/Longitude or Coordinates columns. Found columns: {list(df.columns)}. "
+                        "Supported column names: 'Croppable Area Name', 'CA Name', 'Plot Name', 'Asset Name', 'Location Name', "
+                        "'Croppable Area Latitude'/'Longitude', 'CA Lat'/'CA Lon', 'Centroid Lat'/'Centroid Lon', "
+                        "'Plot Lat'/'Plot Lon', 'Asset Lat'/'Asset Lon', 'Latitude', 'Longitude', or 'Coordinates'."
+                    ),
+                    "columns_found": [str(c) for c in df.columns]
                 }
             )
 
@@ -1415,6 +1561,12 @@ async def parse_location_file(file: UploadFile = File(...)):
             "total_rows": len(df),
             "valid_count": len(valid_locations),
             "invalid_count": len(invalid_rows),
+            "detected_columns": {
+                "name": str(name_col) if name_col else None,
+                "latitude": str(lat_col) if lat_col else None,
+                "longitude": str(lon_col) if lon_col else None,
+                "coordinates": str(pair_col) if pair_col else None
+            },
             "locations": valid_locations,
             "invalid_rows": invalid_rows
         }

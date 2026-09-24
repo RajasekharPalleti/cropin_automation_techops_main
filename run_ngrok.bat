@@ -1,27 +1,4 @@
-:<<"::WINDOWS_ONLY"
-@echo off
-goto :WINDOWS
-::WINDOWS_ONLY
-
-# Mac/Linux script
-printf "\033]0;CROPIN_NGROK\007"
-echo "Initializing Remote Tunnel..."
-echo ""
-echo "The public URL will appear below."
-echo "Keep this window OPEN to maintain remote access."
-echo ""
-cd "$(dirname "$0")"
-PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-if [ -z "$PORT" ]; then PORT=4444; fi
-if [ -f "./ngrok" ]; then
-    ./ngrok http $PORT
-else
-    ngrok http $PORT
-fi
-read -p "Press any key to close..."
-exit 0
-
-:WINDOWS
+:; exec "$(dirname "$0")/run_ngrok.sh" "$@"
 @echo off
 title CROPIN_NGROK
 echo Initializing Remote Tunnel

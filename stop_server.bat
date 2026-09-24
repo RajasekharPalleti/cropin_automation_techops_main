@@ -1,26 +1,5 @@
-:<<"::WINDOWS_ONLY"
+:; exec "$(dirname "$0")/stop_server.sh" "$@"
 @echo off
-goto :WINDOWS
-::WINDOWS_ONLY
-
-# Mac/Linux script
-printf "\033]0;STOP_SERVER\007"
-cd "$(dirname "$0")"
-PORT=$(grep "SERVER_PORT" app/script_configs.py 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-if [ -z "$PORT" ]; then PORT=4444; fi
-
-echo "Stopping Server on port $PORT..."
-PID=$(lsof -ti:$PORT 2>/dev/null)
-if [ -n "$PID" ]; then
-  kill -9 $PID
-  echo "Server stopped (PID: $PID)."
-else
-  echo "No server found running on port $PORT."
-fi
-read -p "Press any key to close..."
-exit 0
-
-:WINDOWS
 title STOP_SERVER
 for %%I in ("%~dp0.") do set "PROJECT_DIR=%%~fI"
 cd /d "%PROJECT_DIR%"
