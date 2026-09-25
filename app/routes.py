@@ -1574,6 +1574,99 @@ async def parse_location_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(e)}")
 
 
+@router.get("/api/location-search-suggest")
+async def location_search_suggest(q: str = "", lat: float = None, lng: float = None):
+    """Fetch on-demand location suggestions using Komoot Photon (autocomplete prefix engine)
+    with Nominatim fallback and async threadpool execution."""
+    query = (q or "").strip()
+    if not query or len(query) < 2:
+        return {"success": True, "results": []}
+
+    def fetch_suggestions():
+        results = []
+        seen = set()
+
+        # 1. Primary: Komoot Photon (built specifically for fast typeahead autocomplete & prefix search)
+        try:
+            photon_url = "https://photon.komoot.io/api/"
+            params = {"q": query, "limit": 7}
+            if lat is not None and lng is not None:
+                params["lat"] = lat
+                params["lon"] = lng
+            headers = {"User-Agent": "Mozilla/5.0 (CropinTechopsApp/1.0)"}
+            resp = ext_requests.get(photon_url, params=params, headers=headers, timeout=2.8)
+            if resp.status_code == 200:
+                features = resp.json().get("features", [])
+                for feat in features:
+                    p = feat.get("properties", {})
+                    coords = feat.get("geometry", {}).get("coordinates", [])
+                    if len(coords) >= 2:
+                        name = p.get("name") or query
+                        # Build clean hierarchical location text
+                        parts = [
+                            p.get("name"),
+                            p.get("city") or p.get("district") or p.get("locality"),
+                            p.get("county"),
+                            p.get("state"),
+                            p.get("country")
+                        ]
+                        clean_parts = []
+                        for pt in parts:
+                            if pt and pt not in clean_parts:
+                                clean_parts.append(pt)
+                        disp = ", ".join(clean_parts)
+                        key = (round(coords[1], 4), round(coords[0], 4))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append({
+                                "name": name,
+                                "display_name": disp,
+                                "lat": float(coords[1]),
+                                "lng": float(coords[0]),
+                                "type": p.get("type", "location")
+                            })
+        except Exception:
+            pass
+
+        # 2. Secondary fallback: OpenStreetMap Nominatim if Photon had no matches
+        if not results:
+            try:
+                nom_url = "https://nominatim.openstreetmap.org/search"
+                params = {
+                    "format": "json",
+                    "q": query,
+                    "limit": 6,
+                    "addressdetails": 1
+                }
+                headers = {"User-Agent": "CropinTechopsApp/1.0 (LocationSearch)"}
+                resp = ext_requests.get(nom_url, params=params, headers=headers, timeout=2.5)
+                if resp.status_code == 200:
+                    for item in resp.json():
+                        name = item.get("name") or (item.get("display_name", "").split(",")[0])
+                        coords = (float(item["lat"]), float(item["lon"]))
+                        key = (round(coords[0], 4), round(coords[1], 4))
+                        if key not in seen:
+                            seen.add(key)
+                            results.append({
+                                "name": name,
+                                "display_name": item.get("display_name", ""),
+                                "lat": coords[0],
+                                "lng": coords[1],
+                                "type": item.get("type", "location")
+                            })
+            except Exception:
+                pass
+
+        return results
+
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, fetch_suggestions)
+        return {"success": True, "results": results}
+    except Exception as e:
+        return {"success": False, "error": str(e), "results": []}
+
+
 
 class PasswordAutomationRequest(BaseModel):
     admin_username: str

@@ -25,6 +25,9 @@
     <!-- Leaflet MarkerCluster JS -->
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
+    <!-- Google Maps JavaScript API (Places) -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDCx7aFvYx5LLXyk-0ZPGuLrH1HbP1Dff8&libraries=places"></script>
+
     <style>
         :root {
             --primary: #00897b;
@@ -722,44 +725,63 @@
             z-index: 10;
         }
 
-        /* ── Floating Controls on Google Maps (UI Designer Polish) ── */
-        .map-floating-bar {
+        /* ── Unified Floating Top Bar Over Map (Prevents Any UI Overlaps) ── */
+        .map-top-bar {
             position: absolute;
-            top: 14px;
+            top: 12px;
+            left: 56px; /* Generous clearance from sidebar toggle button (<) */
             right: 14px;
-            z-index: 400;
+            z-index: 450;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .map-top-bar > * {
+            pointer-events: auto;
+        }
+
+        .map-floating-bar {
+            position: relative;
             display: flex;
             align-items: center;
-            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-shrink: 1;
         }
 
         /* Google Maps Layer Switcher (Segmented Control) */
         .google-layer-switcher {
             background: var(--surface-glass);
             backdrop-filter: blur(12px);
-            padding: 4px;
-            border-radius: 10px;
+            padding: 3px;
+            border-radius: 9px;
             box-shadow: var(--shadow-md);
             border: 1px solid rgba(226, 232, 240, 0.9);
             display: flex;
             align-items: center;
             gap: 3px;
+            flex-shrink: 0;
         }
 
         .layer-pill {
             background: none;
             border: none;
-            padding: 7px 14px;
+            padding: 6px 12px;
             border-radius: 7px;
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             font-weight: 600;
             color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             transition: all 0.16s ease;
+            white-space: nowrap;
         }
 
         .layer-pill:hover {
@@ -784,26 +806,33 @@
             background: var(--surface-glass);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(226, 232, 240, 0.9);
-            height: 38px;
-            padding: 0 12px;
-            border-radius: 9px;
+            height: 35px;
+            padding: 0 10px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 5px;
             cursor: pointer;
-            box-shadow: var(--shadow-md);
+            box-shadow: var(--shadow-sm);
             color: var(--text-main);
             font-family: inherit;
-            font-size: 0.78rem;
+            font-size: 0.76rem;
             font-weight: 600;
             transition: all 0.16s ease;
+            white-space: nowrap;
+        }
+
+        .map-tool-btn.icon-only {
+            width: 35px;
+            padding: 0;
         }
 
         .map-tool-btn:hover {
             background: #fff;
             color: var(--primary);
             transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .map-tool-btn.active {
@@ -1035,6 +1064,17 @@
 
         .popup-btn-outline:hover {
             background: #f1f5f9;
+        }
+
+        .popup-zoom-btn.zoom-up-mode {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+            border-color: #93c5fd !important;
+        }
+
+        .popup-zoom-btn.zoom-up-mode:hover {
+            background: #dbeafe !important;
+            border-color: #60a5fa !important;
         }
 
         /* Toast Container */
@@ -1346,6 +1386,638 @@
         .kpi-row-4 .kpi-val {
             font-size: 1.1rem;
         }
+
+        /* ── Floating Location Search Bar ── */
+        /* ── Floating Location Search Bar ── */
+        .map-search-container {
+            position: relative;
+            width: 360px;
+            max-width: 420px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: auto;
+        }
+
+        .map-search-bar {
+            background: #ffffff;
+            border: 1.5px solid rgba(203, 213, 225, 0.95);
+            border-radius: 28px;
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.16), 0 2px 6px -1px rgba(15, 23, 42, 0.08);
+            display: flex;
+            align-items: center;
+            padding: 5px 6px 5px 14px;
+            gap: 8px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .map-search-bar:focus-within {
+            background: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.2), 0 10px 25px -3px rgba(15, 23, 42, 0.2);
+        }
+
+        .map-search-bar .search-icon,
+        .map-search-icon {
+            position: static !important;
+            transform: none !important;
+            color: var(--primary) !important;
+            font-size: 20px !important;
+            flex-shrink: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0 !important;
+            pointer-events: none !important;
+        }
+
+        .map-search-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-family: inherit;
+            font-size: 0.86rem;
+            font-weight: 500;
+            color: var(--text-main);
+            background: transparent;
+            padding: 8px 2px;
+            min-width: 0;
+        }
+
+        .map-search-input::placeholder {
+            color: var(--text-subtle);
+            font-size: 0.84rem;
+        }
+
+        .search-action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.15s ease;
+        }
+
+        .search-clear-btn {
+            width: 26px;
+            height: 26px;
+            color: var(--text-subtle);
+        }
+
+        .search-clear-btn:hover {
+            color: var(--danger);
+            background: var(--danger-bg);
+        }
+
+        .search-clear-btn .material-icons {
+            font-size: 16px;
+        }
+
+        .search-submit-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .search-submit-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+
+        .search-submit-btn .material-icons {
+            font-size: 18px;
+        }
+
+        /* ── Search Suggestions Dropdown ── */
+        .map-search-suggestions {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            max-height: 360px;
+            overflow-y: auto;
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            animation: fadeInDown 0.16s ease;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .suggestions-loading-bar {
+            height: 3px;
+            width: 100%;
+            background: #e2e8f0;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .suggestions-loading-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 40%;
+            background: var(--primary);
+            animation: suggestLoadingAnim 0.9s infinite linear;
+        }
+
+        @keyframes suggestLoadingAnim {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(280%); }
+        }
+
+        .google-suggestion-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f3f4;
+            transition: background 0.12s ease;
+        }
+
+        .google-suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .google-suggestion-item:hover,
+        .google-suggestion-item.active-item {
+            background-color: #f1f3f4;
+        }
+
+        .google-suggestion-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: #70757a;
+            width: 28px;
+            height: 28px;
+        }
+
+        .google-suggestion-icon.icon-plot {
+            color: #1e8e3e;
+        }
+
+        .google-suggestion-icon.icon-coords {
+            color: #d97706;
+        }
+
+        .google-suggestion-body {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .google-suggestion-title {
+            font-size: 0.88rem;
+            font-weight: 500;
+            color: #202124;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+        }
+
+        .google-suggestion-subtitle {
+            font-size: 0.76rem;
+            color: #70757a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.25;
+        }
+
+        .google-suggestion-badge {
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+
+        .google-badge-plot {
+            background: #e6f4ea;
+            color: #137333;
+        }
+
+        .google-badge-coords {
+            background: #fef7e0;
+            color: #b06000;
+        }
+
+        .google-badge-location {
+            background: #f1f3f4;
+            color: #5f6368;
+        }
+
+        .google-suggestions-footer {
+            padding: 6px 14px;
+            background: #f8f9fa;
+            border-top: 1px solid #f1f3f4;
+            font-size: 0.70rem;
+            color: #70757a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ── Minimized Search Result Bar (Keeps Search Pointer on Map!) ── */
+        .search-comparison-minibar {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(203, 213, 225, 0.95);
+            border-radius: 24px;
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.18), 0 2px 6px -1px rgba(15, 23, 42, 0.08);
+            padding: 6px 10px 6px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            animation: fadeInDown 0.16s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .minibar-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .minibar-pin {
+            color: #ef4444;
+            font-size: 18px;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .minibar-dist-pill {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+
+        .minibar-dist-pill.tag-close {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .minibar-dist-pill.tag-moderate {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .minibar-dist-pill.tag-far {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .minibar-plot-name {
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .minibar-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+            z-index: 2;
+        }
+
+        .btn-minibar-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 4px 9px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .btn-minibar-action:hover {
+            background: #e2e8f0;
+            color: var(--primary-dark);
+            border-color: #94a3b8;
+        }
+
+        .btn-minibar-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .btn-minibar-close:hover {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .btn-hide-results {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 2px 7px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-hide-results:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+            border-color: #94a3b8;
+        }
+
+        /* ── Location Comparison Card ── */
+        .search-comparison-card {
+            background: var(--surface-glass);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 14px;
+            box-shadow: 0 14px 34px -4px rgba(15, 23, 42, 0.2), 0 4px 10px -2px rgba(15, 23, 42, 0.08);
+            padding: 13px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            animation: slideDownSearch 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        @keyframes slideDownSearch {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .comparison-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .comparison-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: #fff;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .searched-place-name {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.3;
+        }
+
+        .searched-place-address {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+            margin-top: 2px;
+        }
+
+        .searched-coords-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .comparison-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .comparison-selector-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .comparison-selector-row label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.4px;
+        }
+
+        .comparison-select {
+            width: 100%;
+            padding: 6px 9px;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            font-family: inherit;
+            font-weight: 600;
+            color: var(--text-main);
+            background: #fff;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .comparison-select:focus {
+            border-color: var(--primary);
+        }
+
+        .comparison-metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .comparison-metric-item {
+            background: #fff;
+            border: 1px solid #edf2f7;
+            border-radius: 7px;
+            padding: 7px 9px;
+        }
+
+        .comparison-metric-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .comparison-metric-val {
+            font-size: 0.88rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+            margin-top: 1px;
+        }
+
+        .accuracy-badge {
+            padding: 5px 9px;
+            border-radius: 6px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .accuracy-badge.match-exact {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .accuracy-badge.match-minor {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .accuracy-badge.match-major {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .comparison-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .comparison-actions-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        /* Midpoint Distance Badge on Map Polyline */
+        .distance-label-badge {
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(4px);
+            color: #fff;
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+            white-space: nowrap;
+            pointer-events: none;
+            text-align: center;
+        }
+
+        /* Searched Pin Pulse Beacon */
+        .searched-pin-beacon {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(124, 58, 237, 0.4);
+            animation: searchBeaconPulse 1.8s infinite ease-out;
+            top: 4px;
+            left: 4px;
+            pointer-events: none;
+        }
+
+        @keyframes searchBeaconPulse {
+            0% { transform: scale(0.6); opacity: 0.9; }
+            100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        /* ── Strictly Suppress Google's Default pac-container (Eliminates Duplicate Overlapping Dropdown) ── */
+        .pac-container,
+        .pac-item,
+        .pac-logo {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            height: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            border: none !important;
+            z-index: -9999 !important;
+        }
     </style>
 </head>
 <body>
@@ -1520,7 +2192,7 @@
                     </div>
 
                     <div class="search-box-wrap" style="margin-top:4px;">
-                        <span class="material-icons search-icon">search</span>
+                        <span class="material-icons map-search-icon">search</span>
                         <input type="text" class="search-input" id="search-locations" placeholder="Search locations or coordinates..." oninput="filterLocationsList()" />
                     </div>
 
@@ -1581,40 +2253,65 @@
                 </button>
             </div>
 
-            <!-- Floating Top Right Controls (Google Layer Switcher & Tools) -->
-            <div class="map-floating-bar">
-                <!-- Google Maps Layer Switcher -->
-                <div class="google-layer-switcher">
-                    <button class="layer-pill" id="layer-btn-google-streets" onclick="switchGoogleLayer('streets')">
-                        <span class="material-icons" style="font-size: 15px;">map</span> Google Map
-                    </button>
-                    <button class="layer-pill active" id="layer-btn-google-hybrid" onclick="switchGoogleLayer('hybrid')">
-                        <span class="material-icons" style="font-size: 15px;">satellite_alt</span> Satellite
-                    </button>
-                    <button class="layer-pill" id="layer-btn-google-terrain" onclick="switchGoogleLayer('terrain')">
-                        <span class="material-icons" style="font-size: 15px;">terrain</span> Terrain
-                    </button>
+            <!-- Unified Top Bar (Search on Left, Layer Switcher & Tools on Right) -->
+            <div class="map-top-bar" id="map-top-bar">
+                <!-- Floating Location Search Bar & Alignment Comparison Panel -->
+                <div class="map-search-container" id="map-search-container">
+                    <div class="map-search-bar" id="map-search-bar">
+                        <span class="material-icons search-icon">search</span>
+                        <input type="text" class="map-search-input" id="map-search-input" placeholder="Search location, address or lat,lng..." autocomplete="off" />
+                        <button class="search-action-btn search-clear-btn" id="btn-clear-search" onclick="clearLocationSearch()" title="Clear Search" style="display: none;">
+                            <span class="material-icons">close</span>
+                        </button>
+                        <button class="search-action-btn search-submit-btn" id="btn-submit-search" onclick="executeLocationSearch()" title="Search & Compare">
+                            <span class="material-icons">arrow_forward</span>
+                        </button>
+                    </div>
+
+                    <!-- On-Demand Suggestions Dropdown (Instant matching for plots, addresses, and coordinates) -->
+                    <div class="map-search-suggestions" id="map-search-suggestions" style="display: none;"></div>
+
+                    <!-- Location Comparison Card (Appears when a place is searched/selected) -->
+                    <div class="search-comparison-card" id="search-comparison-card" style="display: none;">
+                        <!-- Dynamically rendered by updateComparisonUI() -->
+                    </div>
                 </div>
 
-                <!-- Quick Action Tools Group -->
-                <div class="map-tools-group">
-                    <button class="map-tool-btn" id="btn-add-plot-tool" onclick="toggleAddPlotMode()" title="Add a new plot on the map">
-                        <span class="material-icons" style="font-size: 17px; color: var(--accent-green);">add_location_alt</span>
-                        <span>Add Plot</span>
-                    </button>
-                    <button class="map-tool-btn" id="toggle-pin-labels-tool" onclick="togglePinLabels()" title="Show Location Names under Pins">
-                        <span class="material-icons" style="font-size: 17px;">label_outline</span>
-                        <span>Labels</span>
-                    </button>
-                    <button class="map-tool-btn" id="toggle-cluster-btn" onclick="toggleClustering()" title="Toggle Clustering Grouping">
-                        <span class="material-icons" style="font-size: 17px;">bubble_chart</span>
-                    </button>
-                    <button class="map-tool-btn" onclick="fitAllMarkers()" title="Fit All Markers to Screen">
-                        <span class="material-icons" style="font-size: 17px;">center_focus_strong</span>
-                    </button>
-                    <button class="map-tool-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen">
-                        <span class="material-icons" style="font-size: 17px;">fullscreen</span>
-                    </button>
+                <!-- Floating Controls (Google Layer Switcher & Tools) -->
+                <div class="map-floating-bar">
+                    <!-- Google Maps Layer Switcher -->
+                    <div class="google-layer-switcher">
+                        <button class="layer-pill" id="layer-btn-google-streets" onclick="switchGoogleLayer('streets')" title="Google Standard Street Map">
+                            <span class="material-icons" style="font-size: 14px;">map</span> Map
+                        </button>
+                        <button class="layer-pill active" id="layer-btn-google-hybrid" onclick="switchGoogleLayer('hybrid')" title="Google High-Res Satellite View">
+                            <span class="material-icons" style="font-size: 14px;">satellite_alt</span> Satellite
+                        </button>
+                        <button class="layer-pill" id="layer-btn-google-terrain" onclick="switchGoogleLayer('terrain')" title="Google Terrain Topography">
+                            <span class="material-icons" style="font-size: 14px;">terrain</span> Terrain
+                        </button>
+                    </div>
+
+                    <!-- Quick Action Tools Group -->
+                    <div class="map-tools-group">
+                        <button class="map-tool-btn" id="btn-add-plot-tool" onclick="toggleAddPlotMode()" title="Add a new plot on the map">
+                            <span class="material-icons" style="font-size: 16px; color: var(--accent-green);">add_location_alt</span>
+                            <span>Add Plot</span>
+                        </button>
+                        <button class="map-tool-btn" id="toggle-pin-labels-tool" onclick="togglePinLabels()" title="Show Location Names under Pins">
+                            <span class="material-icons" style="font-size: 16px;">label_outline</span>
+                            <span>Labels</span>
+                        </button>
+                        <button class="map-tool-btn icon-only" id="toggle-cluster-btn" onclick="toggleClustering()" title="Toggle Clustering Grouping">
+                            <span class="material-icons" style="font-size: 16px;">bubble_chart</span>
+                        </button>
+                        <button class="map-tool-btn icon-only" onclick="fitAllMarkers()" title="Fit All Markers to Screen">
+                            <span class="material-icons" style="font-size: 16px;">center_focus_strong</span>
+                        </button>
+                        <button class="map-tool-btn icon-only" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+                            <span class="material-icons" style="font-size: 16px;">fullscreen</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1782,7 +2479,6 @@
                 </button>
             </div>
         </div>
-    </div>
 
     <!-- ── Toast Notifications Container ── -->
     <div class="toast-container" id="toast-container"></div>
@@ -1809,6 +2505,15 @@
         let activeDragId = null;
         let activeDragMarker = null;
         let dragInitialCoords = null;
+
+        // Location Search State
+        let googlePlacesAutocomplete = null;
+        let googleGeocoder = null;
+        let activeSearchedLocation = null;
+        let searchedMarker = null;
+        let comparisonPolyline = null;
+        let comparisonDistanceLabel = null;
+        let selectedComparePlotId = null;
 
         // ── LocalStorage Session Persistence ──
         const STORAGE_KEY = 'cropin_location_check_plots_v2';
@@ -1859,6 +2564,8 @@
             initGoogleMap();
             initDragAndDrop();
             initKeyboardShortcuts();
+            initGooglePlacesSearch();
+            initSearchContainerIsolation();
             
             // Configure default Popup margins so popups never overlap the top floating bar
             if (L.Popup && L.Popup.prototype && L.Popup.prototype.options) {
@@ -1945,7 +2652,7 @@
                 }
             });
 
-            // Map Click Listener for "Add Plot" mode
+            // Map Click Listener
             map.on('click', (e) => {
                 if (isAddPlotMode) {
                     handleMapClickForAddPlot(e.latlng);
@@ -1960,6 +2667,15 @@
 
             map.on('zoomend', () => {
                 document.getElementById('map-zoom-level').textContent = `Zoom: ${map.getZoom()}`;
+                updatePopupZoomButtons();
+            });
+
+            map.on('zoom', () => {
+                updatePopupZoomButtons();
+            });
+
+            map.on('popupopen', () => {
+                updatePopupZoomButtons();
             });
         }
 
@@ -2049,7 +2765,7 @@
             } else {
                 map.setZoom(19);
             }
-            showToast("Zoomed to High-Detail Street / Plot View (18x)");
+            showToast("Zoomed to High-Detail Plot View (18x)");
         }
 
         function zoomInDetail(lat, lng) {
@@ -2057,7 +2773,7 @@
                 animate: true,
                 duration: 1.2
             });
-            showToast("Zoomed to 18x high-detail street view");
+            showToast("Zoomed to 18x high-detail plot view");
         }
 
         // ── Universal Google Maps Coordinate Parsers ──
@@ -2261,6 +2977,12 @@
                 </button>
             ` : '';
 
+            const currentZoom = (typeof map !== 'undefined' && map) ? map.getZoom() : 20;
+            const isZoomUp = currentZoom <= 4;
+            const zoomBtnIcon = isZoomUp ? 'zoom_in' : 'zoom_out';
+            const zoomBtnText = isZoomUp ? 'Zoom Up' : 'Zoom Down';
+            const zoomBtnTitle = isZoomUp ? 'Zoom up back to plot' : 'Zoom down by 2 levels';
+
             return `
                 <div class="popup-card">
                     <div class="popup-header">
@@ -2292,10 +3014,19 @@
                                     <span class="material-icons" style="font-size:14px;">edit</span> Edit Details
                                 </button>
                                 ${revertBtnHtml}
-                                <button class="popup-btn popup-btn-outline" onclick="zoomDownTwoLevels()" title="Zoom down by 2 levels">
-                                    <span class="material-icons" style="font-size:14px;">zoom_out</span> Zoom Down
+                                <button class="popup-btn popup-btn-outline popup-zoom-btn ${isZoomUp ? 'zoom-up-mode' : ''}" data-plot-id="${id}" onclick="handlePopupZoomToggle(${id})" title="${zoomBtnTitle}">
+                                    <span class="material-icons popup-zoom-icon" style="font-size:14px;">${zoomBtnIcon}</span>
+                                    <span class="popup-zoom-text">${zoomBtnText}</span>
                                 </button>
                             </div>
+                            ${(activeSearchedLocation ? `
+                            <div style="margin-bottom: 8px;">
+                                <button class="btn-action btn-primary btn-full" style="background:#7c3aed;border-color:#7c3aed;padding:7px 10px;font-size:0.78rem;" onclick="alignSpecificPlotToSearched(${id})" title="Align this plot's coordinates to the searched location">
+                                    <span class="material-icons" style="font-size:15px;">my_location</span>
+                                    Align to Searched Place (${formatDistance(getDistanceMeters(lat, lng, activeSearchedLocation.lat, activeSearchedLocation.lng))} offset)
+                                </button>
+                            </div>
+                            ` : '')}
                             <div class="popup-actions">
                                 <button class="popup-btn popup-btn-outline" onclick="copyCoords(${lat}, ${lng})">
                                     <span class="material-icons" style="font-size:14px;">content_copy</span> Copy Coords
@@ -2747,6 +3478,10 @@
             
             document.getElementById('banner-drag-coords').textContent = 
                 `Lat: ${cur.lat}, Lng: ${cur.lng} (Moved ${formatDistance(dist)})`;
+
+            if (activeSearchedLocation && selectedComparePlotId === activeDragId) {
+                updateComparisonPolylineAndDistance(cur.lat, cur.lng);
+            }
         }
 
         function onMarkerDragEnd(e) {
@@ -2796,6 +3531,10 @@
             saveToLocalStorage();
             updateMetricsAndKPIs();
             renderLocationsList(locationsData);
+
+            if (activeSearchedLocation) {
+                updateComparisonUI();
+            }
         }
 
         function saveDragPosition() {
@@ -3033,6 +3772,12 @@
             // Highlight sidebar item in distinct color
             highlightLocationInList(id);
 
+            // If location search is active, set this plot as the compared plot
+            if (activeSearchedLocation) {
+                selectedComparePlotId = id;
+                updateComparisonUI();
+            }
+
             const maxZoom = map.getMaxZoom() || 20;
 
             const openMarkerPopupMenu = () => {
@@ -3085,13 +3830,95 @@
             startDragMode(id);
         }
 
-        // ── Zoom Down by 2 Levels ──
-        function zoomDownTwoLevels() {
+        // ── Zoom Down / Zoom Up Toggle in Marker Popup ──
+        function handlePopupZoomToggle(id) {
+            if (!map) return;
             const currentZoom = map.getZoom();
-            const minZoom = map.getMinZoom() || 1;
-            const newZoom = Math.max(minZoom, currentZoom - 2);
-            map.setZoom(newZoom, { animate: true });
-            showToast(`Zoomed down to level ${newZoom} (-2 levels)`);
+
+            if (currentZoom <= 4) {
+                // When zoom level reaches 4 or below, button acts as "Zoom Up": fly back to max zoom at plot position
+                const maxZoom = map.getMaxZoom() || 20;
+                let targetLat = null;
+                let targetLng = null;
+                let plotName = '';
+
+                // Try to resolve plot data
+                if (id) {
+                    const plot = locationsData.find(x => x.id === id);
+                    if (plot && plot.lat !== undefined && plot.lng !== undefined) {
+                        targetLat = plot.lat;
+                        targetLng = plot.lng;
+                        plotName = plot.name;
+                    }
+                }
+
+                if (targetLat === null || targetLng === null) {
+                    const openBtn = document.querySelector('.popup-zoom-btn');
+                    if (openBtn && openBtn.dataset.plotId) {
+                        id = parseInt(openBtn.dataset.plotId, 10);
+                        const plot = locationsData.find(x => x.id === id);
+                        if (plot && plot.lat !== undefined && plot.lng !== undefined) {
+                            targetLat = plot.lat;
+                            targetLng = plot.lng;
+                            plotName = plot.name;
+                        }
+                    }
+                }
+
+                if (id && markerIdMap.has(id)) {
+                    // Smoothly fly back to plot and show popup
+                    selectLocation(id);
+                    showToast(`Zoomed up to plot ${plotName ? `"${plotName}"` : ''} at level ${maxZoom}`, 'info');
+                } else if (targetLat !== null && targetLng !== null) {
+                    map.flyTo([targetLat, targetLng], maxZoom, { animate: true, duration: 0.6 });
+                    showToast(`Zoomed up to level ${maxZoom}`, 'info');
+                } else {
+                    map.setZoom(maxZoom, { animate: true });
+                    showToast(`Zoomed up to level ${maxZoom}`, 'info');
+                }
+            } else {
+                // When zoom level > 4, button acts as "Zoom Down": decrease zoom by 2 levels, stopping at 4
+                const newZoom = Math.max(4, currentZoom - 2);
+                map.setZoom(newZoom, { animate: true });
+                if (newZoom <= 4) {
+                    showToast(`Zoomed down to level ${newZoom} (Reached zoom 4 - Zoom Up mode now active)`);
+                } else {
+                    showToast(`Zoomed down to level ${newZoom} (-2 levels)`);
+                }
+            }
+
+            setTimeout(updatePopupZoomButtons, 60);
+        }
+
+        // Backward compatibility
+        function zoomDownTwoLevels(id) {
+            handlePopupZoomToggle(id);
+        }
+
+        function updatePopupZoomButtons() {
+            if (!map) return;
+            const currentZoom = map.getZoom();
+            const isZoomUp = currentZoom <= 4;
+            const targetIcon = isZoomUp ? 'zoom_in' : 'zoom_out';
+            const targetText = isZoomUp ? 'Zoom Up' : 'Zoom Down';
+            const targetTitle = isZoomUp ? 'Zoom up back to plot' : 'Zoom down by 2 levels';
+
+            document.querySelectorAll('.popup-zoom-btn').forEach(btn => {
+                btn.setAttribute('title', targetTitle);
+                if (isZoomUp) {
+                    btn.classList.add('zoom-up-mode');
+                } else {
+                    btn.classList.remove('zoom-up-mode');
+                }
+                const iconEl = btn.querySelector('.popup-zoom-icon');
+                const textEl = btn.querySelector('.popup-zoom-text');
+                if (iconEl && iconEl.textContent.trim() !== targetIcon) {
+                    iconEl.textContent = targetIcon;
+                }
+                if (textEl && textEl.textContent.trim() !== targetText) {
+                    textEl.textContent = targetText;
+                }
+            });
         }
 
         function highlightLocationInList(id) {
@@ -3167,6 +3994,7 @@
         }
 
         function executeClearAllLocations() {
+            clearLocationSearch();
             plotLocationsArray([], false);
             localStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(HEADERS_STORAGE_KEY);
@@ -3648,6 +4476,1117 @@
             openExportModal();
         }
 
+        // ══════════════════════════════════════════════════════════════════
+        // ── Location Search & Alignment Comparison System ──
+        // ══════════════════════════════════════════════════════════════════
+
+        function initSearchContainerIsolation() {
+            const searchContainer = document.getElementById('map-search-container');
+
+            if (searchContainer && L.DomEvent) {
+                L.DomEvent.disableClickPropagation(searchContainer);
+                L.DomEvent.disableScrollPropagation(searchContainer);
+            }
+        }
+
+        let searchSuggestDebounceTimer = null;
+        let activeSuggestAbortController = null;
+        let activeSuggestRequestId = 0;
+        let activeSuggestionIndex = -1;
+        let currentSuggestions = [];
+
+        function initGooglePlacesSearch() {
+            const input = document.getElementById('map-search-input');
+            const clearBtn = document.getElementById('btn-clear-search');
+            if (!input) return;
+
+            // Live input listener for suggestions & clear button
+            input.addEventListener('input', () => {
+                const query = input.value.trim();
+                if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+
+                if (searchSuggestDebounceTimer) {
+                    clearTimeout(searchSuggestDebounceTimer);
+                    searchSuggestDebounceTimer = null;
+                }
+
+                if (!query) {
+                    closeSearchSuggestions();
+                    return;
+                }
+
+                // If user typed coordinates or matching plot name, show immediate local preview
+                renderImmediateLocalSuggestions(query);
+
+                // Debounce remote places search by 240ms for snappy, fluid typeahead
+                searchSuggestDebounceTimer = setTimeout(() => {
+                    fetchAndRenderSuggestions(query);
+                }, 240);
+            });
+
+            input.addEventListener('focus', () => {
+                const query = input.value.trim();
+                if (query.length >= 2) {
+                    fetchAndRenderSuggestions(query);
+                }
+            });
+
+            // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+            input.addEventListener('keydown', (e) => {
+                const suggestionsBox = document.getElementById('map-search-suggestions');
+                const isDropdownOpen = suggestionsBox && suggestionsBox.style.display !== 'none';
+
+                if (e.key === 'ArrowDown') {
+                    if (isDropdownOpen && currentSuggestions.length > 0) {
+                        e.preventDefault();
+                        activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
+                        highlightActiveSuggestion();
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    if (isDropdownOpen && currentSuggestions.length > 0) {
+                        e.preventDefault();
+                        activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+                        highlightActiveSuggestion();
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (isDropdownOpen && activeSuggestionIndex >= 0 && activeSuggestionIndex < currentSuggestions.length) {
+                        selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+                    } else {
+                        closeSearchSuggestions();
+                        executeLocationSearch();
+                    }
+                } else if (e.key === 'Escape') {
+                    closeSearchSuggestions();
+                }
+            });
+
+            // Close suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                const container = document.getElementById('map-search-container');
+                if (container && !container.contains(e.target)) {
+                    closeSearchSuggestions();
+                }
+            });
+        }
+
+        function renderImmediateLocalSuggestions(query) {
+            const suggestionsBox = document.getElementById('map-search-suggestions');
+            if (!suggestionsBox) return;
+
+            const qLower = query.toLowerCase();
+            const localSuggestions = [];
+
+            // 1. Coordinates check
+            const coordRegex = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*(?:,|\s+)\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+            const coordMatch = query.match(coordRegex);
+            if (coordMatch) {
+                const lat = parseFloat(coordMatch[1]);
+                const lng = parseFloat(coordMatch[2]);
+                if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    localSuggestions.push({
+                        category: 'coords',
+                        type: 'coords',
+                        title: `Coordinates: ${lat.toFixed(5)}°, ${lng.toFixed(5)}°`,
+                        subtitle: 'Navigate to exact latitude & longitude coordinates',
+                        lat: lat,
+                        lng: lng,
+                        name: `Coordinates (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+                        address: `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`
+                    });
+                }
+            }
+
+            // 2. Uploaded plot matches
+            if (locationsData && locationsData.length > 0) {
+                const matchedPlots = locationsData.filter(p => 
+                    p.name && p.name.toLowerCase().includes(qLower)
+                ).slice(0, 4);
+
+                matchedPlots.forEach(plot => {
+                    localSuggestions.push({
+                        category: 'plot',
+                        type: 'plot',
+                        plotId: plot.id,
+                        title: plot.name,
+                        subtitle: `Uploaded Plot #${plot.id} • Lat: ${plot.lat.toFixed(5)}, Lng: ${plot.lng.toFixed(5)}`,
+                        lat: plot.lat,
+                        lng: plot.lng,
+                        name: plot.name,
+                        address: `Plot #${plot.id} (${plot.lat.toFixed(6)}, ${plot.lng.toFixed(6)})`
+                    });
+                });
+            }
+
+            if (localSuggestions.length > 0) {
+                currentSuggestions = localSuggestions;
+                activeSuggestionIndex = -1;
+                renderSuggestionsHtml(localSuggestions, query, true);
+            }
+        }
+
+        async function fetchAndRenderSuggestions(query) {
+            const input = document.getElementById('map-search-input');
+            const suggestionsBox = document.getElementById('map-search-suggestions');
+            if (!suggestionsBox || !input) return;
+
+            // Abort previous in-flight HTTP request
+            if (activeSuggestAbortController) {
+                try {
+                    activeSuggestAbortController.abort();
+                } catch (e) {}
+            }
+            activeSuggestAbortController = new AbortController();
+            const thisRequestId = ++activeSuggestRequestId;
+
+            const qLower = query.toLowerCase();
+            const suggestions = [];
+
+            // 1. Check coordinates
+            const coordRegex = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*(?:,|\s+)\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+            const coordMatch = query.match(coordRegex);
+            if (coordMatch) {
+                const lat = parseFloat(coordMatch[1]);
+                const lng = parseFloat(coordMatch[2]);
+                if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    suggestions.push({
+                        category: 'coords',
+                        type: 'coords',
+                        title: `Coordinates: ${lat.toFixed(5)}°, ${lng.toFixed(5)}°`,
+                        subtitle: 'Navigate to exact latitude & longitude coordinates',
+                        lat: lat,
+                        lng: lng,
+                        name: `Coordinates (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+                        address: `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`
+                    });
+                }
+            }
+
+            // 2. Check matching uploaded plots
+            if (locationsData && locationsData.length > 0) {
+                const matchedPlots = locationsData.filter(p => 
+                    p.name && p.name.toLowerCase().includes(qLower)
+                ).slice(0, 4);
+
+                matchedPlots.forEach(plot => {
+                    suggestions.push({
+                        category: 'plot',
+                        type: 'plot',
+                        plotId: plot.id,
+                        title: plot.name,
+                        subtitle: `Uploaded Plot #${plot.id} • Lat: ${plot.lat.toFixed(5)}, Lng: ${plot.lng.toFixed(5)}`,
+                        lat: plot.lat,
+                        lng: plot.lng,
+                        name: plot.name,
+                        address: `Plot #${plot.id} (${plot.lat.toFixed(6)}, ${plot.lng.toFixed(6)})`
+                    });
+                });
+            }
+
+            // 3. Query server suggestions proxy with map center coordinates for proximity bias
+            let remoteResults = [];
+            let locationParams = '';
+            if (window.map && typeof map.getCenter === 'function') {
+                try {
+                    const c = map.getCenter();
+                    if (c && !isNaN(c.lat) && !isNaN(c.lng)) {
+                        locationParams = `&lat=${c.lat.toFixed(4)}&lng=${c.lng.toFixed(4)}`;
+                    }
+                } catch(e){}
+            }
+
+            try {
+                const res = await fetch(`/api/location-search-suggest?q=${encodeURIComponent(query)}${locationParams}`, {
+                    signal: activeSuggestAbortController.signal
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.results && data.results.length > 0) {
+                        remoteResults = data.results;
+                    }
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return; // Cancelled by newer keystroke
+                console.warn('Location suggestion fetch error:', err);
+            }
+
+            // Fallback direct to Nominatim if backend had no results and not aborted
+            if (remoteResults.length === 0 && query.length >= 3 && !coordMatch) {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`, {
+                        signal: activeSuggestAbortController.signal
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) {
+                            remoteResults = data.map(item => ({
+                                name: item.name || item.display_name.split(',')[0],
+                                display_name: item.display_name,
+                                lat: parseFloat(item.lat),
+                                lng: parseFloat(item.lon),
+                                type: item.type || 'location'
+                            }));
+                        }
+                    }
+                } catch (e) {
+                    if (e.name === 'AbortError') return;
+                }
+            }
+
+            // Race Condition Check: Ensure user hasn't changed input or a newer request hasn't been fired
+            const currentVal = input.value.trim();
+            if (thisRequestId !== activeSuggestRequestId || currentVal.toLowerCase() !== query.toLowerCase()) {
+                return; // Discard outdated response!
+            }
+
+            remoteResults.slice(0, 6).forEach(item => {
+                suggestions.push({
+                    category: 'place',
+                    type: 'place',
+                    title: item.name || item.display_name.split(',')[0],
+                    subtitle: item.display_name,
+                    lat: item.lat,
+                    lng: item.lng,
+                    name: item.name || item.display_name.split(',')[0],
+                    address: item.display_name
+                });
+            });
+
+            currentSuggestions = suggestions;
+            activeSuggestionIndex = -1;
+            renderSuggestionsHtml(suggestions, currentVal, false);
+        }
+
+        function renderSuggestionsHtml(suggestions, queryText, isLoading) {
+            const suggestionsBox = document.getElementById('map-search-suggestions');
+            if (!suggestionsBox) return;
+
+            if (suggestions.length === 0) {
+                suggestionsBox.innerHTML = `
+                    <div class="google-suggestion-item" onclick="executeLocationSearch()">
+                        <div class="google-suggestion-icon">
+                            <span class="material-icons" style="font-size:20px;">search</span>
+                        </div>
+                        <div class="google-suggestion-body">
+                            <div class="google-suggestion-title">Search for "${escapeHtml(queryText)}"</div>
+                            <div class="google-suggestion-subtitle">Press Enter or click to search on map</div>
+                        </div>
+                    </div>
+                `;
+                suggestionsBox.style.display = 'flex';
+                return;
+            }
+
+            let html = '';
+            if (isLoading) {
+                html += '<div class="suggestions-loading-bar"></div>';
+            }
+
+            suggestions.forEach((item, index) => {
+                let iconName = 'location_on';
+                let iconClass = '';
+                let badgeClass = 'google-badge-location';
+                let badgeText = 'Location';
+
+                if (item.category === 'plot') {
+                    iconName = 'eco';
+                    iconClass = 'icon-plot';
+                    badgeClass = 'google-badge-plot';
+                    badgeText = 'Plot';
+                } else if (item.category === 'coords') {
+                    iconName = 'my_location';
+                    iconClass = 'icon-coords';
+                    badgeClass = 'google-badge-coords';
+                    badgeText = 'Coords';
+                }
+
+                html += `
+                    <div class="google-suggestion-item" id="suggestion-item-${index}" onclick="selectSuggestionIndex(${index})">
+                        <div class="google-suggestion-icon ${iconClass}">
+                            <span class="material-icons" style="font-size:20px;">${iconName}</span>
+                        </div>
+                        <div class="google-suggestion-body">
+                            <div class="google-suggestion-title">${escapeHtml(item.title)}</div>
+                            <div class="google-suggestion-subtitle" title="${escapeHtml(item.subtitle)}">${escapeHtml(item.subtitle)}</div>
+                        </div>
+                        <span class="google-suggestion-badge ${badgeClass}">${badgeText}</span>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div class="google-suggestions-footer">
+                    <span>Press Enter or click to search</span>
+                    <span style="display:inline-flex;align-items:center;gap:3px;">
+                        <span class="material-icons" style="font-size:12px;">explore</span> Location Check
+                    </span>
+                </div>
+            `;
+
+            suggestionsBox.innerHTML = html;
+            suggestionsBox.style.display = 'flex';
+        }
+
+        function selectSuggestionIndex(index) {
+            if (index < 0 || index >= currentSuggestions.length) return;
+            selectSuggestion(currentSuggestions[index]);
+        }
+
+        function selectSuggestion(item) {
+            closeSearchSuggestions();
+            const input = document.getElementById('map-search-input');
+            if (input) input.value = item.title;
+
+            if (item.category === 'plot' && item.plotId) {
+                // User picked an uploaded plot
+                const plot = locationsData.find(x => x.id === item.plotId);
+                if (plot) {
+                    highlightLocationInList(plot.id);
+                    const marker = markerIdMap.get(plot.id);
+                    if (clusterGroup && marker) {
+                        clusterGroup.zoomToShowLayer(marker, () => {
+                            map.flyTo([plot.lat, plot.lng], Math.max(18, map.getZoom()), { animate: true });
+                            marker.openPopup();
+                        });
+                    } else if (marker) {
+                        map.flyTo([plot.lat, plot.lng], Math.max(18, map.getZoom()), { animate: true });
+                        marker.openPopup();
+                    }
+                    showToast(`Selected Plot: ${plot.name}`, 'info');
+                }
+                return;
+            }
+
+            // User picked a searched location or coordinates
+            handleLocationSearchResult({
+                name: item.name,
+                address: item.address,
+                lat: item.lat,
+                lng: item.lng
+            });
+        }
+
+        function highlightActiveSuggestion() {
+            document.querySelectorAll('.google-suggestion-item').forEach((el, idx) => {
+                if (idx === activeSuggestionIndex) {
+                    el.classList.add('active-item');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('active-item');
+                }
+            });
+        }
+
+        function closeSearchSuggestions() {
+            if (activeSuggestAbortController) {
+                try {
+                    activeSuggestAbortController.abort();
+                } catch(e){}
+                activeSuggestAbortController = null;
+            }
+            if (searchSuggestDebounceTimer) {
+                clearTimeout(searchSuggestDebounceTimer);
+                searchSuggestDebounceTimer = null;
+            }
+            const suggestionsBox = document.getElementById('map-search-suggestions');
+            if (suggestionsBox) {
+                suggestionsBox.style.display = 'none';
+                suggestionsBox.innerHTML = '';
+            }
+            activeSuggestionIndex = -1;
+            currentSuggestions = [];
+        }
+
+        function executeLocationSearch() {
+            closeSearchSuggestions();
+            const input = document.getElementById('map-search-input');
+            if (!input) return;
+            const query = input.value.trim();
+            if (!query) {
+                showToast("Please enter a location name, address, or lat/long to search", "info");
+                return;
+            }
+
+            // Check if query is latitude, longitude coordinates (e.g., "12.9716, 77.5946" or "12.9716 77.5946")
+            const coordRegex = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*(?:,|\s+)\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+            const coordMatch = query.match(coordRegex);
+
+            if (coordMatch) {
+                const parsedLat = parseFloat(coordMatch[1]);
+                const parsedLng = parseFloat(coordMatch[2]);
+
+                if (parsedLat >= -90 && parsedLat <= 90 && parsedLng >= -180 && parsedLng <= 180) {
+                    reverseGeocodeCoordinates(parsedLat, parsedLng);
+                    return;
+                }
+            }
+
+            // Check if query matches an uploaded plot
+            if (locationsData && locationsData.length > 0) {
+                const qLower = query.toLowerCase();
+                const matchedPlot = locationsData.find(p => p.name && p.name.toLowerCase() === qLower) ||
+                                    locationsData.find(p => p.name && p.name.toLowerCase().includes(qLower));
+                if (matchedPlot) {
+                    highlightLocationInList(matchedPlot.id);
+                    const marker = markerIdMap.get(matchedPlot.id);
+                    if (clusterGroup && marker) {
+                        clusterGroup.zoomToShowLayer(marker, () => {
+                            map.flyTo([matchedPlot.lat, matchedPlot.lng], Math.max(18, map.getZoom()), { animate: true });
+                            marker.openPopup();
+                        });
+                    } else if (marker) {
+                        map.flyTo([matchedPlot.lat, matchedPlot.lng], Math.max(18, map.getZoom()), { animate: true });
+                        marker.openPopup();
+                    }
+                    showToast(`Found Plot: "${matchedPlot.name}"`, 'success');
+                    return;
+                }
+            }
+
+            // Perform text geocoding via Google Geocoder with Nominatim fallback
+            geocodeSearchQuery(query);
+        }
+
+        function geocodeSearchQuery(query) {
+            showToast(`Searching for "${query}"...`, 'info');
+
+            if (window.google && window.google.maps) {
+                if (!googleGeocoder) {
+                    googleGeocoder = new google.maps.Geocoder();
+                }
+
+                googleGeocoder.geocode({ address: query }, (results, status) => {
+                    if (status === 'OK' && results && results.length > 0) {
+                        const top = results[0];
+                        const loc = top.geometry.location;
+                        const name = top.formatted_address.split(',')[0];
+                        handleLocationSearchResult({
+                            name: name,
+                            address: top.formatted_address,
+                            lat: loc.lat(),
+                            lng: loc.lng()
+                        });
+                    } else {
+                        // Fallback to backend proxy / Nominatim
+                        fallbackNominatimSearch(query);
+                    }
+                });
+            } else {
+                fallbackNominatimSearch(query);
+            }
+        }
+
+        function reverseGeocodeCoordinates(lat, lng) {
+            showToast(`Searching coordinates ${lat.toFixed(6)}, ${lng.toFixed(6)}...`, 'info');
+
+            if (window.google && window.google.maps) {
+                if (!googleGeocoder) {
+                    googleGeocoder = new google.maps.Geocoder();
+                }
+
+                googleGeocoder.geocode({ location: { lat: lat, lng: lng } }, (results, status) => {
+                    if (status === 'OK' && results && results.length > 0) {
+                        const top = results[0];
+                        const name = top.formatted_address.split(',')[0];
+                        handleLocationSearchResult({
+                            name: name || 'Coordinates Location',
+                            address: top.formatted_address,
+                            lat: lat,
+                            lng: lng
+                        });
+                    } else {
+                        handleLocationSearchResult({
+                            name: `Location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+                            address: `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`,
+                            lat: lat,
+                            lng: lng
+                        });
+                    }
+                });
+            } else {
+                handleLocationSearchResult({
+                    name: `Location (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+                    address: `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`,
+                    lat: lat,
+                    lng: lng
+                });
+            }
+        }
+
+        async function fallbackNominatimSearch(query) {
+            // First try local backend proxy /api/location-search-suggest
+            try {
+                const res = await fetch(`/api/location-search-suggest?q=${encodeURIComponent(query)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.results && data.results.length > 0) {
+                        const item = data.results[0];
+                        handleLocationSearchResult({
+                            name: item.name,
+                            address: item.display_name,
+                            lat: item.lat,
+                            lng: item.lng
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('Backend search proxy error, trying direct Nominatim:', e);
+            }
+
+            // Direct Nominatim fetch fallback
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const item = data[0];
+                        const lat = parseFloat(item.lat);
+                        const lng = parseFloat(item.lon);
+                        const name = item.display_name.split(',')[0];
+                        handleLocationSearchResult({
+                            name: name,
+                            address: item.display_name,
+                            lat: lat,
+                            lng: lng
+                        });
+                    } else {
+                        showToast(`No locations found matching "${query}"`, 'error');
+                    }
+                })
+                .catch(err => {
+                    console.warn('Geocoding search failed:', err);
+                    showToast(`Could not find "${query}". Check internet or try coordinates.`, 'error');
+                });
+        }
+
+        let isComparisonCardMinimized = false;
+
+        function toggleComparisonCardMinimize(minimize) {
+            isComparisonCardMinimized = minimize;
+            updateComparisonUI(false);
+        }
+
+        function handleLocationSearchResult(result) {
+            activeSearchedLocation = result;
+            isComparisonCardMinimized = false;
+
+            const clearBtn = document.getElementById('btn-clear-search');
+            if (clearBtn) clearBtn.style.display = 'flex';
+
+            // Create or update searched marker
+            if (searchedMarker) {
+                map.removeLayer(searchedMarker);
+            }
+
+            const searchPinIcon = L.divIcon({
+                className: 'custom-search-pin-wrap',
+                html: `
+                    <div class="custom-pin-wrap">
+                        <div class="searched-pin-beacon"></div>
+                        <div class="custom-pin" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 4px 12px rgba(124,58,237,0.45);display:flex;align-items:center;justify-content:center;">
+                            <span class="material-icons" style="transform:rotate(45deg);color:#fff;font-size:18px;">search</span>
+                        </div>
+                        <div class="pin-label-badge" style="background:#7c3aed;color:#fff;border-color:#6d28d9;margin-top:4px;">
+                            ${escapeHtml(result.name || 'Searched Location')}
+                        </div>
+                    </div>
+                `,
+                iconSize: [36, 48],
+                iconAnchor: [18, 44],
+                popupAnchor: [0, -42]
+            });
+
+            searchedMarker = L.marker([result.lat, result.lng], {
+                icon: searchPinIcon,
+                draggable: true,
+                zIndexOffset: 1200
+            }).addTo(map);
+
+            searchedMarker.bindPopup(buildSearchedMarkerPopup(result));
+
+            // Dragging searched marker updates comparison live
+            searchedMarker.on('drag', (e) => {
+                const pos = e.target.getLatLng();
+                activeSearchedLocation.lat = pos.lat;
+                activeSearchedLocation.lng = pos.lng;
+                updateComparisonUI(false);
+            });
+
+            searchedMarker.on('dragend', () => {
+                searchedMarker.setPopupContent(buildSearchedMarkerPopup(activeSearchedLocation));
+                updateComparisonUI(false);
+                showToast(`Searched location updated to ${activeSearchedLocation.lat.toFixed(6)}, ${activeSearchedLocation.lng.toFixed(6)}`, 'info');
+            });
+
+            // Update UI & fly to location
+            updateComparisonUI(true);
+            showToast(`Found: ${result.name}`, 'success');
+        }
+
+        function findNearestPlot(targetLat, targetLng) {
+            if (!locationsData || locationsData.length === 0) return null;
+            let minDistance = Infinity;
+            let nearestPlot = null;
+            locationsData.forEach(plot => {
+                const d = getDistanceMeters(targetLat, targetLng, plot.lat, plot.lng);
+                if (d < minDistance) {
+                    minDistance = d;
+                    nearestPlot = plot;
+                }
+            });
+            return { plot: nearestPlot, distance: minDistance };
+        }
+
+        function updateComparisonUI(shouldFitBounds = false) {
+            const card = document.getElementById('search-comparison-card');
+            if (!activeSearchedLocation || !card) {
+                if (card) card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = 'flex';
+            const sLat = activeSearchedLocation.lat;
+            const sLng = activeSearchedLocation.lng;
+            const sName = activeSearchedLocation.name || 'Searched Location';
+            const sAddress = activeSearchedLocation.address || `${sLat.toFixed(6)}, ${sLng.toFixed(6)}`;
+
+            let comparisonBodyHtml = '';
+            let targetPlot = null;
+            let dist = null;
+
+            if (locationsData.length > 0) {
+                targetPlot = locationsData.find(x => x.id === selectedComparePlotId);
+                if (!targetPlot) {
+                    const nearestInfo = findNearestPlot(sLat, sLng);
+                    if (nearestInfo && nearestInfo.plot) {
+                        targetPlot = nearestInfo.plot;
+                        selectedComparePlotId = targetPlot.id;
+                    } else {
+                        targetPlot = locationsData[0];
+                        selectedComparePlotId = targetPlot.id;
+                    }
+                }
+
+                dist = getDistanceMeters(sLat, sLng, targetPlot.lat, targetPlot.lng);
+                const dLat = (sLat - targetPlot.lat);
+                const dLng = (sLng - targetPlot.lng);
+                const dLatStr = (dLat >= 0 ? `+${dLat.toFixed(6)}` : dLat.toFixed(6));
+                const dLngStr = (dLng >= 0 ? `+${dLng.toFixed(6)}` : dLng.toFixed(6));
+
+                let accuracyBadgeClass = 'match-exact';
+                let accuracyBadgeIcon = 'check_circle';
+                let accuracyText = 'Exact Match / Within Field (<20m)';
+                if (dist > 150) {
+                    accuracyBadgeClass = 'match-major';
+                    accuracyBadgeIcon = 'warning';
+                    accuracyText = `Significant Offset (${formatDistance(dist)}) — Review recommended`;
+                } else if (dist > 20) {
+                    accuracyBadgeClass = 'match-minor';
+                    accuracyBadgeIcon = 'info';
+                    accuracyText = `Moderate Offset (${formatDistance(dist)}) — Check boundaries`;
+                }
+
+                // Generate Plot Options for Dropdown
+                const optionsHtml = locationsData.map(p => {
+                    const pDist = getDistanceMeters(sLat, sLng, p.lat, p.lng);
+                    const isSel = (p.id === targetPlot.id) ? 'selected' : '';
+                    return `<option value="${p.id}" ${isSel}>${escapeHtml(p.name)} (${formatDistance(pDist)} offset)</option>`;
+                }).join('');
+
+                comparisonBodyHtml = `
+                    <div class="comparison-box">
+                        <div class="comparison-selector-row">
+                            <label>Compare Against Uploaded Plot:</label>
+                            <select class="comparison-select" id="compare-plot-select" onchange="changeComparedPlot(this.value)">
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                        
+                        <div class="comparison-metrics-grid">
+                            <div class="comparison-metric-item">
+                                <div class="comparison-metric-label">Distance Offset</div>
+                                <div class="comparison-metric-val" style="color:${dist > 150 ? '#dc2626' : dist > 20 ? '#d97706' : '#10b981'};">
+                                    ${formatDistance(dist)}
+                                </div>
+                            </div>
+                            <div class="comparison-metric-item">
+                                <div class="comparison-metric-label">Coordinate Difference</div>
+                                <div class="comparison-metric-val" style="font-size:0.75rem;">
+                                    ΔLat: ${dLatStr}<br>ΔLng: ${dLngStr}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accuracy-badge ${accuracyBadgeClass}">
+                            <span class="material-icons" style="font-size: 15px;">${accuracyBadgeIcon}</span>
+                            <span>${accuracyText}</span>
+                        </div>
+                    </div>
+
+                    <div class="comparison-actions">
+                        <button class="btn-action btn-primary" style="background:#7c3aed;border-color:#7c3aed;padding:8px 12px;font-size:0.8rem;" onclick="alignComparedPlotToSearched()" title="Update this plot's latitude & longitude to the exact searched location">
+                            <span class="material-icons" style="font-size:16px;">my_location</span>
+                            Move "${escapeHtml(targetPlot.name)}" Here
+                        </button>
+                        <div class="comparison-actions-row">
+                            <button class="btn-action btn-outline" style="font-size:0.76rem;width:100%;" onclick="addSearchedLocationAsPlot()">
+                                <span class="material-icons" style="font-size:15px;color:var(--accent-blue);">add_location</span> Add as Plot
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                // Update polyline and midpoint distance label
+                updateComparisonPolylineAndDistance(targetPlot.lat, targetPlot.lng, dist);
+
+                if (shouldFitBounds) {
+                    map.fitBounds([
+                        [sLat, sLng],
+                        [targetPlot.lat, targetPlot.lng]
+                    ], {
+                        paddingTopLeft: [60, 410],
+                        paddingBottomRight: [60, 60],
+                        maxZoom: 18
+                    });
+                }
+            } else {
+                // No plots uploaded yet
+                comparisonBodyHtml = `
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:0.78rem;color:var(--text-muted);line-height:1.4;">
+                        No plots uploaded yet. Upload your plots in the sidebar to compare coordinates, or click <strong>Save as Plot</strong> to place a new plot pin here.
+                    </div>
+                    <div class="comparison-actions-row" style="margin-top:4px;">
+                        <button class="btn-action btn-primary" style="font-size:0.76rem;width:100%;" onclick="addSearchedLocationAsPlot()">
+                            <span class="material-icons" style="font-size:15px;">add_location</span> Save as Plot
+                        </button>
+                    </div>
+                `;
+
+                if (comparisonPolyline) { map.removeLayer(comparisonPolyline); comparisonPolyline = null; }
+                if (comparisonDistanceLabel) { map.removeLayer(comparisonDistanceLabel); comparisonDistanceLabel = null; }
+
+                if (shouldFitBounds) {
+                    map.setView([sLat, sLng], 16, { animate: true });
+                }
+            }
+
+            // If user clicked "Hide Details", render compact minibar so search pin stays on map!
+            if (isComparisonCardMinimized) {
+                card.style.background = 'transparent';
+                card.style.border = 'none';
+                card.style.boxShadow = 'none';
+                card.style.padding = '0';
+                card.style.maxHeight = 'none';
+                card.style.overflow = 'visible';
+
+                let distHtml = '';
+                if (dist !== null && targetPlot) {
+                    const tagClass = dist < 30 ? 'tag-close' : dist < 150 ? 'tag-moderate' : 'tag-far';
+                    distHtml = `
+                        <span class="minibar-dist-pill ${tagClass}" title="Offset: ${formatDistance(dist)}">${formatDistance(dist)}</span>
+                        <span class="minibar-plot-name" title="Nearest plot: ${escapeHtml(targetPlot.name)}">to ${escapeHtml(targetPlot.name)}</span>
+                    `;
+                } else {
+                    distHtml = `<span class="minibar-plot-name" title="${escapeHtml(sName)}">${escapeHtml(sName)}</span>`;
+                }
+
+                card.innerHTML = `
+                    <div class="search-comparison-minibar">
+                        <div class="minibar-left" onclick="toggleComparisonCardMinimize(false)" title="Click to show full comparison details">
+                            <span class="material-icons minibar-pin">location_on</span>
+                            ${distHtml}
+                        </div>
+                        <div class="minibar-right">
+                            <button class="btn-minibar-action" onclick="toggleComparisonCardMinimize(false)" title="Show Comparison Details">
+                                <span class="material-icons" style="font-size:14px;">visibility</span> Details
+                            </button>
+                            <button class="btn-minibar-close" onclick="clearLocationSearch()" title="Remove Search Pin & Line">
+                                <span class="material-icons" style="font-size:16px;">close</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Restore full card styling
+            card.style.background = '';
+            card.style.border = '';
+            card.style.boxShadow = '';
+            card.style.padding = '';
+            card.style.maxHeight = '';
+            card.style.overflow = '';
+
+            card.innerHTML = `
+                <div class="comparison-header">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span class="comparison-tag">
+                            <span class="material-icons" style="font-size: 13px;">location_on</span>
+                            Searched Location
+                        </span>
+                        <button class="btn-hide-results" onclick="toggleComparisonCardMinimize(true)" title="Hide card to see map clearly (Search pointer stays on map)">
+                            <span class="material-icons" style="font-size:14px;">visibility_off</span> Hide Details
+                        </button>
+                    </div>
+                    <button class="icon-btn-sm" onclick="clearLocationSearch()" title="Dismiss / Clear Search Pin">
+                        <span class="material-icons" style="font-size:18px;">close</span>
+                    </button>
+                </div>
+                <div>
+                    <div class="searched-place-name">${escapeHtml(sName)}</div>
+                    <div class="searched-place-address">${escapeHtml(sAddress)}</div>
+                </div>
+                <div class="searched-coords-badge">
+                    <span>${sLat.toFixed(6)}°, ${sLng.toFixed(6)}°</span>
+                    <button class="icon-btn-sm" onclick="copyCoords(${sLat}, ${sLng})" title="Copy Searched Coords" style="padding:2px;">
+                        <span class="material-icons" style="font-size:14px;">content_copy</span>
+                    </button>
+                </div>
+                ${comparisonBodyHtml}
+            `;
+        }
+
+        function updateComparisonPolylineAndDistance(plotLat, plotLng, distMeters) {
+            if (!activeSearchedLocation || !map) return;
+            const sLat = activeSearchedLocation.lat;
+            const sLng = activeSearchedLocation.lng;
+            const latlngs = [[sLat, sLng], [plotLat, plotLng]];
+
+            if (!comparisonPolyline) {
+                comparisonPolyline = L.polyline(latlngs, {
+                    color: '#7c3aed',
+                    weight: 3,
+                    dashArray: '6, 8',
+                    opacity: 0.85
+                }).addTo(map);
+            } else {
+                comparisonPolyline.setLatLngs(latlngs);
+                if (!map.hasLayer(comparisonPolyline)) comparisonPolyline.addTo(map);
+            }
+
+            const dist = (distMeters !== undefined) ? distMeters : getDistanceMeters(sLat, sLng, plotLat, plotLng);
+            const midLat = (sLat + plotLat) / 2;
+            const midLng = (sLng + plotLng) / 2;
+            const distLabelHtml = `<div class="distance-label-badge"><span>Offset: ${formatDistance(dist)}</span></div>`;
+
+            if (!comparisonDistanceLabel) {
+                comparisonDistanceLabel = L.marker([midLat, midLng], {
+                    icon: L.divIcon({ className: 'custom-dist-label', html: distLabelHtml, iconSize: [110, 24], iconAnchor: [55, 12] }),
+                    interactive: false
+                }).addTo(map);
+            } else {
+                comparisonDistanceLabel.setLatLng([midLat, midLng]);
+                comparisonDistanceLabel.setIcon(L.divIcon({ className: 'custom-dist-label', html: distLabelHtml, iconSize: [110, 24], iconAnchor: [55, 12] }));
+                if (!map.hasLayer(comparisonDistanceLabel)) comparisonDistanceLabel.addTo(map);
+            }
+        }
+
+        function changeComparedPlot(plotId) {
+            selectedComparePlotId = Number(plotId);
+            updateComparisonUI(true);
+        }
+
+        function alignComparedPlotToSearched() {
+            if (!selectedComparePlotId || !activeSearchedLocation) return;
+            alignSpecificPlotToSearched(selectedComparePlotId);
+        }
+
+        function alignSpecificPlotToSearched(plotId) {
+            if (!activeSearchedLocation) return;
+            const plot = locationsData.find(x => x.id === plotId);
+            const marker = markerIdMap.get(plotId);
+            if (!plot) return;
+
+            // Set original coordinates before modifying
+            if (plot.originalLat === null || plot.originalLat === undefined) {
+                plot.originalLat = plot.lat;
+                plot.originalLng = plot.lng;
+                plot.rawOriginalLat = plot.rawLat ? plot.rawLat : String(plot.lat);
+                plot.rawOriginalLng = plot.rawLng ? plot.rawLng : String(plot.lng);
+            }
+
+            // Update to searched coordinates
+            plot.lat = activeSearchedLocation.lat;
+            plot.lng = activeSearchedLocation.lng;
+            plot.rawLat = String(activeSearchedLocation.lat);
+            plot.rawLng = String(activeSearchedLocation.lng);
+            plot.status = 'Updated';
+
+            if (plot.originalRow) {
+                if (plot.originalLatKey) plot.originalRow[plot.originalLatKey] = plot.rawLat;
+                if (plot.originalLngKey) plot.originalRow[plot.originalLngKey] = plot.rawLng;
+            }
+
+            if (marker) {
+                marker.setLatLng([plot.lat, plot.lng]);
+                marker.setIcon(createCustomPinIcon(plot.name, plot.id, plot.status));
+                marker.setTooltipContent(`
+                    <div class="location-tooltip-title">${escapeHtml(plot.name)}</div>
+                    <span class="location-tooltip-sub">${plot.rawLat}, ${plot.rawLng}</span>
+                `);
+                marker.setPopupContent(buildMarkerPopupContent(plot));
+            }
+
+            selectedComparePlotId = plot.id;
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+            updateComparisonUI(false);
+
+            if (marker && marker.isPopupOpen()) {
+                marker.setPopupContent(buildMarkerPopupContent(plot));
+            }
+
+            showToast(`Plot "${plot.name}" aligned to searched coordinates!`, 'success');
+        }
+
+        function addSearchedLocationAsPlot() {
+            if (!activeSearchedLocation) return;
+            const newId = locationsData.length > 0 ? Math.max(...locationsData.map(x => x.id)) + 1 : 1;
+            const newPlot = {
+                id: newId,
+                name: activeSearchedLocation.name || `Location ${newId}`,
+                lat: activeSearchedLocation.lat,
+                lng: activeSearchedLocation.lng,
+                rawLat: String(activeSearchedLocation.lat),
+                rawLng: String(activeSearchedLocation.lng),
+                status: 'New',
+                originalLat: null,
+                originalLng: null,
+                originalRow: null
+            };
+
+            locationsData.push(newPlot);
+
+            // Add marker to cluster & map
+            const marker = L.marker([newPlot.lat, newPlot.lng], {
+                icon: createCustomPinIcon(newPlot.name, newPlot.id, newPlot.status),
+                draggable: false
+            });
+
+            marker.bindPopup(buildMarkerPopupContent(newPlot), { maxWidth: 320 });
+            marker.bindTooltip(`
+                <div class="location-tooltip-title">${escapeHtml(newPlot.name)}</div>
+                <span class="location-tooltip-sub">${newPlot.rawLat}, ${newPlot.rawLng}</span>
+            `, {
+                permanent: false,
+                direction: 'top',
+                offset: [0, -42],
+                className: 'location-tooltip'
+            });
+
+            marker.on('click', () => {
+                highlightLocationInList(newPlot.id);
+            });
+
+            markerIdMap.set(newPlot.id, marker);
+            markersGroup.addLayer(marker);
+            clusterGroup.addLayer(marker);
+
+            selectedComparePlotId = newPlot.id;
+            saveToLocalStorage();
+            updateMetricsAndKPIs();
+            renderLocationsList(locationsData);
+            updateComparisonUI(false);
+            showToast(`Added "${newPlot.name}" as new plot!`, 'success');
+        }
+
+        function clearLocationSearch() {
+            if (searchedMarker) {
+                map.removeLayer(searchedMarker);
+                searchedMarker = null;
+            }
+            if (comparisonPolyline) {
+                map.removeLayer(comparisonPolyline);
+                comparisonPolyline = null;
+            }
+            if (comparisonDistanceLabel) {
+                map.removeLayer(comparisonDistanceLabel);
+                comparisonDistanceLabel = null;
+            }
+
+            activeSearchedLocation = null;
+            isComparisonCardMinimized = false;
+            const input = document.getElementById('map-search-input');
+            const clearBtn = document.getElementById('btn-clear-search');
+            const card = document.getElementById('search-comparison-card');
+
+            if (input) input.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            if (card) {
+                card.style.display = 'none';
+                card.style.background = '';
+                card.style.border = '';
+                card.style.boxShadow = '';
+                card.style.padding = '';
+            }
+            closeSearchSuggestions();
+        }
+
+        function buildSearchedMarkerPopup(loc) {
+            const name = loc.name || 'Searched Location';
+            const address = loc.address || `${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}`;
+            const lat = loc.lat;
+            const lng = loc.lng;
+
+            let comparisonSnippet = '';
+            if (locationsData.length > 0) {
+                const compPlot = locationsData.find(x => x.id === selectedComparePlotId) || findNearestPlot(lat, lng)?.plot;
+                if (compPlot) {
+                    const dist = getDistanceMeters(lat, lng, compPlot.lat, compPlot.lng);
+                    comparisonSnippet = `
+                        <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:7px;padding:7px 10px;margin:8px 0;">
+                            <div style="font-size:0.68rem;font-weight:700;color:#6d28d9;text-transform:uppercase;">Compared with Uploaded Plot</div>
+                            <div style="font-weight:700;font-size:0.84rem;color:#0f172a;margin-top:2px;">${escapeHtml(compPlot.name)}</div>
+                            <div style="font-size:0.75rem;color:#5b21b6;margin-top:2px;">Distance offset: <strong>${formatDistance(dist)}</strong></div>
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="popup-card" style="min-width:280px;">
+                    <div class="popup-header" style="background:linear-gradient(135deg,#6d28d9,#4f46e5);">
+                        <div class="pin-icon" style="background:rgba(255,255,255,0.2);">
+                            <span class="material-icons" style="font-size:16px;">search</span>
+                        </div>
+                        <div style="flex:1;overflow:hidden;">
+                            <div class="popup-title">${escapeHtml(name)}</div>
+                            <span class="status-badge" style="background:rgba(255,255,255,0.25);color:#fff;margin-top:2px;">SEARCHED LOCATION</span>
+                        </div>
+                    </div>
+                    <div class="popup-body">
+                        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;line-height:1.35;">${escapeHtml(address)}</div>
+                        <div class="popup-coord-row">
+                            <div class="coord-label">Searched Coordinates</div>
+                            <div class="coord-val">${lat.toFixed(6)}°, ${lng.toFixed(6)}°</div>
+                        </div>
+                        ${comparisonSnippet}
+                        <div class="popup-actions" style="margin-bottom:8px;">
+                            <button class="popup-btn popup-btn-outline" style="width:100%;" onclick="copyCoords(${lat}, ${lng})">
+                                <span class="material-icons" style="font-size:14px;">content_copy</span> Copy Coordinates
+                            </button>
+                        </div>
+                        ${locationsData.length > 0 ? `
+                        <div style="margin-bottom:8px;">
+                            <button class="btn-action btn-primary btn-full" style="background:#7c3aed;border-color:#7c3aed;padding:7px 10px;font-size:0.78rem;" onclick="alignComparedPlotToSearched()">
+                                <span class="material-icons" style="font-size:15px;">my_location</span> Align Plot to this Location
+                            </button>
+                        </div>
+                        ` : ''}
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                            <button class="icon-btn-sm" style="color:var(--accent-blue);font-size:0.75rem;display:inline-flex;align-items:center;gap:4px;" onclick="addSearchedLocationAsPlot()">
+                                <span class="material-icons" style="font-size:14px;">add_circle_outline</span> Save as Plot
+                            </button>
+                            <button class="icon-btn-sm" style="color:var(--danger);font-size:0.75rem;display:inline-flex;align-items:center;gap:4px;" onclick="clearLocationSearch()">
+                                <span class="material-icons" style="font-size:14px;">close</span> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         // ── Fullscreen Toggle ──
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
