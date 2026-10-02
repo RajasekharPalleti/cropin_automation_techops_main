@@ -187,5 +187,12 @@
     "older_high": 23,
     "recent_highest": 0,
     "recent_high": 3
+  },
+  {
+    "date": "2026-10-02",
+    "older_highest": 4,
+    "older_high": 25,
+    "recent_highest": 1,
+    "recent_high": 2
   }
 ]
