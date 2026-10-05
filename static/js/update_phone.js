@@ -678,21 +678,19 @@ function renderSearchResults(query) {
                 </div>
                 <div class="user-sugg-content">
                     <div class="user-sugg-top">
-                        <span class="user-sugg-name">
-                            ${highlightMatch(user.name || 'Unnamed User', q)}
-                            <span class="user-sugg-contact">(${user.contactNumber ? highlightPhone(user.contactNumber, q) : '<span style="color:#94a3b8;font-weight:400;">No contact number</span>'})</span>
-                        </span>
+                        <span class="user-sugg-name">${highlightMatch(user.name || 'Unnamed User', q)}</span>
+                        <span class="user-sugg-contact">(${user.contactNumber ? highlightPhone(user.contactNumber, q) : '<span style="color:#94a3b8;font-weight:400;">No number</span>'})</span>
+                    </div>
+                    <div class="user-sugg-meta">
+                        <span class="user-sugg-id">ID: <strong>${highlightMatch(String(user.id), q)}</strong></span>
                         ${role ? `<span class="badge-role">${escapeHtml(role)}</span>` : ''}
                         <span class="badge-status ${isActive ? 'active' : 'inactive'}">
                             <span class="status-dot"></span> ${escapeHtml(user.userStatus || (isActive ? 'ACTIVE' : 'INACTIVE'))}
                         </span>
-                    </div>
-                    <div class="user-sugg-meta">
-                        <span class="user-sugg-id">ID: <strong>${highlightMatch(String(user.id), q)}</strong></span>
-                        ${user.email ? `<span class="user-sugg-email"><span class="material-icons" style="font-size:0.8rem;">email</span> ${highlightMatch(user.email, q)}</span>` : ''}
+                        ${user.email ? `<span class="user-sugg-email"><span class="material-icons" style="font-size:0.75rem;">email</span> ${highlightMatch(user.email, q)}</span>` : ''}
                         ${locationStr ? `
                             <span class="user-sugg-loc">
-                                <span class="material-icons" style="font-size:0.8rem;">place</span>
+                                <span class="material-icons" style="font-size:0.75rem;">place</span>
                                 ${escapeHtml(locationStr)}
                             </span>` : ''}
                     </div>
