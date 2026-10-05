@@ -1153,6 +1153,42 @@ async def update_phone_page():
     return FileResponse("static/update_phone.html")
 
 
+@router.post("/api/cropin/users/list")
+async def cropin_users_list_proxy(body: dict = Body(...)):
+    """
+    Proxy endpoint to fetch users list from Cropin API.
+    Handles CORS and corporate network requirements.
+    """
+    base_url = body.get("baseUrl", "https://cloud.cropin.in").rstrip("/")
+    token = body.get("token", "")
+    company_id = body.get("companyId", 1251)
+    user_login_type = body.get("userLoginType", "DEFAULT")
+    page = body.get("page", 0)
+    size = body.get("size", 1000)
+    sort = body.get("sort", "name,asc")
+
+    url = f"{base_url}/services/user/api/users/list/{company_id}?userLoginType={user_login_type}&page={page}&size={size}&sort={sort}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        resp = ext_requests.post(url, headers=headers, json={}, timeout=40)
+        resp.raise_for_status()
+        return JSONResponse(content=resp.json(), status_code=resp.status_code)
+    except ext_requests.exceptions.HTTPError as e:
+        detail = str(e)
+        if e.response is not None:
+            try:
+                detail = e.response.text
+            except Exception:
+                pass
+        raise HTTPException(status_code=e.response.status_code if e.response is not None else 500, detail=detail)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/location-check")
 async def location_check_page():
     """Serve the standalone location check page."""
