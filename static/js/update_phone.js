@@ -141,7 +141,7 @@ function hideErr(elId) {
 
     // Close user search dropdown on outside click
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.user-search-wrapper')) {
+        if (!e.target.closest('#user-picker-search-view')) {
             hideUserDropdown();
         }
     });
@@ -396,10 +396,13 @@ async function fetchLiveUsers(force = false) {
     isUsersLoading = false;
     updateLiveUsersUIState('success');
 
-    // If dropdown currently open, re-render
+    // If search input currently has an active query, re-render
     const searchInput = document.getElementById('user-search-input');
     if (searchInput && document.activeElement === searchInput) {
-        renderSearchResults(searchInput.value.trim());
+        const query = searchInput.value.trim();
+        if (query) {
+            renderSearchResults(query);
+        }
     }
 }
 
@@ -414,7 +417,7 @@ function updateLiveUsersUIState(state, errorMsg) {
     if (state === 'loading') {
         if (pill) pill.className = 'live-status-pill';
         if (dot) dot.className = 'dot-pulse orange';
-        if (countText) countText.textContent = `Loading live users…`;
+        if (countText) countText.textContent = `Loading users…`;
         if (reloadIcon) reloadIcon.classList.add('spin');
         if (reloadBtn) reloadBtn.disabled = true;
         if (searchInput && !searchInput.value) {
@@ -423,11 +426,11 @@ function updateLiveUsersUIState(state, errorMsg) {
     } else if (state === 'success') {
         if (pill) pill.className = 'live-status-pill success';
         if (dot) dot.className = 'dot-pulse';
-        if (countText) countText.textContent = `${liveUsers.length.toLocaleString()} live users`;
+        if (countText) countText.textContent = `${liveUsers.length.toLocaleString()} users`;
         if (reloadIcon) reloadIcon.classList.remove('spin');
         if (reloadBtn) reloadBtn.disabled = false;
         if (searchInput && searchInput.placeholder === 'Loading users from cloud…') {
-            searchInput.placeholder = 'Type contact number (e.g. 8954646816) or name (e.g. Rana)...';
+            searchInput.placeholder = 'Search by name or contact number...';
         }
     } else if (state === 'error') {
         if (pill) pill.className = 'live-status-pill error';
@@ -515,29 +518,27 @@ function getAvatarColor(name) {
 function onUserSearchInput() {
     const input = document.getElementById('user-search-input');
     const clearBtn = document.getElementById('clear-search-btn');
-    const query = input.value;
+    const query = input ? (input.value || '').trim() : '';
 
-    if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+    if (clearBtn) clearBtn.style.display = (input && input.value) ? 'flex' : 'none';
 
-    if (!query.trim()) {
-        if (liveUsers.length > 0) {
-            renderSearchResults('');
-        } else {
-            hideUserDropdown();
-        }
+    // Without search, do NOT show users
+    if (!query) {
+        hideUserDropdown();
         return;
     }
 
-    renderSearchResults(query.trim());
+    renderSearchResults(query);
 }
 
 function onUserSearchFocus() {
     const input = document.getElementById('user-search-input');
-    const query = input.value.trim();
+    const query = input ? (input.value || '').trim() : '';
+    // Without search, do NOT show users
     if (query) {
         renderSearchResults(query);
-    } else if (liveUsers.length > 0) {
-        renderSearchResults('');
+    } else {
+        hideUserDropdown();
     }
 }
 
@@ -555,49 +556,17 @@ function clearUserSearch() {
         input.focus();
     }
     if (clearBtn) clearBtn.style.display = 'none';
-    if (liveUsers.length > 0) {
-        renderSearchResults('');
-    } else {
-        hideUserDropdown();
-    }
-}
-
-function setQuickFilter(filterKey) {
-    currentQuickFilter = filterKey;
-    const chips = document.querySelectorAll('#quick-filter-chips .filter-chip');
-    chips.forEach(chip => {
-        const key = chip.getAttribute('data-filter');
-        chip.classList.toggle('active', key === filterKey);
-    });
-
-    const searchInput = document.getElementById('user-search-input');
-    const query = searchInput ? searchInput.value.trim() : '';
-    renderSearchResults(query);
-    const dropdown = document.getElementById('user-search-dropdown');
-    if (dropdown) dropdown.style.display = 'block';
+    hideUserDropdown();
 }
 
 function filterLiveUsers(query) {
     if (!liveUsers || !liveUsers.length) return [];
+    if (!query || !query.trim()) return []; // Absolutely no users without search query!
 
-    let pool = liveUsers;
-    if (currentQuickFilter === 'active') {
-        pool = pool.filter(u => u.userStatus === 'ACTIVE' || u.enabled === true);
-    } else if (currentQuickFilter === 'phone') {
-        pool = pool.filter(u => u.contactNumber && String(u.contactNumber).replace(/\D/g, '').length > 0);
-    } else if (currentQuickFilter && currentQuickFilter !== 'all') {
-        const qf = currentQuickFilter.toLowerCase();
-        pool = pool.filter(u => (u.userRoleName || '').toLowerCase().includes(qf));
-    }
-
-    if (!query) {
-        return pool.slice(0, 30);
-    }
-
-    const rawQuery = query.toLowerCase();
+    const rawQuery = query.trim().toLowerCase();
     const digitsQuery = query.replace(/\D/g, '');
 
-    const filtered = pool.filter(u => {
+    const filtered = liveUsers.filter(u => {
         const name = (u.name || '').toLowerCase();
         const phone = (u.contactNumber || '').toString();
         const phoneDigits = phone.replace(/\D/g, '');
@@ -612,7 +581,7 @@ function filterLiveUsers(query) {
         return false;
     });
 
-    // Rank results by relevance
+    // Rank results by relevance: exact match on phone or name first
     filtered.sort((a, b) => {
         const aName = (a.name || '').toLowerCase();
         const bName = (b.name || '').toLowerCase();
@@ -641,10 +610,16 @@ function renderSearchResults(query) {
     const dropdown = document.getElementById('user-search-dropdown');
     if (!dropdown) return;
 
+    const q = (query || '').trim();
+    if (!q) {
+        hideUserDropdown();
+        return;
+    }
+
     if (isUsersLoading) {
         dropdown.innerHTML = `
             <div class="dropdown-empty-state">
-                <span class="material-icons spin" style="font-size:1.4rem;color:var(--blue);margin-bottom:6px;">refresh</span>
+                <span class="material-icons spin" style="font-size:1.3rem;color:var(--blue);margin-bottom:6px;">refresh</span>
                 <div>Loading live users from cloud…</div>
             </div>`;
         dropdown.style.display = 'block';
@@ -654,9 +629,9 @@ function renderSearchResults(query) {
     if (!liveUsers.length) {
         dropdown.innerHTML = `
             <div class="dropdown-empty-state">
-                <span class="material-icons" style="font-size:1.4rem;color:#f59e0b;margin-bottom:6px;">warning</span>
+                <span class="material-icons" style="font-size:1.3rem;color:#f59e0b;margin-bottom:6px;">warning</span>
                 <div>No users loaded for Company ID ${companyId}.</div>
-                <button type="button" class="btn btn-blue" style="margin-top:10px;padding:6px 12px;font-size:0.78rem;" onclick="fetchLiveUsers(true)">
+                <button type="button" class="btn btn-blue" style="margin-top:8px;padding:5px 12px;font-size:0.75rem;" onclick="fetchLiveUsers(true)">
                     Reload Users
                 </button>
             </div>`;
@@ -664,31 +639,31 @@ function renderSearchResults(query) {
         return;
     }
 
-    const matches = filterLiveUsers(query);
+    const matches = filterLiveUsers(q);
     activeDropdownIndex = -1;
 
     if (!matches.length) {
         dropdown.innerHTML = `
             <div class="dropdown-empty-state">
-                <span class="material-icons" style="font-size:1.4rem;color:#94a3b8;margin-bottom:6px;">search_off</span>
-                <div>No matching users found for "<strong>${escapeHtml(query)}</strong>"</div>
-                <div style="font-size:0.76rem;margin-top:4px;">Try searching by numeric phone number, full name, or User ID.</div>
+                <span class="material-icons" style="font-size:1.3rem;color:#94a3b8;margin-bottom:6px;">search_off</span>
+                <div>No matching users found for "<strong>${escapeHtml(q)}</strong>"</div>
+                <div style="font-size:0.75rem;margin-top:4px;color:#94a3b8;">Try typing a phone number (e.g. 8954) or name.</div>
             </div>`;
         dropdown.style.display = 'block';
         return;
     }
 
-    const displayCount = Math.min(matches.length, 60);
+    const displayCount = Math.min(matches.length, 50);
     const items = matches.slice(0, displayCount);
 
-    const matchLabel = query
-        ? (matches.length > displayCount ? `Matches (${matches.length}) · Showing ${displayCount}` : `Matches (${matches.length})`)
-        : (currentQuickFilter !== 'all' ? `Filtered (${matches.length})` : `All Users (${liveUsers.length})`);
+    const matchLabel = matches.length > displayCount
+        ? `Found ${matches.length} users · Showing top ${displayCount}`
+        : `Found ${matches.length} matching ${matches.length === 1 ? 'user' : 'users'}`;
 
     let html = `
         <div class="dropdown-header-bar">
             <span>${matchLabel}</span>
-            <span style="font-size:0.7rem;font-weight:500;color:#94a3b8;">Click to select &amp; fetch details</span>
+            <span style="font-size:0.7rem;font-weight:500;color:#94a3b8;">Click to select</span>
         </div>`;
 
     items.forEach((user, index) => {
@@ -704,8 +679,8 @@ function renderSearchResults(query) {
                 <div class="user-sugg-content">
                     <div class="user-sugg-top">
                         <span class="user-sugg-name">
-                            ${highlightMatch(user.name || 'Unnamed User', query)}
-                            <span class="user-sugg-contact">(${user.contactNumber ? highlightPhone(user.contactNumber, query) : '<span style="color:#94a3b8;font-weight:400;">No contact number</span>'})</span>
+                            ${highlightMatch(user.name || 'Unnamed User', q)}
+                            <span class="user-sugg-contact">(${user.contactNumber ? highlightPhone(user.contactNumber, q) : '<span style="color:#94a3b8;font-weight:400;">No contact number</span>'})</span>
                         </span>
                         ${role ? `<span class="badge-role">${escapeHtml(role)}</span>` : ''}
                         <span class="badge-status ${isActive ? 'active' : 'inactive'}">
@@ -713,8 +688,8 @@ function renderSearchResults(query) {
                         </span>
                     </div>
                     <div class="user-sugg-meta">
-                        <span class="user-sugg-id">ID: <strong>${highlightMatch(String(user.id), query)}</strong></span>
-                        ${user.email ? `<span class="user-sugg-email"><span class="material-icons" style="font-size:0.8rem;">email</span> ${highlightMatch(user.email, query)}</span>` : ''}
+                        <span class="user-sugg-id">ID: <strong>${highlightMatch(String(user.id), q)}</strong></span>
+                        ${user.email ? `<span class="user-sugg-email"><span class="material-icons" style="font-size:0.8rem;">email</span> ${highlightMatch(user.email, q)}</span>` : ''}
                         ${locationStr ? `
                             <span class="user-sugg-loc">
                                 <span class="material-icons" style="font-size:0.8rem;">place</span>
@@ -724,7 +699,7 @@ function renderSearchResults(query) {
                 </div>
                 <div class="btn-select-indicator">
                     <span>Select</span>
-                    <span class="material-icons" style="font-size:0.9rem;">arrow_forward</span>
+                    <span class="material-icons" style="font-size:0.85rem;">arrow_forward</span>
                 </div>
             </div>`;
     });
@@ -735,9 +710,17 @@ function renderSearchResults(query) {
 
 function onUserSearchKeydown(e) {
     const dropdown = document.getElementById('user-search-dropdown');
+    const input = document.getElementById('user-search-input');
+    const query = input ? (input.value || '').trim() : '';
+
+    if (!query) {
+        if (dropdown) dropdown.style.display = 'none';
+        return;
+    }
+
     if (!dropdown || dropdown.style.display === 'none') {
         if (e.key === 'ArrowDown' || e.key === 'Enter') {
-            onUserSearchFocus();
+            renderSearchResults(query);
         }
         return;
     }
@@ -784,11 +767,11 @@ async function selectUserFromSearch(userId) {
 
     selectedUser = user;
 
-    // 1. Single-Select switch: Hide search directory, show active user card
+    // 1. Single-Select switch: Hide search view, show cute selected card
     const searchView = document.getElementById('user-picker-search-view');
     const card = document.getElementById('active-selected-card');
     if (searchView) searchView.style.display = 'none';
-    if (card) card.style.display = 'block';
+    if (card) card.style.display = 'flex';
 
     // 2. Set #user-id input
     const userIdInput = document.getElementById('user-id');
@@ -802,7 +785,7 @@ async function selectUserFromSearch(userId) {
     }
     if (clearBtn) clearBtn.style.display = 'flex';
 
-    // 4. Render active selected card immediately in initial loading state
+    // 4. Render active cute selected card immediately in initial loading state
     renderActiveSelectedCard(user, false);
 
     // 5. Automatically trigger Fetch User to get full object from Cropin API and populate Step 2
@@ -829,82 +812,93 @@ function deselectUser() {
     hideUserDropdown();
 }
 
-// ── RENDER ACTIVE SINGLE-SELECTED USER CARD ──
+// ── RENDER ACTIVE SINGLE-SELECTED USER CARD (Simple & Cute) ──
 function renderActiveSelectedCard(user, isFullyLoaded = false) {
     const card = document.getElementById('active-selected-card');
     if (!card || !user) return;
 
     const avatarEl = document.getElementById('sel-avatar');
     const nameEl = document.getElementById('sel-name');
+    const nameContactEl = document.getElementById('sel-name-contact');
     const roleEl = document.getElementById('sel-role');
+    const roleBlock = document.getElementById('sel-role-block');
     const statusWrapEl = document.getElementById('sel-status');
     const statusTextEl = document.getElementById('sel-status-text');
-    const phoneEl = document.getElementById('sel-phone');
     const idEl = document.getElementById('sel-id');
     const emailEl = document.getElementById('sel-email');
-    const locEl = document.getElementById('sel-loc');
     const emailBlock = document.getElementById('sel-email-block');
+    const locEl = document.getElementById('sel-loc');
     const locBlock = document.getElementById('sel-loc-block');
-    const readyBadge = document.getElementById('sel-ready-badge');
+    const syncBadge = document.getElementById('sel-sync-badge');
 
     if (avatarEl) {
         avatarEl.textContent = getInitials(user.name);
         avatarEl.style.background = getAvatarColor(user.name);
     }
-    if (nameEl) nameEl.textContent = user.name || `User #${user.id}`;
+    if (nameEl) {
+        nameEl.textContent = user.name || `User #${user.id}`;
+    }
 
-    const nameContactEl = document.getElementById('sel-name-contact');
     if (nameContactEl) {
         const phone = user.contactNumber ? String(user.contactNumber).trim() : '';
         nameContactEl.textContent = phone ? `(${phone})` : '(No contact number)';
         nameContactEl.style.display = 'inline-block';
     }
 
+    if (idEl) {
+        idEl.textContent = user.id;
+    }
+
     const role = user.userRoleName || (user.userRoleId ? `Role #${user.userRoleId}` : '');
-    if (roleEl) {
-        roleEl.textContent = role;
-        roleEl.style.display = role ? 'inline-block' : 'none';
+    if (roleEl && roleBlock) {
+        if (role) {
+            roleEl.textContent = role;
+            roleBlock.style.display = 'inline-flex';
+        } else {
+            roleBlock.style.display = 'none';
+        }
     }
 
     const isActive = (user.userStatus === 'ACTIVE' || user.enabled === true);
     if (statusWrapEl) {
-        statusWrapEl.className = `badge-status ${isActive ? 'active' : 'inactive'}`;
+        statusWrapEl.className = `cute-pill cute-pill-status ${isActive ? 'active' : 'inactive'}`;
     }
     if (statusTextEl) {
         statusTextEl.textContent = user.userStatus || (isActive ? 'ACTIVE' : 'INACTIVE');
     }
 
-    if (idEl) idEl.textContent = user.id;
-
-    const formattedPhone = (user.countryCode ? `${user.countryCode} ` : '') + (user.contactNumber || 'None');
-    if (phoneEl) phoneEl.textContent = formattedPhone;
-
-    if (user.email) {
-        if (emailEl) emailEl.textContent = user.email;
-        if (emailBlock) emailBlock.style.display = 'flex';
-    } else {
-        if (emailBlock) emailBlock.style.display = 'none';
-    }
-
-    const locStr = user.locations?.name || user.locations?.administrativeAreaLevel1 || user.location || '';
-    if (locStr) {
-        if (locEl) locEl.textContent = locStr;
-        if (locBlock) locBlock.style.display = 'flex';
-    } else {
-        if (locBlock) locBlock.style.display = 'none';
-    }
-
-    if (readyBadge) {
-        if (isFullyLoaded) {
-            readyBadge.className = 'active-synced-banner';
-            readyBadge.innerHTML = '<span class="material-icons" style="font-size:1.05rem;color:var(--green-dark);">task_alt</span> <span>Details fetched from Live API &amp; synchronized into Step 2</span>';
+    if (emailEl && emailBlock) {
+        if (user.email) {
+            emailEl.textContent = user.email;
+            emailBlock.style.display = 'inline-flex';
         } else {
-            readyBadge.className = 'active-synced-banner';
-            readyBadge.innerHTML = '<span class="material-icons spin" style="font-size:1.05rem;color:var(--blue);">refresh</span> <span>Fetching full details from Cropin API…</span>';
+            emailBlock.style.display = 'none';
         }
     }
 
-    card.style.display = 'block';
+    const locStr = user.locations?.name || user.locations?.administrativeAreaLevel1 || user.location || '';
+    if (locEl && locBlock) {
+        if (locStr) {
+            locEl.textContent = locStr;
+            locBlock.style.display = 'inline-flex';
+        } else {
+            locBlock.style.display = 'none';
+        }
+    }
+
+    if (syncBadge) {
+        if (isFullyLoaded) {
+            syncBadge.innerHTML = '<span class="material-icons" style="font-size:0.8rem;color:#15803d;">check_circle</span> <span>Ready for Step 2</span>';
+            syncBadge.style.background = '#dcfce7';
+            syncBadge.style.color = '#15803d';
+        } else {
+            syncBadge.innerHTML = '<span class="material-icons spin" style="font-size:0.75rem;color:#0284c7;">refresh</span> <span>Syncing…</span>';
+            syncBadge.style.background = '#e0f2fe';
+            syncBadge.style.color = '#0369a1';
+        }
+    }
+
+    card.style.display = 'flex';
 }
 
 function updateSelectedUserCard(user, isFullyLoaded = false) {
@@ -1003,13 +997,17 @@ async function doFetchUser(targetUserId) {
             step2Card.classList.add('step-highlight');
         }
 
-        // Display formatted JSON
+        // Display formatted JSON (only show when manually fetched via User ID input)
         responseEl.textContent = JSON.stringify(data, null, 2);
-        if (resultWrap) resultWrap.classList.add('show');
-
-        setStatus('fetch-user-status',
-            `<span class="material-icons" style="font-size:1rem;color:#2e7d32;">check_circle</span> User fetched successfully — ${data.name || data.id}`,
-            '#2e7d32');
+        if (!targetUserId && resultWrap) {
+            resultWrap.classList.add('show');
+            setStatus('fetch-user-status',
+                `<span class="material-icons" style="font-size:1rem;color:#2e7d32;">check_circle</span> User fetched successfully — ${data.name || data.id}`,
+                '#2e7d32');
+        } else {
+            if (resultWrap) resultWrap.classList.remove('show');
+            setStatus('fetch-user-status', '');
+        }
 
         // Auto-resolve ISO from the pre-filled ISD code
         await resolveIsoCode();

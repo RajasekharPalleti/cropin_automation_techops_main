@@ -1033,86 +1033,154 @@
             font-size: 0.84rem;
         }
 
-        /* ── Single-Selected User Card (Elite Design) ── */
-        .active-selected-card {
-            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #f0f9ff 100%);
-            border: 2px solid #10b981;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05);
-            position: relative;
-            animation: cardPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes cardPopIn {
-            from { opacity: 0; transform: scale(0.97) translateY(4px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .active-selected-header {
+        /* ── Simple & Cute Selected User Card ── */
+        .cute-selected-card {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            margin-bottom: 12px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 50%, #f0f9ff 100%);
+            border: 1.5px solid #86efac;
+            border-radius: 12px;
+            padding: 10px 14px;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.08);
+            animation: cutePopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .active-selected-user-meta {
+        @keyframes cutePopIn {
+            from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .cute-card-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 11px;
             min-width: 0;
+            flex: 1;
         }
 
-        .active-avatar {
-            width: 44px;
-            height: 44px;
+        .cute-avatar {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
+            font-size: 0.92rem;
             font-weight: 700;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
             flex-shrink: 0;
-            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
         }
 
-        .active-titles {
+        .cute-user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
             min-width: 0;
         }
 
-        .active-name-row {
+        .cute-name-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 7px;
             flex-wrap: wrap;
         }
 
-        .active-name {
-            font-size: 1.02rem;
+        .cute-user-name {
+            font-size: 0.96rem;
             font-weight: 700;
             color: #0f172a;
             letter-spacing: -0.01em;
         }
 
-        .active-contact-tag {
-            font-size: 0.92rem;
-            font-weight: 700;
+        .cute-phone-pill {
             font-family: monospace;
-            color: #0369a1;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #0284c7;
             background: #e0f2fe;
-            padding: 2px 8px;
-            border-radius: 6px;
-            border: 1px solid #bae6fd;
+            padding: 1px 7px;
+            border-radius: 5px;
             letter-spacing: 0.02em;
         }
 
-        .btn-change-user {
+        .cute-meta-pills {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .cute-pill {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 3px;
+            font-size: 0.73rem;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        .cute-pill-id {
+            background: #eff6ff;
+            color: #1e40af;
+        }
+
+        .cute-pill-email {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .cute-pill-role {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .cute-pill-loc {
+            background: #fffbeb;
+            color: #b45309;
+        }
+
+        .cute-pill-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 10px;
+        }
+
+        .cute-pill-status.active {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .cute-pill-status.inactive {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
+        .cute-sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #15803d;
+            background: #dcfce7;
+            padding: 1px 7px;
+            border-radius: 5px;
+            letter-spacing: 0.01em;
+        }
+
+        .btn-cute-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
             background: #ffffff;
             border: 1.5px solid #cbd5e1;
             color: #334155;
@@ -1124,103 +1192,15 @@
             font-family: inherit;
             transition: all 0.15s;
             white-space: nowrap;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         }
 
-        .btn-change-user:hover {
+        .btn-cute-change:hover {
             background: #f8fafc;
             border-color: #0284c7;
             color: #0284c7;
-            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
-        }
-
-        /* Active Details Hub */
-        .active-details-hub {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-            background: #ffffff;
-            border: 1px solid #d1fae5;
-            border-radius: 9px;
-            padding: 12px 14px;
-        }
-
-        .hub-block {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .hub-label {
-            font-size: 0.68rem;
-            font-weight: 700;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .hub-val-wrap {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .hub-val-phone {
-            font-family: monospace;
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: #065f46;
-        }
-
-        .hub-val-id {
-            font-family: monospace;
-            font-size: 0.88rem;
-            font-weight: 700;
-            color: #1e40af;
-            background: #eff6ff;
-            padding: 1px 6px;
-            border-radius: 4px;
-        }
-
-        .hub-val-text {
-            font-size: 0.8rem;
-            color: #334155;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .btn-copy-chip {
-            border: none;
-            background: #f1f5f9;
-            color: #64748b;
-            border-radius: 4px;
-            padding: 2px 5px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.15s;
-        }
-
-        .btn-copy-chip:hover {
-            background: #e2e8f0;
-            color: #0f172a;
-        }
-
-        .active-synced-banner {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.76rem;
-            font-weight: 600;
-            color: #15803d;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid #d1fae5;
+            box-shadow: 0 2px 6px rgba(2, 132, 199, 0.15);
         }
 
         /* ── Step 2 Pulse on Select ── */
@@ -1346,7 +1326,7 @@
                             <div class="step-title blue">Select Target User</div>
                             <div style="font-size:0.72rem;color:#0369a1;margin-top:1px;">Search live users by contact number or name</div>
                         </div>
-                        <span class="step-badge get" id="step1-badge">LIVE 1,000</span>
+                        <span class="step-badge get">GET</span>
                     </div>
                     <div class="step-card-body">
 
@@ -1366,94 +1346,63 @@
                             </div>
                         </div>
 
-                        <!-- ══ VIEW 1: SEARCH & DIRECTORY (When no user selected) ══ -->
+                        <!-- ══ VIEW 1: SEARCH BAR (Simple & Clean) ══ -->
                         <div id="user-picker-search-view" class="user-picker-search-view">
                             <div class="field" style="margin-bottom:0;">
-                                <label for="user-search-input">
-                                    Search Live User <span class="req">*</span>
-                                    <span class="hint" style="font-weight:400;margin-left:4px;">(search by contact number or name)</span>
-                                </label>
+                                <label for="user-search-input">Search User <span class="req">*</span></label>
                                 <div class="search-input-box">
                                     <span class="material-icons search-input-icon">search</span>
-                                    <input type="text" id="user-search-input" placeholder="Search by contact number (e.g. 8954646816) or name (e.g. Rana)..." autocomplete="off" oninput="onUserSearchInput()" onkeydown="onUserSearchKeydown(event)" onfocus="onUserSearchFocus()">
+                                    <input type="text" id="user-search-input" placeholder="Search by name or contact number..." autocomplete="off" oninput="onUserSearchInput()" onkeydown="onUserSearchKeydown(event)" onfocus="onUserSearchFocus()">
                                     <button type="button" id="clear-search-btn" class="search-clear-btn" onclick="clearUserSearch()" style="display:none;" title="Clear search">
                                         <span class="material-icons" style="font-size:1.1rem;">close</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Quick Filter Chips -->
-                            <div class="quick-filter-chips" id="quick-filter-chips">
-                                <span class="filter-chip active" data-filter="all" onclick="setQuickFilter('all')">All Users</span>
-                                <span class="filter-chip" data-filter="active" onclick="setQuickFilter('active')">Active Only</span>
-                                <span class="filter-chip" data-filter="phone" onclick="setQuickFilter('phone')">With Phone</span>
-                                <span class="filter-chip" data-filter="Territory Incharge" onclick="setQuickFilter('Territory Incharge')">Territory Incharge</span>
-                                <span class="filter-chip" data-filter="Auditor" onclick="setQuickFilter('Auditor')">Auditor</span>
-                                <span class="filter-chip" data-filter="Admin" onclick="setQuickFilter('Admin')">Admin</span>
-                            </div>
-
-                            <!-- Live Dropdown Suggestions -->
+                            <!-- Live Dropdown Suggestions (Only shown when searching) -->
                             <div id="user-search-dropdown" class="user-search-dropdown" style="display:none;"></div>
                         </div>
 
-                        <!-- ══ VIEW 2: ACTIVE SINGLE-SELECTED USER CARD ══ -->
-                        <div id="active-selected-card" class="active-selected-card" style="display:none;">
-                            <div class="active-selected-header">
-                                <div class="active-selected-user-meta">
-                                    <div class="active-avatar" id="sel-avatar">--</div>
-                                    <div class="active-titles">
-                                        <div class="active-name-row">
-                                            <span class="active-name" id="sel-name">--</span>
-                                            <span class="active-contact-tag" id="sel-name-contact">(--)</span>
-                                            <span class="badge-role" id="sel-role">--</span>
-                                            <span class="badge-status active" id="sel-status">
-                                                <span class="status-dot"></span> <span id="sel-status-text">ACTIVE</span>
-                                            </span>
-                                        </div>
-                                        <div style="font-size:0.75rem; color:#64748b; margin-top:2px;">
-                                            Selected for Phone &amp; Details Update
-                                        </div>
+                        <!-- ══ VIEW 2: ACTIVE SINGLE-SELECTED USER CARD (Simple & Cute) ══ -->
+                        <div id="active-selected-card" class="cute-selected-card" style="display:none;">
+                            <div class="cute-card-left">
+                                <div class="cute-avatar" id="sel-avatar">--</div>
+                                <div class="cute-user-info">
+                                    <div class="cute-name-row">
+                                        <span class="cute-user-name" id="sel-name">--</span>
+                                        <span class="cute-phone-pill" id="sel-name-contact">(--)</span>
+                                    </div>
+                                    <div class="cute-meta-pills">
+                                        <span class="cute-pill cute-pill-id">
+                                            <span class="material-icons" style="font-size:0.75rem;">badge</span>
+                                            ID: <strong id="sel-id">--</strong>
+                                        </span>
+                                        <span class="cute-pill cute-pill-email" id="sel-email-block" style="display:none;">
+                                            <span class="material-icons" style="font-size:0.75rem;">email</span>
+                                            <span id="sel-email">--</span>
+                                        </span>
+                                        <span class="cute-pill cute-pill-role" id="sel-role-block" style="display:none;">
+                                            <span class="material-icons" style="font-size:0.75rem;">work_outline</span>
+                                            <span id="sel-role">--</span>
+                                        </span>
+                                        <span class="cute-pill cute-pill-loc" id="sel-loc-block" style="display:none;">
+                                            <span class="material-icons" style="font-size:0.75rem;">place</span>
+                                            <span id="sel-loc">--</span>
+                                        </span>
+                                        <span class="cute-pill cute-pill-status" id="sel-status">
+                                            <span class="status-dot"></span> <span id="sel-status-text">ACTIVE</span>
+                                        </span>
+                                        <span class="cute-sync-badge" id="sel-sync-badge">
+                                            <span class="material-icons" style="font-size:0.8rem;">check_circle</span>
+                                            <span>Ready for Step 2</span>
+                                        </span>
                                     </div>
                                 </div>
-                                <button type="button" class="btn-change-user" onclick="deselectUser()" title="Choose a different user">
-                                    <span class="material-icons" style="font-size:0.95rem;">swap_horiz</span>
-                                    Change User
-                                </button>
                             </div>
-
-                            <div class="active-details-hub">
-                                <div class="hub-block">
-                                    <span class="hub-label"><span class="material-icons" style="font-size:0.85rem;color:var(--green-dark);">phone</span> Contact Number</span>
-                                    <div class="hub-val-wrap">
-                                        <span class="hub-val-phone" id="sel-phone">--</span>
-                                        <button type="button" class="btn-copy-chip" onclick="copyContactNumber()" title="Copy phone number">
-                                            <span class="material-icons" style="font-size:0.85rem;">content_copy</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="hub-block">
-                                    <span class="hub-label"><span class="material-icons" style="font-size:0.85rem;color:#2563eb;">badge</span> User ID</span>
-                                    <div class="hub-val-wrap">
-                                        <span class="hub-val-id" id="sel-id">--</span>
-                                        <button type="button" class="btn-copy-chip" onclick="copyUserId()" title="Copy user ID">
-                                            <span class="material-icons" style="font-size:0.85rem;">content_copy</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="hub-block" id="sel-email-block">
-                                    <span class="hub-label"><span class="material-icons" style="font-size:0.85rem;color:#64748b;">email</span> Email</span>
-                                    <span class="hub-val-text" id="sel-email">--</span>
-                                </div>
-                                <div class="hub-block" id="sel-loc-block">
-                                    <span class="hub-label"><span class="material-icons" style="font-size:0.85rem;color:#64748b;">place</span> Location</span>
-                                    <span class="hub-val-text" id="sel-loc">--</span>
-                                </div>
-                            </div>
-
-                            <div class="active-synced-banner" id="sel-ready-badge">
-                                <span class="material-icons" style="font-size:1.05rem;color:var(--green-dark);">task_alt</span>
-                                <span>Details fetched from Live API &amp; synchronized into Step 2</span>
-                            </div>
+                            <button type="button" class="btn-cute-change" onclick="deselectUser()" title="Choose a different user">
+                                <span class="material-icons" style="font-size:0.95rem;">swap_horiz</span>
+                                <span>Change User</span>
+                            </button>
                         </div>
 
                         <!-- Manual ID lookup toggle (preserved for power users) -->
